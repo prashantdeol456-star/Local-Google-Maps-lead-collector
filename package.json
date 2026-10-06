@@ -1,0 +1,25 @@
+{
+  "name": "google-maps-lead-platform",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "backend",
+    "extension",
+    "admin"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:extension": "npm run dev -w extension",
+    "build:extension": "npm run build -w extension",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "dev:admin": "npm run dev -w admin",
+    "build:admin": "npm run build -w admin"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.0": true,
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true
+  }
+}

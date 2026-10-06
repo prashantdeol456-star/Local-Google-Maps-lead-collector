@@ -1,0 +1,463 @@
+// The one schema for both databases. This file is SQLite (local); prisma/postgres/schema.prisma
+// is generated from it for PostgreSQL (npm run db:pg:schema) and has its own migrations.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum JobStatus {
+  pending
+  running
+  paused
+  completed
+  failed
+  stopped
+}
+
+enum ItemResult {
+  new
+  duplicate
+  error
+}
+
+enum Channel {
+  email
+  whatsapp
+}
+
+enum CampaignStatus {
+  draft
+  running
+  paused
+  completed
+  stopped
+}
+
+enum AttemptStatus {
+  queued
+  sending
+  sent
+  delivered
+  failed
+  skipped
+  cancelled
+}
+
+enum LogLevel {
+  info
+  success
+  warning
+  error
+}
+
+model AdminUser {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime        @default(now())
+  lastLoginAt  DateTime?
+  sessions     Session[]
+  apiTokens    ApiToken[]
+  jobs         CollectionJob[]
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Bearer tokens for the Chrome extension (and future API clients). Only the hash is stored.
+model ApiToken {
+  id         String    @id @default(cuid())
+  name       String
+  prefix     String
+  tokenHash  String    @unique
+  userId     String
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  /** full | read (read: GET requests only; for integrations such as n8n) */
+  scope      String    @default("full")
+  createdAt  DateTime  @default(now())
+  user       AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Lead {
+  id                String    @id @default(cuid())
+  placeId           String?   @unique
+  name              String
+  category          String?
+  phone             String?
+  email             String?
+  website           String?
+  address           String?
+  city              String?
+  state             String?
+  country           String?
+  postalCode        String?
+  latitude          Float?
+  longitude         Float?
+  rating            Float?
+  reviewCount       Int?
+  mapsUrl           String?
+  searchKeyword     String?
+  source            String    @default("google_maps")
+
+  normalizedName    String
+  normalizedPhone   String?
+  normalizedWebsite String?
+  normalizedAddress String?
+  dedupeKey         String    @unique
+
+  firstSeenAt       DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  jobItems          JobItem[]
+  attempts          ContactAttempt[]
+  emailEvents       EmailEvent[]
+  whatsappEvents    WhatsAppEvent[]
+  preference        LeadCommunicationPreference?
+
+  @@index([normalizedPhone])
+  @@index([normalizedWebsite])
+  @@index([normalizedName])
+  @@index([city])
+  @@index([category])
+  @@index([searchKeyword])
+  @@index([createdAt])
+}
+
+model CollectionJob {
+  id               String     @id @default(cuid())
+  searchKeyword    String
+  location         String?
+  maxRecords       Int?
+  status           JobStatus  @default(pending)
+  statusReason     String?
+  totalFound       Int        @default(0)
+  newRecords       Int        @default(0)
+  duplicateRecords Int        @default(0)
+  errorRecords     Int        @default(0)
+  // Multi-keyword search queue: jobs sharing a queueId run in `position` order (Phase 6).
+  queueId          String?
+  position         Int?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  createdById      String?
+  createdBy        AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items            JobItem[]
+  logs             AgentLog[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([queueId, position])
+}
+
+model JobItem {
+  id        String        @id @default(cuid())
+  jobId     String
+  clientKey String
+  result    ItemResult
+  matchedBy String?
+  leadId    String?
+  error     String?
+  createdAt DateTime      @default(now())
+  job       CollectionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lead      Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([jobId, clientKey])
+  @@index([leadId])
+}
+
+model AgentLog {
+  id        String         @id @default(cuid())
+  jobId     String?
+  action    String
+  status    LogLevel
+  message   String?
+  createdAt DateTime       @default(now())
+  job       CollectionJob? @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+}
+
+// ---- Outreach (Phase 10+) ----
+
+/** Per-lead consent. No row = defaults (email allowed, WhatsApp needs recorded opt-in). */
+model LeadCommunicationPreference {
+  leadId              String    @id
+  emailAllowed        Boolean   @default(true)
+  whatsappAllowed     Boolean   @default(false)
+  whatsappOptInAt     DateTime?
+  whatsappOptInSource String?
+  optedOut            Boolean   @default(false)
+  optOutReason        String?
+  optedOutAt          DateTime?
+  updatedAt           DateTime  @updatedAt
+  lead                Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model MessageTemplate {
+  id                 String     @id @default(cuid())
+  channel            Channel
+  name               String
+  /** Email only */
+  subject            String?
+  /** Plain text with {{variables}}; HTML is generated safely from it. */
+  body               String
+  /** WhatsApp: the template as approved by Meta (name = template name, body uses lead variables). */
+  provider           String?
+  language           String?
+  /** marketing | utility | authentication */
+  category           String?
+  externalTemplateId String?
+  /** pending | approved | rejected | paused | disabled (set by the admin from WhatsApp Manager) */
+  approvalStatus     String?
+  /** positional ({{1}}, {{2}}) or named ({{name}}) parameters */
+  paramFormat        String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  campaigns          Campaign[]
+
+  @@index([channel])
+}
+
+model Campaign {
+  id             String           @id @default(cuid())
+  channel        Channel
+  name           String
+  templateId     String
+  provider       String
+  status         CampaignStatus   @default(draft)
+  statusReason   String?
+  /** Fixed gap between two sends (seconds). */
+  intervalSec    Int              @default(180)
+  dailyLimit     Int              @default(50)
+  /** Sending window, local time "HH:MM" in timeZone. */
+  windowStart    String           @default("10:00")
+  windowEnd      String           @default("18:00")
+  timeZone       String           @default("Asia/Kolkata")
+  startAt        DateTime?
+  lastSentAt     DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  template       MessageTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  attempts       ContactAttempt[]
+
+  @@index([status])
+}
+
+/** One message to one lead: the send queue and the communication history. */
+model ContactAttempt {
+  id                String        @id @default(cuid())
+  leadId            String
+  campaignId        String?
+  channel           Channel
+  provider          String
+  status            AttemptStatus @default(queued)
+  templateId        String?
+  toAddress         String
+  renderedSubject   String?
+  renderedBody      String?
+  externalMessageId String?
+  /** Retries after temporary provider errors. */
+  tries             Int           @default(0)
+  nextTryAt         DateTime?
+  error             String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  /** First time each tracking event was seen (details in EmailEvent). */
+  openedAt          DateTime?
+  clickedAt         DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  repliedAt         DateTime?
+  /** WhatsApp: shown in an open chat (blue ticks; the recipient can turn read receipts off). */
+  readAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  lead              Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign          Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  emailEvents       EmailEvent[]
+  whatsappEvents    WhatsAppEvent[]
+  trackedLinks      TrackedLink[]
+
+  @@unique([campaignId, leadId])
+  @@unique([campaignId, toAddress])
+  @@index([campaignId, status, createdAt])
+  @@index([leadId, createdAt])
+  @@index([externalMessageId])
+  @@index([status, sentAt])
+}
+
+enum EmailEventType {
+  sent
+  delivered
+  delivery_delayed
+  opened
+  clicked
+  bounced
+  complained
+  failed
+  replied
+  unsubscribed
+}
+
+/** Tracking events: provider webhooks, our click redirects, logged replies, unsubscribes. */
+model EmailEvent {
+  id              String          @id @default(cuid())
+  type            EmailEventType
+  attemptId       String?
+  leadId          String?
+  /** Id from the provider; a webhook delivered twice is stored once. */
+  providerEventId String?         @unique
+  /** resend, click_tracking, admin, unsubscribe_link */
+  source          String
+  /** JSON: clicked link, bounce reason, reply text, user agent */
+  metadata        String?
+  occurredAt      DateTime
+  createdAt       DateTime        @default(now())
+  attempt         ContactAttempt? @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  lead            Lead?           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, occurredAt])
+  @@index([leadId, occurredAt])
+  @@index([type, occurredAt])
+}
+
+/** A link inside a sent email, redirected through /t/c/:id so clicks can be counted. */
+model TrackedLink {
+  id        String         @id
+  attemptId String
+  url       String
+  createdAt DateTime       @default(now())
+  attempt   ContactAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+}
+
+enum WhatsAppEventType {
+  sent
+  delivered
+  read
+  failed
+  /** A message the business received (a reply, or a message from an unknown number). */
+  received
+  /** Opt-in withdrawn: STOP reply, "stop marketing" in WhatsApp, or error 131050 */
+  opted_out
+  /** The user resumed marketing messages in WhatsApp (does NOT restore the opt-in by itself). */
+  marketing_resumed
+}
+
+/** WhatsApp webhook events and received messages, linked to the lead and the message when known. */
+model WhatsAppEvent {
+  id                String            @id @default(cuid())
+  type              WhatsAppEventType
+  attemptId         String?
+  leadId            String?
+  /** Other party, E.164 with "+" */
+  phone             String?
+  /** Id from the provider; a webhook delivered twice is stored once. */
+  providerEventId   String?           @unique
+  /** WhatsApp message id (wamid) of the message this event is about */
+  externalMessageId String?
+  /** meta, keyword, admin */
+  provider          String
+  /** Text of a received message */
+  text              String?
+  /** JSON: error details, profile name, message type */
+  metadata          String?
+  occurredAt        DateTime
+  createdAt         DateTime          @default(now())
+  attempt           ContactAttempt?   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  lead              Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, occurredAt])
+  @@index([leadId, occurredAt])
+  @@index([type, occurredAt])
+}
+
+/**
+ * Addresses that must not receive marketing on a channel (unsubscribed, STOP, spam report,
+ * do-not-contact). Keyed by address, not lead, so it still applies if the lead is deleted
+ * and later collected again from Google Maps.
+ */
+model Suppression {
+  id        String   @id @default(cuid())
+  channel   Channel
+  /** email: lowercase address · whatsapp: E.164 phone with "+" */
+  address   String
+  reason    String
+  /** unsubscribe_link, spam_complaint, stop_reply, whatsapp_stop, whatsapp_error, do_not_contact, admin, import */
+  source    String
+  /** Lead it was recorded for (plain id: the entry must outlive the lead). */
+  leadId    String?
+  createdAt DateTime @default(now())
+
+  @@unique([channel, address])
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+// ---- Integrations (Phase 17): outgoing webhooks, e.g. to n8n ----
+
+model WebhookEndpoint {
+  id         String            @id @default(cuid())
+  name       String
+  url        String
+  /** Signing secret, AES-256-GCM encrypted with a key derived from SESSION_SECRET */
+  secretEnc  String
+  /** Last 4 characters, to recognise it in the UI */
+  secretHint String
+  /** JSON array of event types */
+  events     String
+  enabled    Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  deliveries WebhookDelivery[]
+}
+
+/** One event for one endpoint: the send queue (with retries) and the delivery log. */
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  endpointId     String
+  /** Stable id of the event, e.g. "lead.created:<leadId>": an event is queued once per endpoint */
+  eventId        String
+  event          String
+  payload        String
+  /** pending | delivered | failed */
+  status         String          @default("pending")
+  attempts       Int             @default(0)
+  nextAttemptAt  DateTime        @default(now())
+  responseStatus Int?
+  lastError      String?
+  createdAt      DateTime        @default(now())
+  deliveredAt    DateTime?
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+}

@@ -1,0 +1,8 @@
+# HTTPS certificate from Let's Encrypt is obtained automatically for {$DOMAIN}
+# (its DNS A/AAAA record must point to this server, ports 80 and 443 open).
+{$DOMAIN} {
+	encode zstd gzip
+	# Everything goes to the app: /api, /admin, /u (unsubscribe), /t (click tracking),
+	# /api/webhooks/* (Resend, Meta). Live updates (/api/events) are streamed through.
+	reverse_proxy app:3000
+}

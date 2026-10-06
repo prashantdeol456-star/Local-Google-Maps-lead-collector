@@ -1,0 +1,49 @@
+{
+  "name": "backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:deploy": "prisma migrate deploy",
+    "postinstall": "prisma generate",
+    "admin:password": "tsx src/scripts/setAdminPassword.ts",
+    "db:pg:schema": "tsx src/scripts/syncPostgresSchema.ts",
+    "db:copy-to-postgres": "tsx src/scripts/copySqliteToPostgres.ts",
+    "db:backup": "tsx src/scripts/backupSqlite.ts"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "@types/smtp-server": "^3.5.13",
+    "fake-indexeddb": "^6.2.5",
+    "prisma": "^7.10.0",
+    "smtp-server": "^3.19.17",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/static": "^10.1.5",
+    "@platform/shared": "*",
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.12.5",
+    "nodemailer": "^10.0.15",
+    "pg": "^8.23.1",
+    "svix": "^2.6.1",
+    "zod": "^4.6.5"
+  }
+}

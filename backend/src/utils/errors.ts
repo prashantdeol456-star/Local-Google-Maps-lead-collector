@@ -1,0 +1,19 @@
+export class AppError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AppError";
+  }
+}
+
+export const Errors = {
+  badRequest: (message = "Invalid request") => new AppError(400, "BAD_REQUEST", message),
+  unauthorized: (message = "Login required") => new AppError(401, "UNAUTHORIZED", message),
+  invalidCredentials: () => new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password"),
+  forbidden: (message = "Not allowed") => new AppError(403, "FORBIDDEN", message),
+  notFound: (message = "Not found") => new AppError(404, "NOT_FOUND", message),
+  conflict: (code: string, message: string) => new AppError(409, code, message),
+};

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+extension/dist/
+data/*.db*
+backend/src/generated/
+.env
+backend/public/
+
+# Server secrets and backups (deploy/)
+deploy/app.env
+backups/
+data/backups/

@@ -1,0 +1,551 @@
+// Repository interfaces. Services depend on these, never on Prisma directly.
+import type { JobStatus } from "@platform/shared";
+
+export interface AdminUserRecord {
+  id: string;
+  email: string;
+  name: string | null;
+  passwordHash: string;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+}
+
+export interface SessionRecord {
+  id: string;
+  tokenHash: string;
+  userId: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+export interface AdminUserRepository {
+  count(): Promise<number>;
+  findByEmail(email: string): Promise<AdminUserRecord | null>;
+  findById(id: string): Promise<AdminUserRecord | null>;
+  create(data: { email: string; name?: string | null; passwordHash: string }): Promise<AdminUserRecord>;
+  touchLastLogin(id: string, at: Date): Promise<void>;
+}
+
+export interface SessionRepository {
+  create(data: { tokenHash: string; userId: string; expiresAt: Date }): Promise<SessionRecord>;
+  findByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
+  deleteByTokenHash(tokenHash: string): Promise<void>;
+  deleteExpired(now: Date): Promise<number>;
+}
+
+export interface ApiTokenRecord {
+  id: string;
+  name: string;
+  prefix: string;
+  tokenHash: string;
+  userId: string;
+  expiresAt: Date | null;
+  lastUsedAt: Date | null;
+  revokedAt: Date | null;
+  /** full | read */
+  scope: string;
+  createdAt: Date;
+}
+
+export interface ApiTokenRepository {
+  create(data: { name: string; prefix: string; tokenHash: string; userId: string; expiresAt: Date | null; scope?: string }): Promise<ApiTokenRecord>;
+  findByTokenHash(tokenHash: string): Promise<ApiTokenRecord | null>;
+  listActiveByUser(userId: string, now: Date): Promise<ApiTokenRecord[]>;
+  /** Revokes only if the token belongs to the user; returns false otherwise. */
+  revoke(id: string, userId: string, at: Date): Promise<boolean>;
+  touchLastUsed(id: string, at: Date): Promise<void>;
+}
+
+// ---- Leads ----
+
+export interface LeadRecord {
+  id: string;
+  placeId: string | null;
+  name: string;
+  category: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postalCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  rating: number | null;
+  reviewCount: number | null;
+  mapsUrl: string | null;
+  searchKeyword: string | null;
+  source: string;
+  normalizedName: string;
+  normalizedPhone: string | null;
+  normalizedWebsite: string | null;
+  normalizedAddress: string | null;
+  dedupeKey: string;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const LEAD_SORT_FIELDS = ["createdAt", "name", "city", "category", "rating", "reviewCount"] as const;
+export type LeadSortField = (typeof LEAD_SORT_FIELDS)[number];
+
+export interface LeadListQuery {
+  /** Free-text search over name, phone, website, address. */
+  q?: string;
+  city?: string;
+  category?: string;
+  searchKeyword?: string;
+  /** Only leads created before this instant (stable snapshots for exports). */
+  createdBefore?: Date;
+  sort: LeadSortField;
+  order: "asc" | "desc";
+  skip: number;
+  take: number;
+}
+
+/** Fields written when creating a lead (timestamps are set by the database). */
+export type LeadCreateData = Omit<LeadRecord, "id" | "createdAt" | "updatedAt" | "firstSeenAt" | "lastSeenAt">;
+
+/** Fields that may be filled in on an existing lead (never overwritten). */
+export type LeadFillableData = Partial<
+  Omit<LeadRecord, "id" | "name" | "normalizedName" | "dedupeKey" | "source" | "createdAt" | "updatedAt" | "firstSeenAt" | "lastSeenAt">
+>;
+
+export interface LeadRepository {
+  list(query: LeadListQuery): Promise<{ items: LeadRecord[]; total: number }>;
+  findById(id: string): Promise<LeadRecord | null>;
+  /** Leads with these ids, oldest first (missing ids are skipped). */
+  findByIds(ids: string[]): Promise<LeadRecord[]>;
+  delete(id: string): Promise<boolean>;
+  count(): Promise<number>;
+  countCreatedSince(since: Date): Promise<number>;
+
+  // Duplicate lookups (all on indexed columns)
+  findByPlaceId(placeId: string): Promise<LeadRecord | null>;
+  findByNormalizedPhone(phone: string): Promise<LeadRecord[]>;
+  findByNormalizedWebsite(website: string): Promise<LeadRecord[]>;
+  findByNameAddress(normalizedName: string, normalizedAddress: string): Promise<LeadRecord[]>;
+
+  create(data: LeadCreateData): Promise<LeadRecord>;
+  /** Sets the given (previously empty) fields and lastSeenAt. */
+  update(id: string, data: LeadFillableData & { lastSeenAt: Date }): Promise<LeadRecord>;
+  /** Admin edit: overwrites the given fields. Returns null if the lead does not exist. */
+  edit(id: string, data: LeadEditData): Promise<LeadRecord | null>;
+  /** Distinct values with counts, most common first (for filter dropdowns). */
+  facets(limit: number): Promise<LeadFacets>;
+}
+
+export const LEAD_EDITABLE_FIELDS = [
+  "name", "category", "phone", "email", "website", "address", "city", "state", "country", "postalCode",
+] as const;
+export type LeadEditableField = (typeof LEAD_EDITABLE_FIELDS)[number];
+
+export type LeadEditData = Partial<Pick<LeadRecord, LeadEditableField | "normalizedName" | "normalizedPhone" | "normalizedWebsite" | "normalizedAddress">>;
+
+export interface FacetValue {
+  value: string;
+  count: number;
+}
+
+export interface LeadFacets {
+  cities: FacetValue[];
+  categories: FacetValue[];
+  keywords: FacetValue[];
+}
+
+// ---- Collection jobs ----
+
+export interface JobRecord {
+  id: string;
+  searchKeyword: string;
+  location: string | null;
+  maxRecords: number | null;
+  status: JobStatus;
+  statusReason: string | null;
+  totalFound: number;
+  newRecords: number;
+  duplicateRecords: number;
+  errorRecords: number;
+  queueId: string | null;
+  position: number | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdById: string | null;
+}
+
+export interface JobCreateData {
+  searchKeyword: string;
+  location: string | null;
+  maxRecords: number | null;
+  createdById: string | null;
+  queueId?: string | null;
+  position?: number | null;
+}
+
+export interface JobListQuery {
+  status?: JobStatus;
+  queueId?: string;
+  skip: number;
+  take: number;
+}
+
+export interface JobStatusUpdate {
+  status: JobStatus;
+  statusReason: string | null;
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+export interface JobRepository {
+  create(data: JobCreateData): Promise<JobRecord>;
+  findById(id: string): Promise<JobRecord | null>;
+  list(query: JobListQuery): Promise<{ items: JobRecord[]; total: number }>;
+  /**
+   * Applies the update only if the job is still in `expectedStatus` (optimistic concurrency).
+   * Returns the updated job, or null if the status changed in the meantime.
+   */
+  updateStatus(id: string, expectedStatus: JobStatus, update: JobStatusUpdate): Promise<JobRecord | null>;
+  findOtherWithStatus(status: JobStatus, excludeId: string): Promise<JobRecord | null>;
+  /** Most recently updated running or paused job. */
+  findLatestActive(): Promise<JobRecord | null>;
+  count(status?: JobStatus): Promise<number>;
+  incrementCounters(
+    id: string,
+    by: { totalFound?: number; newRecords?: number; duplicateRecords?: number; errorRecords?: number },
+  ): Promise<JobRecord>;
+}
+
+export type JobItemResult = "new" | "duplicate" | "error";
+
+export interface JobItemRecord {
+  id: string;
+  jobId: string;
+  clientKey: string;
+  result: JobItemResult;
+  matchedBy: string | null;
+  leadId: string | null;
+  error: string | null;
+  createdAt: Date;
+}
+
+export interface JobItemRepository {
+  countByResult(result: JobItemResult): Promise<number>;
+  find(jobId: string, clientKey: string): Promise<JobItemRecord | null>;
+  create(data: { jobId: string; clientKey: string; result: JobItemResult; matchedBy: string | null; leadId: string | null; error?: string | null }): Promise<JobItemRecord>;
+}
+
+// ---- Agent logs ----
+
+export type AgentLogLevel = "info" | "success" | "warning" | "error";
+
+export interface AgentLogRecord {
+  id: string;
+  jobId: string | null;
+  action: string;
+  status: AgentLogLevel;
+  message: string | null;
+  createdAt: Date;
+}
+
+export interface AgentLogRepository {
+  create(data: { jobId: string | null; action: string; status: AgentLogLevel; message?: string | null }): Promise<AgentLogRecord>;
+  listByJob(jobId: string, take: number): Promise<AgentLogRecord[]>;
+  countByJob(jobId: string, action: string): Promise<number>;
+}
+
+// ---- Outreach ----
+
+export type Channel = "email" | "whatsapp";
+export type CampaignStatus = "draft" | "running" | "paused" | "completed" | "stopped";
+export type AttemptStatus = "queued" | "sending" | "sent" | "delivered" | "failed" | "skipped" | "cancelled";
+
+export interface TemplateRecord {
+  id: string;
+  channel: Channel;
+  name: string;
+  subject: string | null;
+  body: string;
+  provider: string | null;
+  language: string | null;
+  category: string | null;
+  externalTemplateId: string | null;
+  approvalStatus: string | null;
+  paramFormat: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Writable template fields (the WhatsApp ones stay null for email templates). */
+export type TemplateWriteData = Pick<TemplateRecord, "name" | "subject" | "body"> &
+  Partial<Pick<TemplateRecord, "provider" | "language" | "category" | "externalTemplateId" | "approvalStatus" | "paramFormat">>;
+
+export interface TemplateRepository {
+  list(channel: Channel): Promise<TemplateRecord[]>;
+  findById(id: string): Promise<TemplateRecord | null>;
+  create(data: { channel: Channel } & TemplateWriteData): Promise<TemplateRecord>;
+  update(id: string, data: Partial<TemplateWriteData>): Promise<TemplateRecord | null>;
+  delete(id: string): Promise<boolean>;
+  countCampaigns(id: string): Promise<number>;
+}
+
+export interface CampaignRecord {
+  id: string;
+  channel: Channel;
+  name: string;
+  templateId: string;
+  provider: string;
+  status: CampaignStatus;
+  statusReason: string | null;
+  intervalSec: number;
+  dailyLimit: number;
+  windowStart: string;
+  windowEnd: string;
+  timeZone: string;
+  startAt: Date | null;
+  lastSentAt: Date | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CampaignCreateData = Pick<
+  CampaignRecord,
+  "channel" | "name" | "templateId" | "provider" | "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd" | "timeZone" | "startAt" | "createdById"
+>;
+
+export interface CampaignRepository {
+  create(data: CampaignCreateData): Promise<CampaignRecord>;
+  findById(id: string): Promise<CampaignRecord | null>;
+  list(query: { channel: Channel; skip: number; take: number }): Promise<{ items: CampaignRecord[]; total: number }>;
+  listByStatus(status: CampaignStatus, channel: Channel): Promise<CampaignRecord[]>;
+  /** Optimistic: only if still in one of `from`. Returns null when the status changed meanwhile. */
+  updateStatus(id: string, from: CampaignStatus[], data: Partial<Pick<CampaignRecord, "status" | "statusReason" | "startedAt" | "completedAt">>): Promise<CampaignRecord | null>;
+  touchLastSent(id: string, at: Date): Promise<void>;
+}
+
+export interface AttemptRecord {
+  id: string;
+  leadId: string;
+  campaignId: string | null;
+  channel: Channel;
+  provider: string;
+  status: AttemptStatus;
+  templateId: string | null;
+  toAddress: string;
+  renderedSubject: string | null;
+  renderedBody: string | null;
+  externalMessageId: string | null;
+  tries: number;
+  nextTryAt: Date | null;
+  error: string | null;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  failedAt: Date | null;
+  openedAt: Date | null;
+  clickedAt: Date | null;
+  bouncedAt: Date | null;
+  complainedAt: Date | null;
+  repliedAt: Date | null;
+  readAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type TrackedField = "deliveredAt" | "openedAt" | "clickedAt" | "bouncedAt" | "complainedAt" | "repliedAt" | "readAt";
+
+export interface AttemptRepository {
+  findById(id: string): Promise<AttemptRecord | null>;
+  findByExternalId(externalMessageId: string): Promise<AttemptRecord | null>;
+  /** Sets the timestamp only if it is still empty (first occurrence wins). */
+  markFirst(id: string, field: TrackedField, at: Date): Promise<void>;
+  /** Attempts of a campaign that have each tracking timestamp set. */
+  trackingCounts(campaignId: string): Promise<Record<TrackedField, number>>;
+  createMany(data: { leadId: string; campaignId: string; channel: Channel; provider: string; templateId: string; toAddress: string }[]): Promise<number>;
+  countByStatus(campaignId: string): Promise<Partial<Record<AttemptStatus, number>>>;
+  list(query: { campaignId?: string; leadId?: string; status?: AttemptStatus; skip: number; take: number }): Promise<{ items: (AttemptRecord & { campaignName: string | null })[]; total: number }>;
+  countSentSince(campaignId: string, since: Date): Promise<number>;
+  countSentTotal(channel: Channel): Promise<number>;
+  /** Oldest queued attempt that may be tried now. */
+  nextDue(campaignId: string, now: Date): Promise<AttemptRecord | null>;
+  /** Most recent WhatsApp message actually sent to this number ("+91…"). */
+  findLatestWhatsAppTo(phone: string): Promise<AttemptRecord | null>;
+  /** Updates only while the status is one of `from` (webhooks must not move a status backwards). */
+  advanceStatus(id: string, from: AttemptStatus[], data: Partial<Omit<AttemptRecord, "id" | "createdAt" | "updatedAt">>): Promise<boolean>;
+  /** queued → sending, only if still queued (so two workers can never send the same attempt). */
+  claim(id: string): Promise<boolean>;
+  update(id: string, data: Partial<Omit<AttemptRecord, "id" | "createdAt" | "updatedAt">>): Promise<void>;
+  cancelQueued(campaignId: string): Promise<number>;
+  /** Attempts of a channel left in "sending" by a crash. */
+  failStuckSending(channel: Channel, error: string, at: Date): Promise<number>;
+  hasPending(campaignId: string): Promise<boolean>;
+}
+
+export interface PreferenceRecord {
+  leadId: string;
+  emailAllowed: boolean;
+  whatsappAllowed: boolean;
+  whatsappOptInAt: Date | null;
+  whatsappOptInSource: string | null;
+  optedOut: boolean;
+  optOutReason: string | null;
+  optedOutAt: Date | null;
+  updatedAt: Date;
+}
+
+export interface PreferenceRepository {
+  find(leadId: string): Promise<PreferenceRecord | null>;
+  findMany(leadIds: string[]): Promise<PreferenceRecord[]>;
+  upsert(leadId: string, data: Partial<Omit<PreferenceRecord, "leadId" | "updatedAt">>): Promise<PreferenceRecord>;
+}
+
+export type EmailEventType =
+  | "sent" | "delivered" | "delivery_delayed" | "opened" | "clicked" | "bounced" | "complained" | "failed" | "replied" | "unsubscribed";
+
+export interface EmailEventRecord {
+  id: string;
+  type: EmailEventType;
+  attemptId: string | null;
+  leadId: string | null;
+  providerEventId: string | null;
+  source: string;
+  metadata: string | null;
+  occurredAt: Date;
+  createdAt: Date;
+}
+
+export interface EmailEventRepository {
+  /** Returns null when an event with the same providerEventId was already stored. */
+  create(data: Omit<EmailEventRecord, "id" | "createdAt">): Promise<EmailEventRecord | null>;
+  listByLead(leadId: string, take: number): Promise<EmailEventRecord[]>;
+  findById(id: string): Promise<EmailEventRecord | null>;
+}
+
+export type WhatsAppEventType = "sent" | "delivered" | "read" | "failed" | "received" | "opted_out" | "marketing_resumed";
+
+export interface WhatsAppEventRecord {
+  id: string;
+  type: WhatsAppEventType;
+  attemptId: string | null;
+  leadId: string | null;
+  phone: string | null;
+  providerEventId: string | null;
+  externalMessageId: string | null;
+  provider: string;
+  text: string | null;
+  metadata: string | null;
+  occurredAt: Date;
+  createdAt: Date;
+}
+
+export interface WhatsAppEventRepository {
+  /** Returns null when an event with the same providerEventId was already stored. */
+  create(data: Omit<WhatsAppEventRecord, "id" | "createdAt">): Promise<WhatsAppEventRecord | null>;
+  listByLead(leadId: string, take: number): Promise<WhatsAppEventRecord[]>;
+  findById(id: string): Promise<WhatsAppEventRecord | null>;
+  /** Received messages, newest first, with the lead name when matched. */
+  listReceived(page: { skip: number; take: number }): Promise<{ items: (WhatsAppEventRecord & { leadName: string | null })[]; total: number }>;
+}
+
+export interface SuppressionRecord {
+  id: string;
+  channel: Channel;
+  address: string;
+  reason: string;
+  source: string;
+  leadId: string | null;
+  createdAt: Date;
+}
+
+export interface SuppressionRepository {
+  /** Adds the entries that are not suppressed yet (the first reason is kept); returns the new ones. */
+  addMany(rows: Omit<SuppressionRecord, "id" | "createdAt">[]): Promise<SuppressionRecord[]>;
+  /** Entries for any of these addresses on a channel. */
+  findByAddresses(channel: Channel, addresses: string[]): Promise<SuppressionRecord[]>;
+  findById(id: string): Promise<SuppressionRecord | null>;
+  list(query: { channel?: Channel; q?: string; skip: number; take: number }): Promise<{ items: SuppressionRecord[]; total: number }>;
+  delete(id: string): Promise<boolean>;
+  /** Removes entries for these addresses (optionally only those from one source); returns the count. */
+  deleteAddresses(channel: Channel, addresses: string[], source?: string): Promise<number>;
+  count(channel: Channel): Promise<number>;
+}
+
+export interface WebhookEndpointRecord {
+  id: string;
+  name: string;
+  url: string;
+  secretEnc: string;
+  secretHint: string;
+  /** JSON array of event types */
+  events: string;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type WebhookDeliveryStatus = "pending" | "delivered" | "failed";
+
+export interface WebhookDeliveryRecord {
+  id: string;
+  endpointId: string;
+  eventId: string;
+  event: string;
+  payload: string;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  nextAttemptAt: Date;
+  responseStatus: number | null;
+  lastError: string | null;
+  createdAt: Date;
+  deliveredAt: Date | null;
+}
+
+export interface WebhookRepository {
+  listEndpoints(): Promise<WebhookEndpointRecord[]>;
+  findEndpoint(id: string): Promise<WebhookEndpointRecord | null>;
+  createEndpoint(data: Pick<WebhookEndpointRecord, "name" | "url" | "secretEnc" | "secretHint" | "events" | "enabled">): Promise<WebhookEndpointRecord>;
+  updateEndpoint(id: string, data: Partial<Pick<WebhookEndpointRecord, "name" | "url" | "secretEnc" | "secretHint" | "events" | "enabled">>): Promise<WebhookEndpointRecord | null>;
+  deleteEndpoint(id: string): Promise<boolean>;
+  /** Queues an event for an endpoint; returns null if this event was already queued for it. */
+  enqueue(data: { endpointId: string; eventId: string; event: string; payload: string; nextAttemptAt?: Date }): Promise<WebhookDeliveryRecord | null>;
+  /** Pending deliveries that are due, oldest first. */
+  due(now: Date, take: number): Promise<WebhookDeliveryRecord[]>;
+  findDelivery(id: string): Promise<WebhookDeliveryRecord | null>;
+  updateDelivery(id: string, data: Partial<Omit<WebhookDeliveryRecord, "id" | "endpointId" | "eventId" | "event" | "payload" | "createdAt">>): Promise<void>;
+  listDeliveries(query: { endpointId: string; status?: WebhookDeliveryStatus; skip: number; take: number }): Promise<{ items: WebhookDeliveryRecord[]; total: number }>;
+  countDeliveries(endpointId: string): Promise<Record<WebhookDeliveryStatus, number>>;
+  /** Deletes deliveries in a final status created before `before`; returns the count. */
+  deleteOld(status: "delivered" | "failed", before: Date): Promise<number>;
+}
+
+export interface TrackedLinkRepository {
+  createMany(links: { id: string; attemptId: string; url: string }[]): Promise<void>;
+  findById(id: string): Promise<{ id: string; attemptId: string; url: string } | null>;
+}
+
+export interface Repositories {
+  adminUsers: AdminUserRepository;
+  sessions: SessionRepository;
+  apiTokens: ApiTokenRepository;
+  leads: LeadRepository;
+  jobs: JobRepository;
+  jobItems: JobItemRepository;
+  agentLogs: AgentLogRepository;
+  templates: TemplateRepository;
+  campaigns: CampaignRepository;
+  attempts: AttemptRepository;
+  preferences: PreferenceRepository;
+  emailEvents: EmailEventRepository;
+  trackedLinks: TrackedLinkRepository;
+  whatsappEvents: WhatsAppEventRepository;
+  suppressions: SuppressionRepository;
+  webhooks: WebhookRepository;
+  /** Runs `fn` in one database transaction; all-or-nothing. */
+  transaction<T>(fn: (tx: Repositories) => Promise<T>): Promise<T>;
+}
