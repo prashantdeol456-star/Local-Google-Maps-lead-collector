@@ -5,6 +5,7 @@ import type { Admin } from "../lib/types";
 
 const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: "▦" },
+  { to: "/inbox", label: "AI Inbox", icon: "✦" },
   { to: "/leads", label: "Google Maps Leads", icon: "☰" },
   { to: "/linkedin", label: "LinkedIn Leads", icon: "in" },
   { to: "/contacts", label: "Contacts (Sheets)", icon: "▤" },

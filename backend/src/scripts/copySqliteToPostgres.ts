@@ -37,6 +37,10 @@ export const TABLES = [
   "LinkedInCampaign",
   "LinkedInMessage",
   "SocialAccount",
+  "InboxConversation",
+  "InboxMessage",
+  "InboxDraft",
+  "AiAssistantSettings",
 ] as const;
 
 const BATCH = 500;

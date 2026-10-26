@@ -19,6 +19,7 @@ import { LinkedInLeadDetailPage, LinkedInLeadsPage } from "./pages/LinkedInPage"
 import { LoginPage } from "./pages/LoginPage";
 import { ContactsPage } from "./pages/ContactsPage";
 import { SocialAccountsPage } from "./pages/SocialAccountsPage";
+import { InboxPage } from "./pages/InboxPage";
 import { CampaignLogsPage } from "./pages/CampaignLogsPage";
 import { LinkedInCampaignDetailPage, LinkedInCampaignsPage, NewLinkedInCampaignPage } from "./pages/LinkedInOutreachPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -37,6 +38,7 @@ function Routes({ admin }: { admin: Admin }) {
   if ((params = matchPath("/linkedin-outreach/:id", path))) return <LinkedInCampaignDetailPage key={params.id} id={params.id!} />;
   if (path === "/campaign-logs") return <CampaignLogsPage />;
   if (path === "/social") return <SocialAccountsPage />;
+  if (path === "/inbox") return <InboxPage />;
   if (path === "/collections") return <CollectionsPage />;
   if ((params = matchPath("/collections/:id", path))) return <CollectionDetailPage key={params.id} id={params.id!} />;
   if (path === "/email") return <EmailCampaignsPage />;

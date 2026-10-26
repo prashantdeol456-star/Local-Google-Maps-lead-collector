@@ -1,5 +1,5 @@
 import { loadAuthState } from "../storage/auth";
-import type { CampaignOverview, ContentEvent, ContentRequest, MessageResponse, NextResponse, PanelRequest } from "../messages";
+import type { CampaignOverview, ContentEvent, ContentRequest, InboxDraft, MessageResponse, NextResponse, PanelRequest } from "../messages";
 import { apiRequest } from "./apiClient";
 import { checkBackend, login, logout } from "./backendSession";
 import { EMPTY_RUNNER, Runner, type ApiResult, type StoredRunner } from "./runner";
@@ -129,6 +129,21 @@ async function handlePanel(message: PanelRequest): Promise<MessageResponse<unkno
       const res = await backend<{ campaigns: CampaignOverview[] }>("/api/linkedin-outreach/overview", "GET");
       return res.ok ? { ok: true, data: res.data.campaigns } : { ok: false, error: res.error };
     }
+    case "INBOX_SYNC": {
+      const res = await backend<{ drafts: InboxDraft[] }>("/api/inbox/linkedin/sync", "POST", {
+        threads: message.threads.map((t) => ({ threadId: t.threadId, participantName: t.participantName, profileUrl: t.profileUrl, messages: t.messages })),
+      });
+      return res.ok ? { ok: true, data: res.data.drafts } : { ok: false, error: res.error };
+    }
+    case "INBOX_DRAFTS": {
+      const q = message.threadId ? `?threadId=${encodeURIComponent(message.threadId)}` : "";
+      const res = await backend<{ drafts: InboxDraft[] }>(`/api/inbox/linkedin/drafts${q}`, "GET");
+      return res.ok ? { ok: true, data: res.data.drafts } : { ok: false, error: res.error };
+    }
+    case "INBOX_RESULT": {
+      const res = await backend(`/api/inbox/linkedin/drafts/${encodeURIComponent(message.draftId)}/result`, "POST", { status: message.status, text: message.text });
+      return res.ok ? { ok: true, data: null } : { ok: false, error: res.error };
+    }
     default:
       return { ok: false, error: "Unknown request" };
   }
@@ -137,6 +152,7 @@ async function handlePanel(message: PanelRequest): Promise<MessageResponse<unkno
 chrome.runtime.onMessage.addListener((message: PanelRequest | ContentEvent, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return;
   // Results come from the content script in the LinkedIn tab.
+  if (message.type === "LI_REPLY_RESULT") return; // for the side panel
   if (message.type === "LM_RESULT") {
     if (!sender.tab || !sender.url?.startsWith("https://www.linkedin.com/")) return;
     void runner.onResult(message.messageId, message.outcome).then(() => runner.tick());

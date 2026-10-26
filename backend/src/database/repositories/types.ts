@@ -760,6 +760,108 @@ export interface SocialAccountRepository {
   delete(id: string): Promise<boolean>;
 }
 
+// ---- AI Inbox ----
+
+export type InboxPlatform = "telegram" | "facebook" | "instagram" | "linkedin";
+export type ReplyMode = "smart" | "auto" | "draft" | "off";
+
+export interface InboxConversationRecord {
+  id: string;
+  platform: string;
+  accountKey: string;
+  externalThreadId: string;
+  participantId: string | null;
+  participantName: string;
+  participantUsername: string | null;
+  replyMode: string | null;
+  status: string;
+  lastIntent: string | null;
+  summary: string | null;
+  lastInboundAt: Date | null;
+  lastOutboundAt: Date | null;
+  lastMessageAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InboxMessageRecord {
+  id: string;
+  conversationId: string;
+  direction: string;
+  externalId: string | null;
+  text: string;
+  author: string;
+  sentAt: Date;
+  createdAt: Date;
+}
+
+export interface InboxDraftRecord {
+  id: string;
+  conversationId: string;
+  status: string;
+  text: string;
+  intent: string | null;
+  summary: string | null;
+  language: string | null;
+  confidence: number | null;
+  needsHuman: boolean;
+  decision: string | null;
+  forMessageId: string | null;
+  model: string | null;
+  error: string | null;
+  sentAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AiAssistantSettingsRecord {
+  id: string;
+  enabled: boolean;
+  businessProfile: string;
+  faqs: string;
+  style: string;
+  neverSay: string;
+  modes: string;
+  minConfidence: number;
+  maxAutoPerChatPerDay: number;
+  telegramOffset: number;
+  updatedAt: Date;
+}
+
+export type InboxConversationListItem = InboxConversationRecord & {
+  lastMessage: Pick<InboxMessageRecord, "direction" | "text" | "author" | "sentAt"> | null;
+  pendingDraft: Pick<InboxDraftRecord, "id" | "text" | "confidence" | "needsHuman" | "decision"> | null;
+};
+
+export interface InboxRepository {
+  getSettings(): Promise<AiAssistantSettingsRecord>;
+  updateSettings(data: Partial<Omit<AiAssistantSettingsRecord, "id" | "updatedAt">>): Promise<AiAssistantSettingsRecord>;
+  upsertConversation(data: Pick<InboxConversationRecord, "platform" | "accountKey" | "externalThreadId" | "participantName"> & Partial<Pick<InboxConversationRecord, "participantId" | "participantUsername">>): Promise<InboxConversationRecord>;
+  findConversation(id: string): Promise<InboxConversationRecord | null>;
+  findConversationByThread(platform: string, accountKey: string, externalThreadId: string): Promise<InboxConversationRecord | null>;
+  updateConversation(id: string, data: Partial<Omit<InboxConversationRecord, "id" | "createdAt" | "updatedAt">>): Promise<InboxConversationRecord>;
+  listConversations(query: { platform?: string; status?: string; q?: string; skip: number; take: number }): Promise<{ items: InboxConversationListItem[]; total: number }>;
+  countByStatus(): Promise<Record<string, number>>;
+  /** Inserts messages not stored yet (by externalId); returns the new ones. */
+  addMessages(conversationId: string, messages: Pick<InboxMessageRecord, "direction" | "externalId" | "text" | "author" | "sentAt">[]): Promise<InboxMessageRecord[]>;
+  /** The latest `take` messages, oldest first. */
+  recentMessages(conversationId: string, take: number): Promise<InboxMessageRecord[]>;
+  lastInbound(conversationId: string): Promise<InboxMessageRecord | null>;
+  countAutoRepliesSince(conversationId: string, since: Date): Promise<number>;
+  /** Chats whose latest message is from the customer, received between since and before. */
+  awaitingReply(since: Date, before: Date, take: number): Promise<InboxConversationRecord[]>;
+  createDraft(data: Omit<InboxDraftRecord, "id" | "createdAt" | "updatedAt" | "sentAt" | "error"> & { error?: string | null }): Promise<InboxDraftRecord>;
+  findDraft(id: string): Promise<InboxDraftRecord | null>;
+  draftFor(conversationId: string, forMessageId: string): Promise<InboxDraftRecord | null>;
+  pendingDraft(conversationId: string): Promise<InboxDraftRecord | null>;
+  listDrafts(conversationId: string, take: number): Promise<InboxDraftRecord[]>;
+  /** Changes a draft only while its status is one of `from`. */
+  updateDraft(id: string, from: string[], data: Partial<Pick<InboxDraftRecord, "status" | "text" | "error" | "sentAt" | "decision">>): Promise<boolean>;
+  supersedePending(conversationId: string): Promise<number>;
+  /** LinkedIn drafts waiting for the extension to type them, optionally for one thread. */
+  pendingLinkedInDrafts(threadId?: string): Promise<(InboxDraftRecord & { threadId: string; participantName: string })[]>;
+}
+
 export interface Repositories {
   adminUsers: AdminUserRepository;
   sessions: SessionRepository;
@@ -782,6 +884,7 @@ export interface Repositories {
   linkedinOutreach: LinkedInOutreachRepository;
   campaignLogs: CampaignLogRepository;
   socialAccounts: SocialAccountRepository;
+  inbox: InboxRepository;
   /** Runs `fn` in one database transaction; all-or-nothing. */
   transaction<T>(fn: (tx: Repositories) => Promise<T>): Promise<T>;
 }

@@ -24,6 +24,7 @@ const waInterrupted = await app.whatsappWorker.recover();
 if (waInterrupted) app.log.warn(`${waInterrupted} WhatsApp message(s) were interrupted mid-send by the last shutdown and marked failed (not re-sent).`);
 app.emailWorker.start();
 app.whatsappWorker.start();
+app.inboxWorker.start();
 app.webhookWorker.start();
 app.maintenance.start();
 

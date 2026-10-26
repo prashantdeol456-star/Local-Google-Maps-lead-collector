@@ -6,6 +6,7 @@ import { parseEmailConfig, type EmailConfig } from "./providers/email/config.js"
 import { parseWhatsAppConfig, type WhatsAppConfig } from "./providers/whatsapp/config.js";
 import { parseAiConfig, type AiConfig } from "./providers/ai/config.js";
 import { parseSocialConfig, type SocialConfig } from "./providers/social/config.js";
+import { parseInboxConfig, type InboxConfig } from "./providers/inbox/config.js";
 import { isValidTimeZone } from "./utils/time.js";
 import { checkDatabaseUrl, parseTrustProxy, productionChecks } from "./configChecks.js";
 
@@ -77,6 +78,7 @@ export const config = {
   email: parseEmailConfig(process.env) as EmailConfig,
   whatsapp: parseWhatsAppConfig(process.env) as WhatsAppConfig,
   ai: parseAiConfig(process.env) as AiConfig,
+  inbox: parseInboxConfig(process.env) as InboxConfig,
   social: parseSocialConfig(process.env, env.PUBLIC_BASE_URL ?? `http://localhost:${env.PORT}`) as SocialConfig,
   trackClicks: env.EMAIL_TRACK_CLICKS === "true",
   publicBaseUrl: (env.PUBLIC_BASE_URL?.replace(/\/+$/, "") ?? null) as string | null,

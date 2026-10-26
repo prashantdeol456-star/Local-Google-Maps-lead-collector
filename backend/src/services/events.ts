@@ -13,7 +13,9 @@ export type AppEvent =
   /** A reply (or a message from an unknown number) was recorded: EmailEvent / WhatsAppEvent id. */
   | { type: "reply.received"; channel: "email" | "whatsapp"; eventId: string }
   /** A new suppression entry (unsubscribe, STOP, spam report, do-not-contact…). */
-  | { type: "optout.recorded"; suppressionId: string };
+  | { type: "optout.recorded"; suppressionId: string }
+  /** A chat in the AI Inbox changed (new message, draft, reply). */
+  | { type: "inbox.updated"; conversationId: string };
 
 export class EventBus {
   private readonly emitter = new EventEmitter();

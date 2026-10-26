@@ -158,6 +158,37 @@ Planned on top of this: publishing/scheduling posts, and an inbox for Page messa
 and comments. The official APIs do not allow cold DMs: Meta only allows messaging people who
 contacted you first.
 
+### AI Inbox (auto-replies on Telegram, Facebook, Instagram, LinkedIn)
+
+**Admin → AI Inbox** puts every chat in one place. When a message comes in, Claude reads that
+person's whole chat history plus what you wrote under **AI instructions** (about the business,
+FAQs, style, topics to leave for you). It writes a reply, says what the person wants, and rates
+how sure it is.
+
+| App | How messages arrive | How replies go out |
+|---|---|---|
+| Telegram | Your bot (`TELEGRAM_BOT_TOKEN` from @BotFather), long polling | Sent by the bot (private chats only) |
+| Facebook Page | Connected under Social Accounts; checked every minute | Page Send API, within 24 h of their last message |
+| Instagram (Business/Creator) | Through the linked Page; checked every minute | Same, within 24 h |
+| LinkedIn | LinkedIn Messenger extension → *Inbox (AI replies)* → *Watch*, while the side panel is open | Typed into the chat; **you** press Send |
+
+Reply modes (per app, and per chat):
+- **smart** (default): sends on its own only when Claude is confident (≥ 80%, adjustable) and the
+  message is routine. Complaints, orders, partnerships, job requests, anything marked "needs
+  you", and chats over the per-day limit stay as drafts.
+- **auto**: always sends.
+- **draft**: you approve every reply.
+- **off**: no AI replies.
+
+The send decision is made in code (`backend/src/services/inbox/policy.ts`), not by the model.
+Nothing is sent until you turn **AI replies** on. None of the platforms allows cold messages to
+strangers; this only answers people who wrote to you.
+
+Setup: `ANTHROPIC_API_KEY` in `backend/.env` (optionally `INBOX_AI_MODEL`, default
+`claude-opus-5-5`, and `INBOX_AI_EFFORT`), `TELEGRAM_BOT_TOKEN`, and your Facebook Page connected
+with the messaging permissions. Instagram also needs *Allow access to messages* turned on in the
+Instagram app. The AI Inbox → Setup tab shows what is done.
+
 ## Scripts (root)
 
 | Command | What it does |

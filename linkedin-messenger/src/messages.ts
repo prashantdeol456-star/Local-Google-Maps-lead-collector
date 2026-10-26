@@ -1,3 +1,4 @@
+import type { OpenThread, ReplyOutcome, UnreadThread } from "./content/inbox";
 import type { SendJob, SendOutcome } from "./content/messenger";
 
 export type MessageResponse<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -46,10 +47,30 @@ export interface RunnerState {
 }
 
 /** Background → content script in the LinkedIn tab. */
-export type ContentRequest = { type: "LM_SEND"; messageId: string; job: SendJob } | { type: "LM_ABORT"; messageId: string } | { type: "LM_PING" };
+export type ContentRequest =
+  | { type: "LM_SEND"; messageId: string; job: SendJob }
+  | { type: "LM_ABORT"; messageId: string }
+  | { type: "LM_PING" }
+  // Inbox assist (LinkedIn messaging pages)
+  | { type: "LI_INBOX_SCAN" }
+  | { type: "LI_READ_THREAD" }
+  | { type: "LI_TYPE_REPLY"; draftId: string; text: string; participantName: string }
+  | { type: "LI_ABORT_REPLY"; draftId: string };
+
+export type { OpenThread, UnreadThread };
+
+/** A reply the AI wrote for a LinkedIn chat, waiting for the extension to type it. */
+export interface InboxDraft {
+  id: string;
+  threadId: string;
+  participantName: string;
+  text: string;
+  confidence: number | null;
+  decision: string | null;
+}
 
 /** Content script → background. */
-export type ContentEvent = { type: "LM_RESULT"; messageId: string; outcome: SendOutcome };
+export type ContentEvent = { type: "LM_RESULT"; messageId: string; outcome: SendOutcome } | { type: "LI_REPLY_RESULT"; draftId: string; outcome: ReplyOutcome };
 
 /** Side panel → background (which holds the backend token). */
 export type PanelRequest =
@@ -60,4 +81,7 @@ export type PanelRequest =
   | { type: "START" }
   | { type: "STOP" }
   | { type: "SKIP_CURRENT" }
-  | { type: "GET_OVERVIEW" };
+  | { type: "GET_OVERVIEW" }
+  | { type: "INBOX_SYNC"; threads: OpenThread[] }
+  | { type: "INBOX_DRAFTS"; threadId?: string }
+  | { type: "INBOX_RESULT"; draftId: string; status: "sent" | "skipped"; text?: string };

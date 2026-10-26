@@ -3,6 +3,7 @@ import type { CampaignOverview, RunnerState, WaitReason } from "../../messages";
 import type { BackendStatus } from "../../storage/auth";
 import { BackendStatusBar } from "../components/BackendStatusBar";
 import { backendClient } from "../services/backendClient";
+import { InboxPanel } from "./InboxPanel";
 
 const WAIT_TEXT: Record<WaitReason, string> = {
   no_running_campaigns: "No running LinkedIn campaign. Start one in the admin panel (LinkedIn Outreach).",
@@ -20,6 +21,7 @@ export function RunnerPage({ backendStatus, onLogout, onRetry }: { backendStatus
   const [campaigns, setCampaigns] = useState<CampaignOverview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"campaigns" | "inbox">("campaigns");
 
   const refresh = useCallback(async () => {
     const res = await backendClient.runner();
@@ -60,6 +62,20 @@ export function RunnerPage({ backendStatus, onLogout, onRetry }: { backendStatus
         <span className={`badge ${runner?.running ? "badge--running" : "badge--paused"}`}>{runner?.running ? "Running" : "Stopped"}</span>
       </header>
       <BackendStatusBar status={backendStatus} onRetry={onRetry} />
+      <div className="controls">
+        <button className={`btn ${tab === "campaigns" ? "btn--primary" : ""}`} onClick={() => setTab("campaigns")}>
+          Campaigns
+        </button>
+        <button className={`btn ${tab === "inbox" ? "btn--primary" : ""}`} onClick={() => setTab("inbox")}>
+          Inbox (AI replies)
+        </button>
+      </div>
+      {/* Kept mounted so watching continues while you look at campaigns. */}
+      <div style={{ display: tab === "inbox" ? "contents" : "none" }}>
+        <InboxPanel busyWithCampaign={!!runner?.current} />
+      </div>
+      {tab === "campaigns" && (
+        <>
 
       <section className="card">
         <p className="hint">
@@ -141,6 +157,9 @@ export function RunnerPage({ backendStatus, onLogout, onRetry }: { backendStatus
           ))}
         </ul>
       </section>
+
+        </>
+      )}
 
       <button className="btn btn--ghost" onClick={onLogout}>
         Log out of the lead platform

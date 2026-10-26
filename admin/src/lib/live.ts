@@ -33,6 +33,7 @@ export function useLiveUpdates(enabled: boolean): LiveState {
     source.onerror = () => setState(source.readyState === EventSource.CLOSED ? "offline" : "connecting");
     for (const type of LEAD_EVENTS) source.addEventListener(type, () => schedule("leads", "lead", "stats", "facets", "jobs", "job", "communications", "wa-inbox", "preferences", "opt-outs"));
     source.addEventListener("job.updated", () => schedule("jobs", "job", "stats", "logs"));
+    source.addEventListener("inbox.updated", () => schedule("inbox"));
     source.addEventListener("campaign.updated", () => schedule("campaigns", "campaign", "stats", "communications", "wa-inbox", "linkedin-campaigns", "linkedin-campaign"));
 
     return () => {

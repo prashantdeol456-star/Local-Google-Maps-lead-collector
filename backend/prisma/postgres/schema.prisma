@@ -623,3 +623,108 @@ model SocialAccount {
   @@unique([platform, externalId])
   @@index([platform])
 }
+
+// ---- AI Inbox: chats from Telegram (bot), Facebook Pages, Instagram and LinkedIn, with
+// AI-written replies (sent automatically when safe, otherwise kept as drafts). ----
+
+/** One chat with one person on one platform. */
+model InboxConversation {
+  id                  String         @id @default(cuid())
+  /** telegram | facebook | instagram | linkedin */
+  platform            String
+  /** SocialAccount id (Facebook/Instagram), "bot" (Telegram), "extension" (LinkedIn) */
+  accountKey          String
+  /** The platform's id for this chat (Telegram chat id, Messenger/Instagram conversation id, LinkedIn thread id) */
+  externalThreadId    String
+  /** The other person's id for sending (Telegram chat id, PSID, IGSID, LinkedIn profile URL) */
+  participantId       String?
+  participantName     String
+  participantUsername String?
+  /** smart | auto | draft | off; null = the platform's default from the AI settings */
+  replyMode           String?
+  /** needs_reply | draft_ready | replied | handled | no_reply */
+  status              String         @default("needs_reply")
+  lastIntent          String?
+  /** The AI's short summary of who this is and what they want */
+  summary             String?
+  lastInboundAt       DateTime?
+  lastOutboundAt      DateTime?
+  lastMessageAt       DateTime
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  messages            InboxMessage[]
+  drafts              InboxDraft[]
+
+  @@unique([platform, accountKey, externalThreadId])
+  @@index([status, lastMessageAt])
+  @@index([platform, lastMessageAt])
+}
+
+model InboxMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  /** in = from the other person · out = from you (or the AI) */
+  direction      String
+  /** The platform's message id (dedupe); LinkedIn: a hash of the message */
+  externalId     String?
+  text           String
+  /** customer | ai_auto | ai_approved | admin | elsewhere (sent outside this panel) */
+  author         String
+  sentAt         DateTime
+  createdAt      DateTime          @default(now())
+  conversation   InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, externalId])
+  @@index([conversationId, sentAt])
+}
+
+/** A reply the AI wrote. */
+model InboxDraft {
+  id             String            @id @default(cuid())
+  conversationId String
+  /** pending | sending | sent | dismissed | failed | superseded */
+  status         String            @default("pending")
+  text           String
+  intent         String?
+  summary        String?
+  language       String?
+  confidence     Float?
+  needsHuman     Boolean           @default(false)
+  /** Why it was held for approval or sent automatically */
+  decision       String?
+  /** The inbound message it answers */
+  forMessageId   String?
+  model          String?
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  conversation   InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([status, createdAt])
+}
+
+/** What the AI knows and may do (one row, id "default"). */
+model AiAssistantSettings {
+  id                   String   @id @default("default")
+  /** Master switch: off = nothing is drafted or sent */
+  enabled              Boolean  @default(false)
+  /** Who you are, what you sell, prices, hours, location, links */
+  businessProfile      String   @default("")
+  /** Questions and answers the AI can use as they are */
+  faqs                 String   @default("")
+  /** Tone, languages (e.g. reply in the customer's language: Hindi, English or Hinglish), length, signature */
+  style                String   @default("")
+  /** Topics the AI must never answer itself (it leaves them for you) */
+  neverSay             String   @default("")
+  /** JSON: platform → smart | auto | draft | off */
+  modes                String   @default("{\"telegram\":\"smart\",\"facebook\":\"smart\",\"instagram\":\"smart\",\"linkedin\":\"draft\"}")
+  /** Smart mode sends on its own only at or above this confidence (0–1) */
+  minConfidence        Float    @default(0.8)
+  /** Most automatic replies per chat per day */
+  maxAutoPerChatPerDay Int      @default(5)
+  /** Telegram getUpdates offset, so a restart does not re-read old messages */
+  telegramOffset       Int      @default(0)
+  updatedAt            DateTime @updatedAt
+}
