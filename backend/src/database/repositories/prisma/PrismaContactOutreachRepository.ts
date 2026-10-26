@@ -129,6 +129,9 @@ export class PrismaLinkedInOutreachRepository implements LinkedInOutreachReposit
   async touchLastSent(id: string, at: Date) {
     await this.db.linkedInCampaign.update({ where: { id }, data: { lastSentAt: at } });
   }
+  updateCampaignSchedule(id: string, data: Partial<Pick<LinkedInCampaignRecord, "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd">>) {
+    return this.db.linkedInCampaign.update({ where: { id }, data });
+  }
   async countByStatus(campaignId: string) {
     const rows = await this.db.linkedInMessage.groupBy({ by: ["status"], where: { campaignId }, _count: { _all: true } });
     return Object.fromEntries(rows.map((r) => [r.status, r._count._all])) as Partial<Record<AttemptStatus, number>>;

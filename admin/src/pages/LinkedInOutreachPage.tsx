@@ -24,11 +24,97 @@ const MODE_LABEL: Record<LinkedInSendMode, string> = { assisted: "Assisted (you 
 
 const WAITING_TEXT: Record<NonNullable<LinkedInCampaignDetail["waitingFor"]>, string> = {
   not_started: "waiting for the scheduled start time",
-  outside_window: "outside the sending hours",
+  outside_window: "outside the sending hours (press Edit timing → Any time to send now)",
   daily_limit: "daily limit reached",
   interval: "waiting for the gap between messages",
   extension: "ready — waiting for the LinkedIn Messenger extension to pick it up",
 };
+
+/** Same start and end = no hours limit. */
+const anyTime = (c: { windowStart: string; windowEnd: string }) => c.windowStart === c.windowEnd;
+const hoursLabel = (c: { windowStart: string; windowEnd: string; timeZone?: string }) =>
+  anyTime(c) ? "any time" : `${c.windowStart}–${c.windowEnd}${c.timeZone ? ` (${c.timeZone})` : ""}`;
+
+/** "Any time" or a from–to range. */
+function HoursFields({ start, end, onChange }: { start: string; end: string; onChange: (start: string, end: string) => void }) {
+  const isAny = start === end;
+  return (
+    <fieldset className="space-y-2 sm:col-span-2">
+      <legend className="label mb-1">Sending hours</legend>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="radio" checked={isAny} onChange={() => onChange("00:00", "00:00")} />
+        Any time: starts as soon as you press Start
+      </label>
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        <input type="radio" checked={!isAny} onChange={() => onChange("10:00", "18:00")} />
+        Only between
+        <input className="input w-auto py-1" type="time" disabled={isAny} value={isAny ? "10:00" : start} onChange={(e) => onChange(e.target.value, end)} aria-label="Send from" />
+        and
+        <input className="input w-auto py-1" type="time" disabled={isAny} value={isAny ? "18:00" : end} onChange={(e) => onChange(start, e.target.value)} aria-label="Send until" />
+      </label>
+    </fieldset>
+  );
+}
+
+/** Change the pace of a campaign that is not finished. */
+function TimingEditor({ campaign, onSaved }: { campaign: LinkedInCampaign; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [intervalMin, setIntervalMin] = useState(campaign.intervalSec / 60);
+  const [dailyLimit, setDailyLimit] = useState(campaign.dailyLimit);
+  const [start, setStart] = useState(campaign.windowStart);
+  const [end, setEnd] = useState(campaign.windowEnd);
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/linkedin-outreach/campaigns/${campaign.id}/schedule`, {
+        method: "PATCH",
+        body: { intervalSec: Math.round(intervalMin * 60), dailyLimit, windowStart: start, windowEnd: end },
+      }),
+    onSuccess: () => {
+      setOpen(false);
+      onSaved();
+    },
+  });
+  if (!open) {
+    return (
+      <button className="btn" onClick={() => setOpen(true)}>
+        Edit timing
+      </button>
+    );
+  }
+  return (
+    <form
+      className="card mb-6 grid gap-4 p-5 sm:grid-cols-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <Field label="Minutes between messages" hint="At least 1 minute.">
+        <input className="input" type="number" min={1} max={1440} step={0.5} required value={intervalMin} onChange={(e) => setIntervalMin(Number(e.target.value))} />
+      </Field>
+      <Field label="Messages per day" hint="At most 100.">
+        <input className="input" type="number" min={1} max={100} required value={dailyLimit} onChange={(e) => setDailyLimit(Number(e.target.value))} />
+      </Field>
+      <HoursFields
+        start={start}
+        end={end}
+        onChange={(a, b) => {
+          setStart(a);
+          setEnd(b);
+        }}
+      />
+      {save.error && <div className="sm:col-span-2"><ErrorBox error={save.error} /></div>}
+      <div className="flex gap-2 sm:col-span-2">
+        <button className="btn btn-primary" disabled={save.isPending}>
+          {save.isPending ? "Saving…" : "Save timing"}
+        </button>
+        <button type="button" className="btn" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export function RiskNotice() {
   return (
@@ -90,7 +176,7 @@ export function LinkedInCampaignsPage() {
                 <div>
                   <p className="font-medium">{c.name}</p>
                   <p className="text-xs text-slate-500">
-                    {MODE_LABEL[c.mode]} · {formatNumber(c.dailyLimit)}/day · every {Math.round(c.intervalSec / 60)} min · {c.windowStart}–{c.windowEnd}
+                    {MODE_LABEL[c.mode]} · {formatNumber(c.dailyLimit)}/day · every {Math.round(c.intervalSec / 60)} min · {hoursLabel(c)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -133,8 +219,8 @@ export function NewLinkedInCampaignPage() {
   const [mode, setMode] = useState<LinkedInSendMode>("assisted");
   const [intervalMin, setIntervalMin] = useState(5);
   const [dailyLimit, setDailyLimit] = useState(20);
-  const [windowStart, setWindowStart] = useState("10:00");
-  const [windowEnd, setWindowEnd] = useState("18:00");
+  const [windowStart, setWindowStart] = useState("00:00"); // any time
+  const [windowEnd, setWindowEnd] = useState("00:00");
 
   useEffect(() => {
     if (!templateId && templates.data?.[0]) setTemplateId(templates.data[0].id);
@@ -245,12 +331,14 @@ export function NewLinkedInCampaignPage() {
               <Field label="Messages per day" hint="At most 100. 20–25 is a common cautious limit.">
                 <input className="input" type="number" min={1} max={100} required value={dailyLimit} onChange={(e) => setDailyLimit(Number(e.target.value))} />
               </Field>
-              <Field label="Send from">
-                <input className="input" type="time" required value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
-              </Field>
-              <Field label="Send until">
-                <input className="input" type="time" required value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
-              </Field>
+              <HoursFields
+                start={windowStart}
+                end={windowEnd}
+                onChange={(a, b) => {
+                  setWindowStart(a);
+                  setWindowEnd(b);
+                }}
+              />
             </div>
             {template && (
               <section className="card p-5">
@@ -305,8 +393,7 @@ export function LinkedInCampaignDetailPage({ id }: { id: string }) {
         title={c.name}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
-            <Badge status={c.status} /> {MODE_LABEL[c.mode]} · {formatNumber(c.dailyLimit)}/day · every {Math.round(c.intervalSec / 60)} min · {c.windowStart}–{c.windowEnd} (
-            {c.timeZone})
+            <Badge status={c.status} /> {MODE_LABEL[c.mode]} · {formatNumber(c.dailyLimit)}/day · every {Math.round(c.intervalSec / 60)} min · {hoursLabel(c)}
           </span>
         }
         actions={
@@ -328,6 +415,11 @@ export function LinkedInCampaignDetailPage({ id }: { id: string }) {
         }
       />
       {action.error && <div className="mb-4"><ErrorBox error={action.error} /></div>}
+      {c.status !== "stopped" && c.status !== "completed" && (
+        <div className="mb-4">
+          <TimingEditor key={`${c.intervalSec}-${c.dailyLimit}-${c.windowStart}-${c.windowEnd}`} campaign={c} onSaved={() => client.invalidateQueries({ queryKey: ["linkedin-campaign", id] })} />
+        </div>
+      )}
       {c.status === "paused" && c.statusReason && c.statusReason !== "paused_by_admin" && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
           Paused: {c.statusReason}. Fix it in your browser (log in to LinkedIn, finish any security check yourself), then press Resume.

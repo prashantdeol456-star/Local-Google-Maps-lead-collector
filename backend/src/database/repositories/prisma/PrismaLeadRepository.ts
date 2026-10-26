@@ -20,11 +20,24 @@ export class PrismaLeadRepository implements LeadRepository {
 
   async list(query: LeadListQuery) {
     const q = query.q?.trim();
+    const present = (has: boolean | undefined, field: "phone" | "email" | "website") =>
+      has === undefined ? [] : [has ? { AND: [{ [field]: { not: null } }, { [field]: { not: "" } }] } : { OR: [{ [field]: null }, { [field]: "" }] }];
+    const createdAt = {
+      ...(query.createdFrom ? { gte: query.createdFrom } : {}),
+      // The earlier of the date filter and the export snapshot.
+      ...(query.createdUntil || query.createdBefore
+        ? { lt: [query.createdUntil, query.createdBefore].filter((d): d is Date => !!d).reduce((a, b) => (a < b ? a : b)) }
+        : {}),
+    };
     const where = {
       ...(query.city ? { city: query.city } : {}),
+      ...(query.state ? { state: query.state } : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.searchKeyword ? { searchKeyword: query.searchKeyword } : {}),
-      ...(query.createdBefore ? { createdAt: { lt: query.createdBefore } } : {}),
+      ...(query.minRating !== undefined ? { rating: { gte: query.minRating } } : {}),
+      ...(query.minReviews !== undefined ? { reviewCount: { gte: query.minReviews } } : {}),
+      ...(Object.keys(createdAt).length ? { createdAt } : {}),
+      AND: [...present(query.hasPhone, "phone"), ...present(query.hasEmail, "email"), ...present(query.hasWebsite, "website")],
       ...(q
         ? {
             OR: [
@@ -103,7 +116,7 @@ export class PrismaLeadRepository implements LeadRepository {
   }
 
   async facets(limit: number): Promise<LeadFacets> {
-    const group = async (field: "city" | "category" | "searchKeyword") => {
+    const group = async (field: "city" | "state" | "category" | "searchKeyword") => {
       const rows = await this.db.lead.groupBy({
         by: [field],
         where: { [field]: { not: null } },
@@ -113,7 +126,7 @@ export class PrismaLeadRepository implements LeadRepository {
       });
       return rows.map((r) => ({ value: r[field] as string, count: r._count._all }));
     };
-    const [cities, categories, keywords] = await Promise.all([group("city"), group("category"), group("searchKeyword")]);
-    return { cities, categories, keywords };
+    const [cities, states, categories, keywords] = await Promise.all([group("city"), group("state"), group("category"), group("searchKeyword")]);
+    return { cities, states, categories, keywords };
   }
 }

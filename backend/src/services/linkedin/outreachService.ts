@@ -43,6 +43,19 @@ export interface LinkedInCampaignInput {
   startAt?: Date | null;
 }
 
+/** Same start and end = no hours limit (sends any time of day). */
+export const ANY_TIME = { windowStart: "00:00", windowEnd: "00:00" } as const;
+
+export type ScheduleInput = Partial<Pick<LinkedInCampaignInput, "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd">>;
+
+function checkSchedule(input: ScheduleInput) {
+  if (input.windowStart !== undefined || input.windowEnd !== undefined) {
+    if (parseClock(input.windowStart ?? "") === null || parseClock(input.windowEnd ?? "") === null) throw Errors.badRequest("Sending hours must use HH:MM (24h)");
+  }
+  if (input.dailyLimit !== undefined && input.dailyLimit > MAX_LINKEDIN_DAILY_LIMIT) throw Errors.badRequest(`Daily limit can be at most ${MAX_LINKEDIN_DAILY_LIMIT} LinkedIn messages`);
+  if (input.intervalSec !== undefined && input.intervalSec < MIN_LINKEDIN_INTERVAL_SEC) throw Errors.badRequest(`Gap between messages must be at least ${MIN_LINKEDIN_INTERVAL_SEC} seconds`);
+}
+
 export type ResultStatus = "sent" | "failed" | "skipped" | "blocked";
 
 export interface HandedOutMessage {
@@ -98,12 +111,7 @@ export class LinkedInOutreachService {
   }
 
   async create(input: LinkedInCampaignInput, adminId: string | null) {
-    const start = parseClock(input.windowStart);
-    const end = parseClock(input.windowEnd);
-    if (start === null || end === null) throw Errors.badRequest("Sending window must use HH:MM (24h)");
-    if (start === end) throw Errors.badRequest("Sending window start and end must differ");
-    if (input.dailyLimit > MAX_LINKEDIN_DAILY_LIMIT) throw Errors.badRequest(`Daily limit can be at most ${MAX_LINKEDIN_DAILY_LIMIT} LinkedIn messages`);
-    if (input.intervalSec < MIN_LINKEDIN_INTERVAL_SEC) throw Errors.badRequest(`Gap between messages must be at least ${MIN_LINKEDIN_INTERVAL_SEC} seconds`);
+    checkSchedule(input);
 
     const template = await this.repos.templates.findById(input.templateId);
     if (!template || template.channel !== "linkedin") throw Errors.badRequest("Choose a LinkedIn message template");
@@ -164,6 +172,17 @@ export class LinkedInOutreachService {
 
   messages(id: string, query: { status?: AttemptStatus; skip: number; take: number }) {
     return this.repos.linkedinOutreach.listMessages({ campaignId: id, ...query });
+  }
+
+  /** Change the pace of a campaign that has not finished (takes effect on the next message). */
+  async updateSchedule(id: string, input: ScheduleInput) {
+    const { campaign } = await this.get(id);
+    if (campaign.status === "completed" || campaign.status === "stopped") throw Errors.conflict("INVALID_TRANSITION", `Cannot change a ${campaign.status} campaign`);
+    checkSchedule(input);
+    const updated = await this.repos.linkedinOutreach.updateCampaignSchedule(id, input);
+    const hours = updated.windowStart === updated.windowEnd ? "any time" : `${updated.windowStart}–${updated.windowEnd}`;
+    await this.log("updated", "info", `"${campaign.name}": ${hours}, every ${Math.round(updated.intervalSec / 60)} min, ${updated.dailyLimit}/day`);
+    return this.changed(updated);
   }
 
   async start(id: string) {

@@ -69,6 +69,36 @@ describe("leads API", () => {
     expect(names((await list("keyword=College&city=Moradabad")).json())).toEqual(["Moradabad Institute"]);
   });
 
+  it("filters by state, has phone/email/website, rating, reviews and date added", async () => {
+    await t.db.lead.updateMany({ where: { city: "Lucknow" }, data: { state: "Uttar Pradesh" } });
+    await t.db.lead.updateMany({ where: { name: "Zeta College" }, data: { email: "info@zeta.in", createdAt: new Date("2026-01-10T06:00:00Z") } });
+    await t.db.lead.updateMany({ where: { name: "Moradabad Institute" }, data: { phone: "", createdAt: new Date("2026-01-15T18:00:00Z") } });
+
+    expect(names((await list("state=Uttar%20Pradesh&sort=name&order=asc")).json())).toEqual(["ABC University", "Zeta College"]);
+    expect(names((await list("hasPhone=yes")).json())).toEqual(["ABC University"]);
+    // An empty string counts as "no phone".
+    expect(names((await list("hasPhone=no&sort=name&order=asc")).json())).toEqual(["Delhi Mobile Shop", "Moradabad Institute", "Zeta College"]);
+    expect(names((await list("hasEmail=yes")).json())).toEqual(["Zeta College"]);
+    expect(names((await list("hasWebsite=yes")).json())).toEqual(["ABC University"]);
+    expect(names((await list("minRating=4")).json())).toEqual(["ABC University"]);
+    expect(names((await list("minReviews=50&sort=name&order=asc")).json())).toEqual(["ABC University", "Zeta College"]);
+    expect(names((await list("from=2026-01-10&to=2026-01-10")).json())).toEqual(["Zeta College"]);
+    // 18:00 UTC on Jan 15 is 23:30 on Jan 15 in India: inside "to=2026-01-15", outside "from=2026-01-16".
+    expect(names((await list("from=2026-01-11&to=2026-01-15")).json())).toEqual(["Moradabad Institute"]);
+    expect((await list("from=2026-01-16&to=2026-01-31")).json().total).toBe(0);
+
+    const facets = (await t.app.inject({ method: "GET", url: "/api/leads/facets", headers: auth })).json();
+    expect(facets.states).toEqual([{ value: "Uttar Pradesh", count: 2 }]);
+
+    // Exports contain exactly the filtered leads.
+    const csv = await t.app.inject({ method: "GET", url: "/api/export/csv?hasEmail=yes", headers: auth });
+    expect(csv.body).toContain("Zeta College");
+    expect(csv.body).not.toContain("ABC University");
+
+    expect((await list("hasPhone=maybe")).statusCode).toBe(400);
+    expect((await list("from=10-01-2026")).statusCode).toBe(400);
+  });
+
   it("sorts, with empty values last", async () => {
     expect(names((await list("sort=rating&order=desc")).json()).slice(0, 2)).toEqual(["ABC University", "Zeta College"]);
     const asc = names((await list("sort=rating&order=asc")).json());

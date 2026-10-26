@@ -96,8 +96,18 @@ export interface LeadListQuery {
   /** Free-text search over name, phone, website, address. */
   q?: string;
   city?: string;
+  state?: string;
   category?: string;
   searchKeyword?: string;
+  /** true = has a value, false = empty */
+  hasPhone?: boolean;
+  hasEmail?: boolean;
+  hasWebsite?: boolean;
+  minRating?: number;
+  minReviews?: number;
+  /** Added at or after / before these instants (date filter) */
+  createdFrom?: Date;
+  createdUntil?: Date;
   /** Only leads created before this instant (stable snapshots for exports). */
   createdBefore?: Date;
   sort: LeadSortField;
@@ -152,6 +162,7 @@ export interface FacetValue {
 
 export interface LeadFacets {
   cities: FacetValue[];
+  states: FacetValue[];
   categories: FacetValue[];
   keywords: FacetValue[];
 }
@@ -684,6 +695,7 @@ export interface LinkedInOutreachRepository {
   listCampaignsByStatus(status: CampaignStatus): Promise<LinkedInCampaignRecord[]>;
   updateCampaignStatus(id: string, from: CampaignStatus[], data: Partial<Pick<LinkedInCampaignRecord, "status" | "statusReason" | "startedAt" | "completedAt">>): Promise<LinkedInCampaignRecord | null>;
   touchLastSent(id: string, at: Date): Promise<void>;
+  updateCampaignSchedule(id: string, data: Partial<Pick<LinkedInCampaignRecord, "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd">>): Promise<LinkedInCampaignRecord>;
   countByStatus(campaignId: string): Promise<Partial<Record<AttemptStatus, number>>>;
   countSentSince(campaignId: string, since: Date): Promise<number>;
   listMessages(query: { campaignId: string; status?: AttemptStatus; skip: number; take: number }): Promise<{ items: LinkedInMessageRecord[]; total: number }>;

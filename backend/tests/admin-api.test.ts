@@ -74,6 +74,7 @@ describe("GET /api/leads/facets", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       cities: [{ value: "Lucknow", count: 2 }, { value: "Agra", count: 1 }],
+      states: [],
       categories: [{ value: "College", count: 2 }, { value: "University", count: 1 }],
       keywords: [{ value: "College", count: 2 }, { value: "University", count: 1 }],
     });

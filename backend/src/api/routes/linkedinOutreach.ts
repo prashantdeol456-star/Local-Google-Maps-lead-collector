@@ -68,6 +68,23 @@ export async function linkedinOutreachRoutes(app: FastifyInstance, opts: { outre
     return { items, total, page: query.page, pageSize: query.pageSize };
   });
 
+  app.patch("/api/linkedin-outreach/campaigns/:id/schedule", async (request) => {
+    const body = parse(
+      z
+        .object({
+          intervalSec: z.number().int().min(MIN_LINKEDIN_INTERVAL_SEC).max(86_400),
+          dailyLimit: z.number().int().min(1).max(MAX_LINKEDIN_DAILY_LIMIT),
+          windowStart: z.string().regex(/^\d{2}:\d{2}$/),
+          windowEnd: z.string().regex(/^\d{2}:\d{2}$/),
+        })
+        .partial()
+        .strict()
+        .refine((b) => (b.windowStart === undefined) === (b.windowEnd === undefined), "Send windowStart and windowEnd together"),
+      request.body,
+    );
+    return { campaign: await outreach.updateSchedule(parse(IdParams, request.params).id, body) };
+  });
+
   app.post("/api/linkedin-outreach/campaigns/:id/start", async (request) => ({ campaign: await outreach.start(parse(IdParams, request.params).id) }));
   app.post("/api/linkedin-outreach/campaigns/:id/pause", async (request) => ({ campaign: await outreach.pause(parse(IdParams, request.params).id) }));
   app.post("/api/linkedin-outreach/campaigns/:id/stop", async (request) => ({ campaign: await outreach.stop(parse(IdParams, request.params).id) }));

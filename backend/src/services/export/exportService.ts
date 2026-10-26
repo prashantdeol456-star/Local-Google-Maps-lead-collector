@@ -111,7 +111,20 @@ export class ExportService {
     if ("ids" in selection) scope = "selected leads";
     else {
       const f = selection.filters;
-      const parts = [f.q && `search "${f.q}"`, f.city && `city=${f.city}`, f.category && `category=${f.category}`, f.searchKeyword && `keyword=${f.searchKeyword}`].filter(Boolean);
+      const yn = (v: boolean | undefined) => (v ? "yes" : "no");
+      const parts = [
+        f.q && `search "${f.q}"`,
+        f.city && `city=${f.city}`,
+        f.state && `state=${f.state}`,
+        f.category && `category=${f.category}`,
+        f.searchKeyword && `keyword=${f.searchKeyword}`,
+        f.hasPhone !== undefined && `phone=${yn(f.hasPhone)}`,
+        f.hasEmail !== undefined && `email=${yn(f.hasEmail)}`,
+        f.hasWebsite !== undefined && `website=${yn(f.hasWebsite)}`,
+        f.minRating !== undefined && `rating>=${f.minRating}`,
+        f.minReviews !== undefined && `reviews>=${f.minReviews}`,
+        (f.createdFrom || f.createdUntil) && "date range",
+      ].filter(Boolean);
       scope = parts.length ? parts.join(", ") : "all leads";
     }
     await this.repos.agentLogs.create({

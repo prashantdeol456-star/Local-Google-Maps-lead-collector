@@ -3,13 +3,11 @@ import { z } from "zod";
 import { LEAD_SORT_FIELDS } from "../../database/repositories/index.js";
 import type { DedupeService } from "../../services/lead/dedupeService.js";
 import { toLeadView, type LeadService } from "../../services/lead/leadService.js";
-import { IdParams, optionalText, Pagination, parse, toSkipTake } from "../validation.js";
+import { IdParams, Pagination, parse, toSkipTake } from "../validation.js";
+import { LeadFilterShape, toLeadFilters } from "../leadFilters.js";
 
 const ListLeadsQuery = Pagination.extend({
-  q: optionalText(200),
-  city: optionalText(100),
-  category: optionalText(100),
-  keyword: optionalText(100),
+  ...LeadFilterShape,
   sort: z.enum(LEAD_SORT_FIELDS).default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -64,7 +62,7 @@ const UpdateLeadBody = z
   .partial()
   .strict();
 
-export async function leadRoutes(app: FastifyInstance, opts: { leads: LeadService; dedupe: DedupeService }) {
+export async function leadRoutes(app: FastifyInstance, opts: { leads: LeadService; dedupe: DedupeService; timeZone: string }) {
   const { leads, dedupe } = opts;
 
   app.post("/api/leads", async (request, reply) => {
@@ -89,10 +87,7 @@ export async function leadRoutes(app: FastifyInstance, opts: { leads: LeadServic
   app.get("/api/leads", async (request) => {
     const query = parse(ListLeadsQuery, request.query);
     const { items, total } = await leads.list({
-      q: query.q,
-      city: query.city,
-      category: query.category,
-      searchKeyword: query.keyword,
+      ...toLeadFilters(query, opts.timeZone),
       sort: query.sort,
       order: query.order,
       ...toSkipTake(query),

@@ -209,6 +209,27 @@ describe("LinkedIn campaigns and the extension queue", () => {
     expect(detail.counts).toEqual({ queued: 2 });
   });
 
+  it("any-time campaigns send right away; timing can be changed on a running campaign", async () => {
+    const { campaign } = await setup("auto");
+    // Hours that never include "now": 1-minute window far from the current time.
+    const h = (new Date().getUTCHours() + 12) % 24;
+    const far = `${String(h).padStart(2, "0")}:00`;
+    const farEnd = `${String(h).padStart(2, "0")}:01`;
+    expect((await call("PATCH", `/api/linkedin-outreach/campaigns/${campaign.id}/schedule`, { windowStart: far, windowEnd: farEnd })).statusCode).toBe(200);
+    await call("POST", `/api/linkedin-outreach/campaigns/${campaign.id}/start`);
+    expect((await call("POST", "/api/linkedin-outreach/next")).json().wait.reason).toBe("outside_window");
+
+    // "Any time" = same start and end.
+    const any = await call("PATCH", `/api/linkedin-outreach/campaigns/${campaign.id}/schedule`, { windowStart: "00:00", windowEnd: "00:00" });
+    expect(any.json().campaign).toMatchObject({ windowStart: "00:00", windowEnd: "00:00", status: "running" });
+    expect((await call("POST", "/api/linkedin-outreach/next")).json().message).toMatchObject({ contactName: "Priya Sharma" });
+
+    expect((await call("PATCH", `/api/linkedin-outreach/campaigns/${campaign.id}/schedule`, { windowStart: "09:00" })).statusCode).toBe(400);
+    expect((await call("PATCH", `/api/linkedin-outreach/campaigns/${campaign.id}/schedule`, { dailyLimit: 500 })).statusCode).toBe(400);
+    await call("POST", `/api/linkedin-outreach/campaigns/${campaign.id}/stop`);
+    expect((await call("PATCH", `/api/linkedin-outreach/campaigns/${campaign.id}/schedule`, { dailyLimit: 10 })).statusCode).toBe(409);
+  });
+
   it("enforces LinkedIn limits and template channel", async () => {
     const { template } = await setup();
     const base = { name: "x", templateId: template.id, mode: "auto", recipients: { filters: {} }, intervalSec: 60, dailyLimit: 20, windowStart: "09:00", windowEnd: "18:00" };

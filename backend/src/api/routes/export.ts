@@ -3,16 +3,14 @@ import { z } from "zod";
 import { LEAD_SORT_FIELDS } from "../../database/repositories/index.js";
 import type { ExportSelection, ExportService } from "../../services/export/exportService.js";
 import { formatWallClock } from "../../utils/time.js";
-import { optionalText, parse } from "../validation.js";
+import { parse } from "../validation.js";
+import { LeadFilterShape, toLeadFilters } from "../leadFilters.js";
 
 export const MAX_EXPORT_IDS = 500;
 
 /** Same filters as GET /api/leads (no paging), or `ids` = comma-separated selected lead ids. */
 const ExportQuery = z.object({
-  q: optionalText(200),
-  city: optionalText(100),
-  category: optionalText(100),
-  keyword: optionalText(100),
+  ...LeadFilterShape,
   sort: z.enum(LEAD_SORT_FIELDS).default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
   ids: z
@@ -35,7 +33,7 @@ export async function exportRoutes(app: FastifyInstance, opts: { exporter: Expor
     const query = parse(ExportQuery, request.query); // validation errors are normal JSON 400s
     const selection: ExportSelection = query.ids
       ? { ids: query.ids }
-      : { filters: { q: query.q, city: query.city, category: query.category, searchKeyword: query.keyword, sort: query.sort, order: query.order } };
+      : { filters: { ...toLeadFilters(query, opts.timeZone), sort: query.sort, order: query.order } };
 
     const stamp = formatWallClock(new Date(), opts.timeZone).replace(" ", "_").replace(":", "");
     const { contentType, extension } = FORMATS[format];

@@ -38,12 +38,33 @@ function FacetSelect({ label, param, value, options }: { label: string; param: s
   );
 }
 
+/** Filters beyond search and the dropdowns, kept in the URL so links and exports keep them. */
+const EXTRA_FILTERS = ["hasPhone", "hasEmail", "hasWebsite", "minRating", "minReviews", "from", "to"] as const;
+const FILTER_PARAMS = ["q", "city", "state", "category", "keyword", ...EXTRA_FILTERS] as const;
+
+function YesNoSelect({ label, param, value }: { label: string; param: string; value: string }) {
+  return (
+    <label className="block space-y-1">
+      <span className="label">{label}</span>
+      <select className="input w-auto min-w-32" value={value} onChange={(e) => setSearchParams({ [param]: e.target.value, page: null })}>
+        <option value="">Any</option>
+        <option value="yes">Has {label.toLowerCase()}</option>
+        <option value="no">No {label.toLowerCase()}</option>
+      </select>
+    </label>
+  );
+}
+
 export function LeadsPage() {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
   const city = params.get("city") ?? "";
   const category = params.get("category") ?? "";
   const keyword = params.get("keyword") ?? "";
+  const state = params.get("state") ?? "";
+  const extra = Object.fromEntries(EXTRA_FILTERS.map((k) => [k, params.get(k) ?? ""])) as Record<(typeof EXTRA_FILTERS)[number], string>;
+  const extraCount = EXTRA_FILTERS.filter((k) => extra[k]).length;
+  const [showMore, setShowMore] = useState(extraCount > 0);
   const sort = (SORTABLE as readonly string[]).includes(params.get("sort") ?? "") ? params.get("sort")! : "createdAt";
   const order = params.get("order") === "asc" ? "asc" : "desc";
   const page = Math.max(1, Number(params.get("page")) || 1);
@@ -58,7 +79,8 @@ export function LeadsPage() {
     return () => clearTimeout(t);
   }, [search, q]);
 
-  const query = qs({ q, city, category, keyword, sort, order, page, pageSize });
+  const filters = { q, city, state, category, keyword, ...extra };
+  const query = qs({ ...filters, sort, order, page, pageSize });
   const leads = useQuery({
     queryKey: ["leads", query],
     queryFn: () => api<Page<Lead>>(`/leads${query}`),
@@ -72,7 +94,7 @@ export function LeadsPage() {
     onSuccess: () => client.invalidateQueries({ queryKey: ["leads"] }),
   });
 
-  const filtered = !!(q || city || category || keyword);
+  const filtered = Object.values(filters).some(Boolean);
 
   // Row selection for "export selected"; cleared whenever the list changes.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -85,7 +107,7 @@ export function LeadsPage() {
     else next.add(id);
     setSelected(next);
   };
-  const exportFiltered = qs({ q, city, category, keyword, sort, order });
+  const exportFiltered = qs({ ...filters, sort, order });
   const exportSelected = qs({ ids: [...selected].join(",") });
 
   return (
@@ -137,10 +159,14 @@ export function LeadsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <FacetSelect label="Cities" param="city" value={city} options={facets.data?.cities} />
+          <FacetSelect label="States" param="state" value={state} options={facets.data?.states} />
           <FacetSelect label="Categories" param="category" value={category} options={facets.data?.categories} />
           <FacetSelect label="Keywords" param="keyword" value={keyword} options={facets.data?.keywords} />
+          <button className={`btn ${extraCount ? "btn-primary" : ""}`} aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
+            ⚙ More filters{extraCount ? ` (${extraCount})` : ""}
+          </button>
           {filtered && (
-            <button className="btn" onClick={() => setSearchParams({ q: null, city: null, category: null, keyword: null, page: null })}>
+            <button className="btn" onClick={() => setSearchParams({ ...Object.fromEntries(FILTER_PARAMS.map((k) => [k, null])), page: null })}>
               Clear filters
             </button>
           )}
@@ -157,6 +183,47 @@ export function LeadsPage() {
             ))}
           </select>
         </div>
+
+        {showMore && (
+          <div className="flex flex-wrap items-end gap-4 border-b border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <YesNoSelect label="Phone" param="hasPhone" value={extra.hasPhone} />
+            <YesNoSelect label="Email" param="hasEmail" value={extra.hasEmail} />
+            <YesNoSelect label="Website" param="hasWebsite" value={extra.hasWebsite} />
+            <label className="block space-y-1">
+              <span className="label">Rating</span>
+              <select className="input w-auto min-w-28" value={extra.minRating} onChange={(e) => setSearchParams({ minRating: e.target.value, page: null })}>
+                <option value="">Any</option>
+                {["3", "3.5", "4", "4.5"].map((r) => (
+                  <option key={r} value={r}>
+                    ★ {r}+
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="label">Min. reviews</span>
+              <input
+                className="input w-28"
+                type="number"
+                min={0}
+                placeholder="Any"
+                defaultValue={extra.minReviews}
+                key={extra.minReviews}
+                onBlur={(e) => setSearchParams({ minReviews: e.target.value.trim(), page: null })}
+                onKeyDown={(e) => e.key === "Enter" && setSearchParams({ minReviews: e.currentTarget.value.trim(), page: null })}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="label">Added from</span>
+              <input className="input w-auto" type="date" value={extra.from} max={extra.to || undefined} onChange={(e) => setSearchParams({ from: e.target.value, page: null })} />
+            </label>
+            <label className="block space-y-1">
+              <span className="label">Added to</span>
+              <input className="input w-auto" type="date" value={extra.to} min={extra.from || undefined} onChange={(e) => setSearchParams({ to: e.target.value, page: null })} />
+            </label>
+            <p className="basis-full text-xs text-slate-500">Exports use the same filters.</p>
+          </div>
+        )}
 
         {leads.error && (
           <div className="p-4">

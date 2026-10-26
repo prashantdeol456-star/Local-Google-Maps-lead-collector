@@ -197,7 +197,7 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
     loginRateLimitPerMinute: config.loginRateLimitPerMinute,
   });
   await app.register(jobRoutes, { jobs });
-  await app.register(leadRoutes, { leads, dedupe });
+  await app.register(leadRoutes, { leads, dedupe, timeZone: config.timeZone });
   await app.register(statsRoutes, { stats });
   await app.register(eventRoutes, { bus });
   await app.register(exportRoutes, { exporter, timeZone: config.timeZone });

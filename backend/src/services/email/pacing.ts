@@ -34,6 +34,8 @@ export function inWindow(now: Date, windowStart: string, windowEnd: string, time
   const start = parseClock(windowStart);
   const end = parseClock(windowEnd);
   if (start === null || end === null) return false;
+  // The same start and end means no hours limit: any time of day.
+  if (start === end) return true;
   const m = localMinutes(now, timeZone);
   // A window like 22:00–06:00 crosses midnight.
   return start <= end ? m >= start && m < end : m >= start || m < end;

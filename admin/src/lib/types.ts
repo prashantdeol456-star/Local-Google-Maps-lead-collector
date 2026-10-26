@@ -83,6 +83,7 @@ export interface Stats {
 
 export interface Facets {
   cities: { value: string; count: number }[];
+  states: { value: string; count: number }[];
   categories: { value: string; count: number }[];
   keywords: { value: string; count: number }[];
 }
