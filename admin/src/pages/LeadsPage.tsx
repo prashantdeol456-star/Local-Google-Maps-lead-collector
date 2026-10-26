@@ -91,7 +91,7 @@ export function LeadsPage() {
   return (
     <>
       <PageHeader
-        title="Leads"
+        title="Google Maps Leads"
         subtitle={leads.data ? `${formatNumber(leads.data.total)} ${filtered ? "matching" : "total"}` : " "}
         actions={
           selected.size > 0 ? (

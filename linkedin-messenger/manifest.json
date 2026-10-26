@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Messenger (Lead Platform)",
+  "version": "0.1.0",
+  "description": "Sends your LinkedIn message campaigns from your own LinkedIn account, one at a time, at the pace set in your lead platform.",
+  "minimum_chrome_version": "120",
+  "action": { "default_title": "Open LinkedIn Messenger" },
+  "side_panel": { "default_path": "src/sidepanel/index.html" },
+  "background": { "service_worker": "src/background/service-worker.ts", "type": "module" },
+  "permissions": ["sidePanel", "storage", "alarms"],
+  "host_permissions": ["https://www.linkedin.com/*", "http://127.0.0.1:3000/*", "http://localhost:3000/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ]
+}

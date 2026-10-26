@@ -15,7 +15,11 @@ import { OptOutsPage } from "./pages/OptOutsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadsPage } from "./pages/LeadsPage";
+import { LinkedInLeadDetailPage, LinkedInLeadsPage } from "./pages/LinkedInPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ContactsPage } from "./pages/ContactsPage";
+import { CampaignLogsPage } from "./pages/CampaignLogsPage";
+import { LinkedInCampaignDetailPage, LinkedInCampaignsPage, NewLinkedInCampaignPage } from "./pages/LinkedInOutreachPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 function Routes({ admin }: { admin: Admin }) {
@@ -24,6 +28,13 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/") return <DashboardPage />;
   if (path === "/leads") return <LeadsPage />;
   if ((params = matchPath("/leads/:id", path))) return <LeadDetailPage key={params.id} id={params.id!} />;
+  if (path === "/linkedin") return <LinkedInLeadsPage />;
+  if ((params = matchPath("/linkedin/:id", path))) return <LinkedInLeadDetailPage key={params.id} id={params.id!} />;
+  if (path === "/contacts") return <ContactsPage />;
+  if (path === "/linkedin-outreach") return <LinkedInCampaignsPage />;
+  if (path === "/linkedin-outreach/new") return <NewLinkedInCampaignPage />;
+  if ((params = matchPath("/linkedin-outreach/:id", path))) return <LinkedInCampaignDetailPage key={params.id} id={params.id!} />;
+  if (path === "/campaign-logs") return <CampaignLogsPage />;
   if (path === "/collections") return <CollectionsPage />;
   if ((params = matchPath("/collections/:id", path))) return <CollectionDetailPage key={params.id} id={params.id!} />;
   if (path === "/email") return <EmailCampaignsPage />;

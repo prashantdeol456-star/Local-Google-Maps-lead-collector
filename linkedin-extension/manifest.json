@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Helper (Lead Platform)",
+  "version": "0.1.0",
+  "description": "Save LinkedIn profiles you open yourself, including the Contact info you can see, to your lead platform.",
+  "minimum_chrome_version": "116",
+  "action": { "default_title": "Open LinkedIn Helper" },
+  "side_panel": { "default_path": "src/sidepanel/index.html" },
+  "background": { "service_worker": "src/background/service-worker.ts", "type": "module" },
+  "permissions": ["sidePanel", "storage", "scripting"],
+  "host_permissions": ["https://www.linkedin.com/*", "http://127.0.0.1:3000/*", "http://localhost:3000/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "commands": {
+    "save-and-next": {
+      "suggested_key": { "default": "Alt+N" },
+      "description": "Save the profile and open the next one (or open the next one)"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ]
+}

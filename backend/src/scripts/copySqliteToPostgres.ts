@@ -32,6 +32,10 @@ export const TABLES = [
   "Suppression",
   "WebhookEndpoint",
   "WebhookDelivery",
+  "LinkedInLead",
+  "OutreachContact",
+  "LinkedInCampaign",
+  "LinkedInMessage",
 ] as const;
 
 const BATCH = 500;

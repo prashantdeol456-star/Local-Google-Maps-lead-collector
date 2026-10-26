@@ -5,12 +5,18 @@
     "shared",
     "backend",
     "extension",
+    "linkedin-extension",
+    "linkedin-messenger",
     "admin"
   ],
   "scripts": {
     "dev:backend": "npm run dev -w backend",
     "dev:extension": "npm run dev -w extension",
     "build:extension": "npm run build -w extension",
+    "dev:linkedin": "npm run dev -w linkedin-extension",
+    "build:linkedin": "npm run build -w linkedin-extension",
+    "dev:messenger": "npm run dev -w linkedin-messenger",
+    "build:messenger": "npm run build -w linkedin-messenger",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "dev:admin": "npm run dev -w admin",

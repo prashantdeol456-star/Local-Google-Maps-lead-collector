@@ -5,11 +5,15 @@ import type { Admin } from "../lib/types";
 
 const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: "▦" },
-  { to: "/leads", label: "Leads", icon: "☰" },
+  { to: "/leads", label: "Google Maps Leads", icon: "☰" },
+  { to: "/linkedin", label: "LinkedIn Leads", icon: "in" },
+  { to: "/contacts", label: "Contacts (Sheets)", icon: "▤" },
   { to: "/collections", label: "Collections", icon: "⌖" },
   { to: "/email", label: "Email", icon: "✉" },
   { to: "/whatsapp", label: "WhatsApp", icon: "✆" },
+  { to: "/linkedin-outreach", label: "LinkedIn Outreach", icon: "➤" },
   { to: "/templates", label: "Templates", icon: "❏" },
+  { to: "/campaign-logs", label: "Campaign Logs", icon: "≡" },
   { to: "/opt-outs", label: "Opt-outs", icon: "⊘" },
   { to: "/integrations", label: "Integrations", icon: "⇄" },
   { to: "/settings", label: "Settings", icon: "⚙" },

@@ -30,6 +30,14 @@ enum Channel {
   whatsapp
 }
 
+/** Templates exist for more channels than the campaigns that send them. */
+enum TemplateChannel {
+  email
+  whatsapp
+  sms
+  linkedin
+}
+
 enum CampaignStatus {
   draft
   running
@@ -217,7 +225,7 @@ model LeadCommunicationPreference {
 
 model MessageTemplate {
   id                 String     @id @default(cuid())
-  channel            Channel
+  channel            TemplateChannel
   name               String
   /** Email only */
   subject            String?
@@ -236,6 +244,7 @@ model MessageTemplate {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
   campaigns          Campaign[]
+  linkedinCampaigns  LinkedInCampaign[]
 
   @@index([channel])
 }
@@ -460,4 +469,124 @@ model WebhookDelivery {
   @@unique([endpointId, eventId])
   @@index([status, nextAttemptAt])
   @@index([endpointId, createdAt])
+}
+
+// ---- LinkedIn Helper: profiles saved by hand from the LinkedIn Helper extension or a
+// LinkedIn "Connections.csv" export. Kept apart from Google Maps leads. ----
+
+model LinkedInLead {
+  id             String   @id @default(cuid())
+  /** https://www.linkedin.com/in/<slug> (lowercase slug, no query) */
+  profileUrl     String   @unique
+  name           String
+  /** Headline / designation */
+  headline       String?
+  company        String?
+  location       String?
+  /** JSON array of lowercase email addresses */
+  emails         String   @default("[]")
+  /** JSON array of phone numbers as shown */
+  phones         String   @default("[]")
+  /** JSON array of { url, label } */
+  websites       String   @default("[]")
+  /** JSON array of instant-messenger entries, e.g. "name (Skype)" */
+  ims            String   @default("[]")
+  /** JSON array of { title, company, employmentType, dates, location } */
+  experience     String   @default("[]")
+  /** JSON array of { school, degree, dates } */
+  education      String   @default("[]")
+  birthday       String?
+  address        String?
+  connectedSince String?
+  notes          String?
+  /** Free label to group profiles, e.g. the search you did ("HR Lucknow") */
+  tag            String?
+  /** extension | csv | admin */
+  source         String
+  hasEmail       Boolean  @default(false)
+  hasPhone       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([company])
+  @@index([tag])
+}
+
+// ---- Contacts uploaded from a sheet (name, LinkedIn URL, phone, email, designation, company)
+// and LinkedIn message campaigns sent through the LinkedIn Messenger extension. ----
+
+model OutreachContact {
+  id          String            @id @default(cuid())
+  name        String
+  /** Canonical https://www.linkedin.com/in/<slug>; the key used to merge re-uploads */
+  linkedinUrl String?           @unique
+  /** Lowercase */
+  email       String?
+  phone       String?
+  designation String?
+  company     String?
+  /** Name given to the uploaded sheet, to group contacts ("HR Lucknow Oct") */
+  listName    String?
+  /** sheet | admin */
+  source      String            @default("sheet")
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  messages    LinkedInMessage[]
+
+  @@index([listName])
+  @@index([email])
+  @@index([createdAt])
+}
+
+model LinkedInCampaign {
+  id           String            @id @default(cuid())
+  name         String
+  templateId   String
+  status       CampaignStatus    @default(draft)
+  statusReason String?
+  /** assisted: the extension types the message and you click Send · auto: it also clicks Send */
+  mode         String            @default("assisted")
+  /** Fixed gap between two messages (seconds). */
+  intervalSec  Int               @default(300)
+  dailyLimit   Int               @default(20)
+  windowStart  String            @default("10:00")
+  windowEnd    String            @default("18:00")
+  timeZone     String            @default("Asia/Kolkata")
+  startAt      DateTime?
+  lastSentAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  template     MessageTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  messages     LinkedInMessage[]
+
+  @@index([status])
+}
+
+/** One LinkedIn message to one contact: the extension's work queue and the send log. */
+model LinkedInMessage {
+  id           String           @id @default(cuid())
+  campaignId   String
+  contactId    String?
+  profileUrl   String
+  contactName  String
+  renderedBody String
+  /** queued → sending (handed to the extension) → sent | failed | skipped; cancelled on stop */
+  status       AttemptStatus    @default(queued)
+  error        String?
+  claimedAt    DateTime?
+  sentAt       DateTime?
+  failedAt     DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  campaign     LinkedInCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact      OutreachContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, profileUrl])
+  @@index([campaignId, status, createdAt])
+  @@index([status, updatedAt])
+  @@index([contactId])
 }

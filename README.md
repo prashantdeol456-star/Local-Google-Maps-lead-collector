@@ -18,6 +18,7 @@ navigation, n8n integration.
 |---|---|
 | `shared/` | Types and logic used by both extension and backend |
 | `extension/` | Chrome extension (Manifest V3, React side panel) |
+| `linkedin-extension/` | LinkedIn Helper: separate Chrome extension that saves LinkedIn profiles you open yourself |
 | `backend/` | Fastify API + Prisma (SQLite or PostgreSQL), workers for campaigns and webhooks |
 | `admin/` | Admin panel (React + Tailwind), served by the backend at `/admin` |
 
@@ -67,6 +68,70 @@ npm run build:extension
 During development, `npm run dev:extension` rebuilds on save (reload the extension
 in `chrome://extensions` after changing the manifest or background script).
 
+### LinkedIn Helper (separate extension)
+
+```bash
+npm run build:linkedin
+```
+
+Load `linkedin-extension/dist` the same way (Load unpacked) and log in with the admin email and
+password. It is user-driven only:
+
+1. Type a keyword in the side panel and click **Search**: LinkedIn's people search (People filter) opens in the tab.
+2. **Add profiles on this page** puts the results in your list (go to the next results page on LinkedIn and add again).
+3. **Open next profile** opens one profile with its Contact info dialog; the helper reads it
+   automatically (name, headline, company, location, email, phone, website, IM, birthday,
+   connected since, Experience and Education; it scrolls the open profile once so LinkedIn
+   loads those sections). Check or edit, then **Save & open next**.
+
+Every search and every profile is opened by your click; the helper does not run through the list on its own. Saved profiles appear in the admin
+panel under **LinkedIn Leads** (separate from Google Maps leads), with filters (company, tag,
+has email / phone, source), editing, CSV export, and import of LinkedIn's own `Connections.csv`
+(LinkedIn → Settings → Data privacy → Get a copy of your data).
+
+### Contacts (Sheets), templates, LinkedIn Messenger and Campaign Logs
+
+**Contacts (Sheets)** in the admin panel takes your own sheet (.xlsx or .csv) with the columns
+**Name, LinkedIn URL, Contact Number, Email, Designation, Company**. Download the template from
+that page, fill it in and upload it with an optional list name. Re-uploading the same LinkedIn
+URL (or email) updates that contact instead of adding a copy; bad rows are listed with the reason.
+
+**Templates** has one tab per channel: Email, SMS, WhatsApp and LinkedIn message. SMS and LinkedIn
+templates use contact variables: `{{first_name}}`, `{{name}}`, `{{company}}`, `{{designation}}`,
+`{{email}}`, `{{phone}}` (fallback: `{{company|your company}}`). SMS templates are for writing and
+previewing only; no SMS provider is connected yet.
+
+**LinkedIn Outreach** creates a campaign from a list (or contacts ticked on the Contacts page) and a
+LinkedIn template, with a gap between messages (min 1 min), a daily cap (max 100) and sending
+hours. Messages are sent by the **LinkedIn Messenger** extension, in your own browser and LinkedIn
+account:
+
+```bash
+npm run build:messenger
+```
+
+1. Load `linkedin-messenger/dist` with **Load unpacked** and log in with the admin email and password.
+2. Log in to LinkedIn in the same browser.
+3. In the admin panel, start the campaign; in the extension's side panel, press **Start**.
+
+The extension asks the backend for one message at a time (when the campaign's pace allows), opens
+that profile in one tab, clicks **Message** and types the personalised text.
+- **Assisted mode** (the default): you read it and press Send yourself (or **Skip this contact**).
+- **Automatic mode**: the extension presses Send too.
+
+People who are not 1st-degree connections, and anyone who would need a paid InMail, are skipped. If
+LinkedIn asks for a login or a security check, or shows a limit, every LinkedIn campaign pauses and
+the extension stops. Fix it yourself in the tab, then resume.
+
+> **Risk:** LinkedIn's User Agreement (section 8.2, "Prohibited software and extensions") does not
+> allow tools that automate sending messages. Accounts that use them can be restricted or closed.
+> Use assisted mode and low daily limits, and message only people who expect to hear from you.
+
+**Campaign Logs** shows every campaign and message across email, WhatsApp and LinkedIn:
+- status counts per campaign;
+- a searchable message log with the reason for each skip or failure;
+- a feed of campaign events (started, paused, stopped, completed).
+
 ## Scripts (root)
 
 | Command | What it does |
@@ -76,6 +141,9 @@ in `chrome://extensions` after changing the manifest or background script).
 | `npm run dev:backend` | Backend with auto-reload |
 | `npm run dev:extension` | Extension dev build with HMR |
 | `npm run build:extension` | Production build into `extension/dist` |
+| `npm run build:messenger` | Production build of the LinkedIn Messenger into `linkedin-messenger/dist` |
+| `npm run dev:messenger` | LinkedIn Messenger dev build with HMR |
+| `npm run build:linkedin` | Production build of the LinkedIn Helper into `linkedin-extension/dist` |
 | `npm run dev:admin` | Admin panel dev server with hot reload |
 | `npm run build:admin` | Production build of the admin panel |
 

@@ -308,3 +308,194 @@ export interface WebhookDelivery {
 }
 
 export type DeliveryResult = { ok: true; status: number } | { ok: false; status: number | null; error: string };
+
+export interface LinkedInLead {
+  id: string;
+  profileUrl: string;
+  name: string;
+  headline: string | null;
+  company: string | null;
+  location: string | null;
+  emails: string[];
+  phones: string[];
+  websites: { url: string; label: string | null }[];
+  ims: string[];
+  experience: { title: string; company: string | null; employmentType: string | null; dates: string | null; location: string | null }[];
+  education: { school: string; degree: string | null; dates: string | null }[];
+  birthday: string | null;
+  address: string | null;
+  connectedSince: string | null;
+  notes: string | null;
+  tag: string | null;
+  source: "extension" | "csv" | "admin";
+  hasEmail: boolean;
+  hasPhone: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LinkedInLeadPage {
+  items: LinkedInLead[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface LinkedInFacets {
+  total: number;
+  withEmail: number;
+  withPhone: number;
+  withWebsite: number;
+  tags: { value: string; count: number }[];
+  companies: { value: string; count: number }[];
+  sources: { value: string; count: number }[];
+}
+
+export interface LinkedInImportResult {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: { line: number; reason: string }[];
+}
+
+// ---- Contacts (uploaded sheets), SMS/LinkedIn templates, LinkedIn campaigns, campaign logs ----
+
+export interface Contact {
+  id: string;
+  name: string;
+  linkedinUrl: string | null;
+  email: string | null;
+  phone: string | null;
+  designation: string | null;
+  company: string | null;
+  listName: string | null;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactFacets {
+  total: number;
+  withLinkedIn: number;
+  withEmail: number;
+  withPhone: number;
+  lists: { value: string; count: number }[];
+}
+
+export interface ContactImportResult {
+  created: number;
+  updated: number;
+  duplicatesInFile: number;
+  errors: { line: number; reason: string }[];
+  total: number;
+}
+
+export type ContactTemplateChannel = "sms" | "linkedin";
+
+export interface ChannelTemplate {
+  id: string;
+  channel: ContactTemplateChannel;
+  name: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChannelTemplatePreview {
+  contact: string;
+  text: string;
+  characters: number;
+  limit: number;
+  sms?: { encoding: "GSM-7" | "Unicode"; characters: number; parts: number };
+}
+
+export type LinkedInSendMode = "assisted" | "auto";
+
+export interface LinkedInCampaign {
+  id: string;
+  name: string;
+  templateId: string;
+  status: CampaignStatus;
+  statusReason: string | null;
+  mode: LinkedInSendMode;
+  intervalSec: number;
+  dailyLimit: number;
+  windowStart: string;
+  windowEnd: string;
+  timeZone: string;
+  startAt: string | null;
+  lastSentAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface LinkedInCampaignDetail {
+  campaign: LinkedInCampaign;
+  template: ChannelTemplate | null;
+  counts: Partial<Record<AttemptStatus, number>>;
+  sentToday: number;
+  nextSendAt: string | null;
+  waitingFor: "not_started" | "outside_window" | "daily_limit" | "interval" | "extension" | null;
+}
+
+export interface LinkedInMessage {
+  id: string;
+  campaignId: string;
+  contactId: string | null;
+  profileUrl: string;
+  contactName: string;
+  renderedBody: string;
+  status: AttemptStatus;
+  error: string | null;
+  claimedAt: string | null;
+  sentAt: string | null;
+  failedAt: string | null;
+  updatedAt: string;
+}
+
+export interface LinkedInRecipientSummary {
+  selected: number;
+  eligible: number;
+  noLinkedIn: number;
+  tooMany: boolean;
+}
+
+export type LogChannel = "email" | "whatsapp" | "linkedin";
+
+export interface CampaignSummary {
+  id: string;
+  channel: LogChannel;
+  name: string;
+  status: CampaignStatus;
+  statusReason: string | null;
+  mode: LinkedInSendMode | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  lastSentAt: string | null;
+  counts: Partial<Record<AttemptStatus, number>>;
+  total: number;
+}
+
+export interface CampaignLogEntry {
+  id: string;
+  channel: LogChannel;
+  campaignId: string | null;
+  campaignName: string | null;
+  recipient: string;
+  to: string;
+  status: AttemptStatus;
+  error: string | null;
+  sentAt: string | null;
+  updatedAt: string;
+}
+
+export interface CampaignEvent {
+  id: string;
+  action: string;
+  status: "info" | "success" | "warning" | "error";
+  message: string | null;
+  createdAt: string;
+}

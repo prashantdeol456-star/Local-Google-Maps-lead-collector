@@ -10,6 +10,7 @@ import type {
   Channel,
   PreferenceRecord,
   PreferenceRepository,
+  TemplateChannel,
   TemplateRepository,
   TemplateWriteData,
   TrackedField,
@@ -26,13 +27,13 @@ import { containsInsensitive, isUniqueViolation } from "../../client.js";
 export class PrismaTemplateRepository implements TemplateRepository {
   constructor(private readonly db: DbClient) {}
 
-  list(channel: Channel) {
+  list(channel: TemplateChannel) {
     return this.db.messageTemplate.findMany({ where: { channel }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }] });
   }
   findById(id: string) {
     return this.db.messageTemplate.findUnique({ where: { id } });
   }
-  create(data: { channel: Channel } & TemplateWriteData) {
+  create(data: { channel: TemplateChannel } & TemplateWriteData) {
     return this.db.messageTemplate.create({ data });
   }
   async update(id: string, data: Partial<TemplateWriteData>) {
@@ -43,8 +44,12 @@ export class PrismaTemplateRepository implements TemplateRepository {
     const { count } = await this.db.messageTemplate.deleteMany({ where: { id } });
     return count > 0;
   }
-  countCampaigns(id: string) {
-    return this.db.campaign.count({ where: { templateId: id } });
+  async countCampaigns(id: string) {
+    const [campaigns, linkedin] = await Promise.all([
+      this.db.campaign.count({ where: { templateId: id } }),
+      this.db.linkedInCampaign.count({ where: { templateId: id } }),
+    ]);
+    return campaigns + linkedin;
   }
 }
 

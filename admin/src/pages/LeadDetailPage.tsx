@@ -122,7 +122,7 @@ export function LeadDetailPage({ id }: { id: string }) {
   return (
     <>
       <Link to="/leads" className="mb-3 inline-block text-sm text-slate-500 hover:text-brand-600">
-        ← Leads
+        ← Google Maps Leads
       </Link>
       <PageHeader
         title={l.name}

@@ -27,6 +27,14 @@ import { aiRoutes } from "./api/routes/ai.js";
 import { createAiNavigator, type AiNavigator } from "./providers/ai/index.js";
 import { AiNavigationService } from "./services/ai/navigationService.js";
 import { integrationRoutes } from "./api/routes/integrations.js";
+import { linkedinRoutes } from "./api/routes/linkedin.js";
+import { LinkedInService } from "./services/linkedin/linkedinService.js";
+import { contactRoutes } from "./api/routes/contacts.js";
+import { linkedinOutreachRoutes } from "./api/routes/linkedinOutreach.js";
+import { ContactService } from "./services/contacts/contactService.js";
+import { ChannelTemplateService } from "./services/contacts/channelTemplates.js";
+import { CampaignLogService } from "./services/outreach/campaignLogService.js";
+import { LinkedInOutreachService } from "./services/linkedin/outreachService.js";
 import { WebhookWorker } from "./jobs/webhookWorker.js";
 import { MaintenanceWorker } from "./jobs/maintenanceWorker.js";
 import { IntegrationService } from "./services/integrations/integrationService.js";
@@ -109,6 +117,11 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   const waCampaigns = new WhatsAppCampaignService(repos, { provider: waProvider.name, timeZone: config.timeZone, bus });
   const waConsent = new WhatsAppConsentService(repos, bus);
   const preferences = new PreferenceService(repos, bus);
+  const linkedin = new LinkedInService(repos);
+  const contacts = new ContactService(repos);
+  const channelTemplates = new ChannelTemplateService(repos);
+  const campaignLogs = new CampaignLogService(repos);
+  const linkedinOutreach = new LinkedInOutreachService(repos, { timeZone: config.timeZone, bus });
   const webhookSecrets = new SecretBox(config.sessionSecret, "webhook-secrets");
   const integrations = new IntegrationService(repos, webhookSecrets, bus, (msg) => app.log.error(msg));
   integrations.start();
@@ -181,6 +194,9 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   await app.register(preferenceRoutes, { preferences });
   await app.register(aiRoutes, { navigation });
   await app.register(integrationRoutes, { integrations, worker: webhookWorker });
+  await app.register(linkedinRoutes, { linkedin, timeZone: config.timeZone });
+  await app.register(contactRoutes, { contacts, channelTemplates, logs: campaignLogs });
+  await app.register(linkedinOutreachRoutes, { outreach: linkedinOutreach });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 

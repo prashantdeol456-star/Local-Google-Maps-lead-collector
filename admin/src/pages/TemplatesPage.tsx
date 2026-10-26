@@ -3,7 +3,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
 import { api } from "../lib/api";
 import { formatRelative } from "../lib/format";
+import { setSearchParams, useSearchParams } from "../lib/router";
 import type { EmailTemplate, RenderedPreview } from "../lib/types";
+import { ChannelTemplatesSection } from "./ChannelTemplatesSection";
+import { WhatsAppTemplatesPage } from "./WhatsAppTemplatesPage";
 
 const VARIABLES = ["name", "category", "city", "state", "country", "website", "phone"];
 
@@ -121,7 +124,7 @@ function Editor({ template, onDone }: { template: EmailTemplate | null; onDone: 
   );
 }
 
-export function TemplatesPage() {
+function EmailTemplatesSection() {
   const client = useQueryClient();
   const [editing, setEditing] = useState<EmailTemplate | "new" | null>(null);
   const templates = useQuery({ queryKey: ["templates"], queryFn: () => api<{ items: EmailTemplate[] }>("/templates").then((r) => r.items) });
@@ -173,6 +176,44 @@ export function TemplatesPage() {
           ))}
         </ul>
       </div>
+    </>
+  );
+}
+
+const TABS = [
+  { id: "email", label: "✉ Email" },
+  { id: "sms", label: "💬 SMS" },
+  { id: "whatsapp", label: "✆ WhatsApp" },
+  { id: "linkedin", label: "in LinkedIn message" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
+/** One place to write templates for every channel. */
+export function TemplatesPage() {
+  const params = useSearchParams();
+  const tab = (TABS.find((t) => t.id === params.get("channel"))?.id ?? "email") as TabId;
+  return (
+    <>
+      <nav className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Template channel">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            aria-current={tab === t.id ? "page" : undefined}
+            onClick={() => setSearchParams({ channel: t.id === "email" ? null : t.id })}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+              tab === t.id ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      {tab === "email" && <EmailTemplatesSection />}
+      {tab === "sms" && <ChannelTemplatesSection key="sms" channel="sms" />}
+      {tab === "whatsapp" && <WhatsAppTemplatesPage />}
+      {tab === "linkedin" && <ChannelTemplatesSection key="linkedin" channel="linkedin" />}
     </>
   );
 }

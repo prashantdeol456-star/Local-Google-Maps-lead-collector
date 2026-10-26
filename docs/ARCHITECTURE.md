@@ -171,6 +171,25 @@ unusual traffic) are checked before every step and always pause the job; 6 steps
 and `AI_MAX_STEPS_PER_JOB` per job; page text is untrusted data; every step is an AgentLog on
 the job. AI is never used for normalization, duplicates, storage, queues or exports.
 
+## 8b. LinkedIn Helper (separate extension)
+
+`linkedin-extension/` is a second Chrome extension with its own token (same backend login).
+It is deliberately **user-driven**: it reads only the page the user has open, when the user
+clicks. It does not search, click, scroll or open profiles by itself, and there is no
+background collection.
+
+- Content script (`src/content/parse.ts`): reads the profile top card and the *Contact info*
+  dialog the user opened, by visible labels (Email, Website, Phone, Address, IM, Birthday,
+  Connected) and link targets (mailto:, tel:, /in/…), not by LinkedIn class names. It also lists
+  member profile links on the current page (for the user's list).
+- Side panel: list of profiles (from the page or pasted links), "Open next profile" (one click
+  = one profile in the current tab), editable form, Save.
+- Backend: table `LinkedInLead` (unique canonical `profileUrl`), routes under `/api/linkedin/…`:
+  save/merge (new values win, empty values never clear, emails/phones/websites/IMs merged),
+  saved-check for the list, filters + facets, edit, delete, CSV export (formula-safe), and
+  import of LinkedIn's own `Connections.csv`.
+- Admin: *LinkedIn Leads* page, separate from Google Maps leads (no dedupe or campaigns with them).
+
 ## 9. Security
 
 - Backend binds to `127.0.0.1`. CORS allows only the extension ID and admin origin.
@@ -206,3 +225,37 @@ the job. AI is never used for normalization, duplicates, storage, queues or expo
 | 16 | Optional AI browser navigation (off by default, Claude structured outputs, step whitelist) | ✅ |
 | 17 | Optional n8n (signed webhooks with retries, read-only API tokens; see docs/n8n.md) | ✅ |
 | 18 | Production deployment prep (PostgreSQL, Docker + Caddy, prod checks, backups; see docs/DEPLOYMENT.md) | ✅ |
+
+
+## 8. Contacts, LinkedIn Messenger, Campaign Logs
+
+**Tables:** `OutreachContact` (sheet rows; unique `linkedinUrl`), `LinkedInCampaign` (same pacing fields
+as `Campaign`, plus `mode` = assisted | auto), `LinkedInMessage` (one per contact: queue + log).
+`MessageTemplate.channel` uses `TemplateChannel` (email, whatsapp, sms, linkedin); `Campaign`,
+`ContactAttempt` and `Suppression` keep `Channel` (email, whatsapp).
+
+**API:** `/api/contacts/*` (import, template.xlsx/.csv, list, facets, edit, delete),
+`/api/channel-templates` (SMS/LinkedIn), `/api/linkedin-outreach/*` (campaigns; `next` and
+`messages/:id/result` for the extension), `/api/campaign-logs/{campaigns,messages,events}`.
+
+**LinkedIn send flow:**
+1. The extension calls `POST /next` every 30 s (chrome.alarms) while the user has pressed Start.
+2. The backend hands out at most one message at a time (`queued → sending`) when `decideSend` allows it.
+3. The content script opens the chat, types the text and either clicks Send (auto) or waits for
+   the user's click or Enter (assisted).
+4. It reports `sent | skipped | failed | blocked`.
+5. `blocked` (login, security check, limit) puts the message back and pauses all LinkedIn campaigns.
+
+A handed-out message with no report in 15 minutes is marked failed and never re-sent. The backend
+never contacts LinkedIn.
+
+**Research notes (Oct 2026):**
+- LinkedIn's help page "Prohibited software and extensions" bans extensions that automate
+  activity, including "send or redirect messages", and warns that accounts can be restricted. That
+  is why assisted mode is the default, why automatic mode is marked as risky in the admin panel and
+  the extension, and why the daily cap is limited to 100.
+- No security check or limit is ever worked around.
+- LinkedIn's markup changes often. The content script finds controls by role, aria-label and
+  visible text ("Message <name>", the `contenteditable` textbox, "Send"), with LinkedIn class names
+  (`msg-form__*`) only as a fallback. A message that cannot be sent is reported as failed with the
+  reason, never retried automatically.

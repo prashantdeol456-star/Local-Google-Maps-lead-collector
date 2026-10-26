@@ -261,12 +261,14 @@ export interface AgentLogRepository {
 // ---- Outreach ----
 
 export type Channel = "email" | "whatsapp";
+/** Templates can be written for more channels than Campaign/ContactAttempt send. */
+export type TemplateChannel = Channel | "sms" | "linkedin";
 export type CampaignStatus = "draft" | "running" | "paused" | "completed" | "stopped";
 export type AttemptStatus = "queued" | "sending" | "sent" | "delivered" | "failed" | "skipped" | "cancelled";
 
 export interface TemplateRecord {
   id: string;
-  channel: Channel;
+  channel: TemplateChannel;
   name: string;
   subject: string | null;
   body: string;
@@ -285,9 +287,9 @@ export type TemplateWriteData = Pick<TemplateRecord, "name" | "subject" | "body"
   Partial<Pick<TemplateRecord, "provider" | "language" | "category" | "externalTemplateId" | "approvalStatus" | "paramFormat">>;
 
 export interface TemplateRepository {
-  list(channel: Channel): Promise<TemplateRecord[]>;
+  list(channel: TemplateChannel): Promise<TemplateRecord[]>;
   findById(id: string): Promise<TemplateRecord | null>;
-  create(data: { channel: Channel } & TemplateWriteData): Promise<TemplateRecord>;
+  create(data: { channel: TemplateChannel } & TemplateWriteData): Promise<TemplateRecord>;
   update(id: string, data: Partial<TemplateWriteData>): Promise<TemplateRecord | null>;
   delete(id: string): Promise<boolean>;
   countCampaigns(id: string): Promise<number>;
@@ -529,6 +531,200 @@ export interface TrackedLinkRepository {
   findById(id: string): Promise<{ id: string; attemptId: string; url: string } | null>;
 }
 
+export interface LinkedInLeadRecord {
+  id: string;
+  profileUrl: string;
+  name: string;
+  headline: string | null;
+  company: string | null;
+  location: string | null;
+  /** JSON arrays (see schema.prisma) */
+  emails: string;
+  phones: string;
+  websites: string;
+  ims: string;
+  experience: string;
+  education: string;
+  birthday: string | null;
+  address: string | null;
+  connectedSince: string | null;
+  notes: string | null;
+  tag: string | null;
+  source: string;
+  hasEmail: boolean;
+  hasPhone: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type LinkedInLeadData = Omit<LinkedInLeadRecord, "id" | "createdAt" | "updatedAt">;
+
+export const LINKEDIN_SORT_FIELDS = ["createdAt", "updatedAt", "name", "company"] as const;
+
+export interface LinkedInLeadFilters {
+  q?: string;
+  company?: string;
+  tag?: string;
+  source?: string;
+  hasEmail?: boolean;
+  hasPhone?: boolean;
+  hasWebsite?: boolean;
+  sort?: (typeof LINKEDIN_SORT_FIELDS)[number];
+  order?: "asc" | "desc";
+}
+
+export interface LinkedInLeadRepository {
+  findById(id: string): Promise<LinkedInLeadRecord | null>;
+  findByProfileUrls(urls: string[]): Promise<LinkedInLeadRecord[]>;
+  create(data: LinkedInLeadData): Promise<LinkedInLeadRecord>;
+  update(id: string, data: Partial<LinkedInLeadData>): Promise<LinkedInLeadRecord>;
+  delete(id: string): Promise<boolean>;
+  list(filters: LinkedInLeadFilters & { skip: number; take: number }): Promise<{ items: LinkedInLeadRecord[]; total: number }>;
+  /** Pages through the filtered profiles in a stable order (for export). */
+  listBatch(filters: LinkedInLeadFilters, cursor: string | null, take: number): Promise<LinkedInLeadRecord[]>;
+  facets(): Promise<{
+    total: number;
+    withEmail: number;
+    withPhone: number;
+    withWebsite: number;
+    tags: { value: string; count: number }[];
+    companies: { value: string; count: number }[];
+    sources: { value: string; count: number }[];
+  }>;
+}
+
+// ---- Contacts from uploaded sheets, LinkedIn message campaigns ----
+
+export interface ContactRecord {
+  id: string;
+  name: string;
+  linkedinUrl: string | null;
+  email: string | null;
+  phone: string | null;
+  designation: string | null;
+  company: string | null;
+  listName: string | null;
+  source: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type ContactData = Omit<ContactRecord, "id" | "createdAt" | "updatedAt">;
+
+export interface ContactFilters {
+  q?: string;
+  listName?: string;
+  hasLinkedIn?: boolean;
+  hasEmail?: boolean;
+  hasPhone?: boolean;
+}
+
+export interface ContactRepository {
+  findById(id: string): Promise<ContactRecord | null>;
+  findByIds(ids: string[]): Promise<ContactRecord[]>;
+  findByLinkedInUrls(urls: string[]): Promise<ContactRecord[]>;
+  findByEmails(emails: string[]): Promise<ContactRecord[]>;
+  create(data: ContactData): Promise<ContactRecord>;
+  update(id: string, data: Partial<ContactData>): Promise<ContactRecord>;
+  deleteMany(ids: string[]): Promise<number>;
+  list(filters: ContactFilters & { skip: number; take: number }): Promise<{ items: ContactRecord[]; total: number }>;
+  /** All matching contacts, oldest first, up to `take`. */
+  listAll(filters: ContactFilters, take: number): Promise<ContactRecord[]>;
+  facets(): Promise<{ total: number; withLinkedIn: number; withEmail: number; withPhone: number; lists: { value: string; count: number }[] }>;
+}
+
+export type LinkedInSendMode = "assisted" | "auto";
+
+export interface LinkedInCampaignRecord {
+  id: string;
+  name: string;
+  templateId: string;
+  status: CampaignStatus;
+  statusReason: string | null;
+  mode: string;
+  intervalSec: number;
+  dailyLimit: number;
+  windowStart: string;
+  windowEnd: string;
+  timeZone: string;
+  startAt: Date | null;
+  lastSentAt: Date | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type LinkedInCampaignCreateData = Pick<
+  LinkedInCampaignRecord,
+  "name" | "templateId" | "mode" | "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd" | "timeZone" | "startAt" | "createdById"
+>;
+
+export interface LinkedInMessageRecord {
+  id: string;
+  campaignId: string;
+  contactId: string | null;
+  profileUrl: string;
+  contactName: string;
+  renderedBody: string;
+  status: AttemptStatus;
+  error: string | null;
+  claimedAt: Date | null;
+  sentAt: Date | null;
+  failedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LinkedInOutreachRepository {
+  createCampaign(data: LinkedInCampaignCreateData, messages: Pick<LinkedInMessageRecord, "contactId" | "profileUrl" | "contactName" | "renderedBody">[]): Promise<LinkedInCampaignRecord>;
+  findCampaign(id: string): Promise<LinkedInCampaignRecord | null>;
+  listCampaigns(page: { skip: number; take: number }): Promise<{ items: LinkedInCampaignRecord[]; total: number }>;
+  listCampaignsByStatus(status: CampaignStatus): Promise<LinkedInCampaignRecord[]>;
+  updateCampaignStatus(id: string, from: CampaignStatus[], data: Partial<Pick<LinkedInCampaignRecord, "status" | "statusReason" | "startedAt" | "completedAt">>): Promise<LinkedInCampaignRecord | null>;
+  touchLastSent(id: string, at: Date): Promise<void>;
+  countByStatus(campaignId: string): Promise<Partial<Record<AttemptStatus, number>>>;
+  countSentSince(campaignId: string, since: Date): Promise<number>;
+  listMessages(query: { campaignId: string; status?: AttemptStatus; skip: number; take: number }): Promise<{ items: LinkedInMessageRecord[]; total: number }>;
+  findMessage(id: string): Promise<LinkedInMessageRecord | null>;
+  /** Oldest queued message of the campaign. */
+  nextQueued(campaignId: string): Promise<LinkedInMessageRecord | null>;
+  /** queued → sending, only if still queued. */
+  claim(id: string, at: Date): Promise<boolean>;
+  /** sending → final status, only if still sending (a late or repeated report changes nothing). */
+  finish(id: string, data: Pick<LinkedInMessageRecord, "status" | "error" | "sentAt" | "failedAt">): Promise<boolean>;
+  /** sending → queued (the extension gave it back untouched, e.g. LinkedIn needed a login). */
+  release(id: string, error: string): Promise<boolean>;
+  /** A message currently handed to the extension, if any. */
+  inFlight(): Promise<LinkedInMessageRecord | null>;
+  /** Messages handed out before `before` with no report back: failed (never re-sent). */
+  failStale(before: Date, error: string, at: Date): Promise<number>;
+  cancelQueued(campaignId: string): Promise<number>;
+  hasPending(campaignId: string): Promise<boolean>;
+}
+
+/** One message of any channel, for the campaign logs page. */
+export interface CampaignLogEntry {
+  id: string;
+  channel: Channel | "linkedin";
+  campaignId: string | null;
+  campaignName: string | null;
+  recipient: string;
+  to: string;
+  status: AttemptStatus;
+  error: string | null;
+  sentAt: Date | null;
+  updatedAt: Date;
+}
+
+export interface CampaignLogRepository {
+  /** Newest first. */
+  list(query: { channel?: Channel | "linkedin"; status?: AttemptStatus; campaignId?: string; q?: string; skip: number; take: number }): Promise<{ items: CampaignLogEntry[]; total: number }>;
+  /** Campaign events (started, paused, completed…) from the activity log, newest first. */
+  events(take: number): Promise<{ id: string; action: string; status: string; message: string | null; createdAt: Date }[]>;
+}
+
 export interface Repositories {
   adminUsers: AdminUserRepository;
   sessions: SessionRepository;
@@ -546,6 +742,10 @@ export interface Repositories {
   whatsappEvents: WhatsAppEventRepository;
   suppressions: SuppressionRepository;
   webhooks: WebhookRepository;
+  linkedinLeads: LinkedInLeadRepository;
+  contacts: ContactRepository;
+  linkedinOutreach: LinkedInOutreachRepository;
+  campaignLogs: CampaignLogRepository;
   /** Runs `fn` in one database transaction; all-or-nothing. */
   transaction<T>(fn: (tx: Repositories) => Promise<T>): Promise<T>;
 }

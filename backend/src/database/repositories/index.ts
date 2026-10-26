@@ -14,6 +14,8 @@ import {
   PrismaWhatsAppEventRepository,
   PrismaSuppressionRepository,
 } from "./prisma/PrismaOutreachRepository.js";
+import { PrismaLinkedInRepository } from "./prisma/PrismaLinkedInRepository.js";
+import { PrismaCampaignLogRepository, PrismaContactRepository, PrismaLinkedInOutreachRepository } from "./prisma/PrismaContactOutreachRepository.js";
 import { PrismaSessionRepository } from "./prisma/PrismaSessionRepository.js";
 import { PrismaWebhookRepository } from "./prisma/PrismaWebhookRepository.js";
 import type { Repositories } from "./types.js";
@@ -36,6 +38,10 @@ function build(db: DbClient, transaction: Repositories["transaction"]): Reposito
     whatsappEvents: new PrismaWhatsAppEventRepository(db),
     suppressions: new PrismaSuppressionRepository(db),
     webhooks: new PrismaWebhookRepository(db),
+    linkedinLeads: new PrismaLinkedInRepository(db),
+    contacts: new PrismaContactRepository(db),
+    linkedinOutreach: new PrismaLinkedInOutreachRepository(db),
+    campaignLogs: new PrismaCampaignLogRepository(db),
     transaction,
   };
 }
