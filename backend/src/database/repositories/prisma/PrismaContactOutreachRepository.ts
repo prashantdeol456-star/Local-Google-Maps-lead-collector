@@ -12,6 +12,9 @@ import type {
   LinkedInCampaignRecord,
   LinkedInMessageRecord,
   LinkedInOutreachRepository,
+  SocialAccountData,
+  SocialAccountRecord,
+  SocialAccountRepository,
 } from "../types.js";
 
 const LIST_FACET_LIMIT = 50;
@@ -261,5 +264,31 @@ export class PrismaCampaignLogRepository implements CampaignLogRepository {
       take,
       select: { id: true, action: true, status: true, message: true, createdAt: true },
     });
+  }
+}
+
+export class PrismaSocialAccountRepository implements SocialAccountRepository {
+  constructor(private readonly db: DbClient) {}
+
+  list() {
+    return this.db.socialAccount.findMany({ orderBy: [{ platform: "asc" }, { name: "asc" }] });
+  }
+  findById(id: string) {
+    return this.db.socialAccount.findUnique({ where: { id } });
+  }
+  upsert(data: SocialAccountData): Promise<SocialAccountRecord> {
+    const fresh = { ...data, status: data.status ?? "connected", lastError: data.lastError ?? null, lastCheckedAt: data.lastCheckedAt ?? new Date() };
+    return this.db.socialAccount.upsert({
+      where: { platform_externalId: { platform: data.platform, externalId: data.externalId } },
+      create: fresh,
+      update: fresh,
+    });
+  }
+  async update(id: string, data: Partial<Pick<SocialAccountRecord, "status" | "lastError" | "lastCheckedAt" | "name" | "username" | "pictureUrl">>) {
+    await this.db.socialAccount.updateMany({ where: { id }, data });
+  }
+  async delete(id: string) {
+    const { count } = await this.db.socialAccount.deleteMany({ where: { id } });
+    return count > 0;
   }
 }

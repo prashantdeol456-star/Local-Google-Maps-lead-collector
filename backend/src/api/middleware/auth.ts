@@ -53,6 +53,8 @@ export function registerAuthGuard(app: FastifyInstance, auth: AuthService) {
     if (!request.url.startsWith("/api/") || PUBLIC_ROUTES.has(routeKey)) return;
     // Provider webhooks authenticate with signatures instead of a login.
     if (request.routeOptions.url?.startsWith("/api/webhooks/")) return;
+    // OAuth redirects from Facebook/LinkedIn: checked with a single-use state instead.
+    if (request.method === "GET" && request.routeOptions.url === "/api/oauth/callback/:provider") return;
 
     const bearer = readBearerToken(request);
     if (bearer) {

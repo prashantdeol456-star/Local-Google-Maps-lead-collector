@@ -132,6 +132,32 @@ the extension stops. Fix it yourself in the tab, then resume.
 - a searchable message log with the reason for each skip or failure;
 - a feed of campaign events (started, paused, stopped, completed).
 
+### Social Accounts (Facebook, Instagram, LinkedIn)
+
+**Admin → Social Accounts** connects your accounts with each platform's own login (OAuth). Never type or
+store a Facebook, Instagram or LinkedIn password in this project. The backend only receives an
+access token, stores it encrypted (AES-256-GCM, key derived from `SESSION_SECRET`) and never sends
+it to the browser.
+
+- **Facebook & Instagram:** one "Connect with Facebook" brings in every Facebook Page you manage, and
+  the Instagram Business/Creator account linked to each Page.
+  - Create an app on developers.facebook.com with Facebook Login for Business.
+  - Add the redirect URI shown on the page.
+  - Set `META_APP_ID` and `META_APP_SECRET` in `backend/.env`.
+- **LinkedIn:** connects your profile (60-day login; connect again when it expires).
+  - Create an app on linkedin.com/developers with *Sign In with LinkedIn using OpenID Connect* and
+    *Share on LinkedIn*.
+  - Add the redirect URL.
+  - Set `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET`.
+
+The redirect URIs are `<SOCIAL_REDIRECT_BASE_URL>/api/oauth/callback/meta` and `/linkedin`. The
+base defaults to `PUBLIC_BASE_URL`, else `http://localhost:3000`. Open the admin panel on that same
+address. **Check** tests a connection; **Disconnect** deletes the token here.
+
+Planned on top of this: publishing/scheduling posts, and an inbox for Page messages, Instagram DMs
+and comments. The official APIs do not allow cold DMs: Meta only allows messaging people who
+contacted you first.
+
 ## Scripts (root)
 
 | Command | What it does |

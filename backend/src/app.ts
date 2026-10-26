@@ -35,6 +35,8 @@ import { ContactService } from "./services/contacts/contactService.js";
 import { ChannelTemplateService } from "./services/contacts/channelTemplates.js";
 import { CampaignLogService } from "./services/outreach/campaignLogService.js";
 import { LinkedInOutreachService } from "./services/linkedin/outreachService.js";
+import { socialRoutes } from "./api/routes/social.js";
+import { SocialService } from "./services/social/socialService.js";
 import { WebhookWorker } from "./jobs/webhookWorker.js";
 import { MaintenanceWorker } from "./jobs/maintenanceWorker.js";
 import { IntegrationService } from "./services/integrations/integrationService.js";
@@ -69,9 +71,11 @@ export interface AppDeps {
   whatsappProvider?: WhatsAppProvider;
   /** Override the AI navigator built from config (tests). */
   aiNavigator?: AiNavigator | null;
+  /** Fake network for Facebook/LinkedIn OAuth (tests). */
+  socialFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db, logger = true, emailProvider, whatsappProvider, aiNavigator }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -123,6 +127,7 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   const campaignLogs = new CampaignLogService(repos);
   const linkedinOutreach = new LinkedInOutreachService(repos, { timeZone: config.timeZone, bus });
   const webhookSecrets = new SecretBox(config.sessionSecret, "webhook-secrets");
+  const social = new SocialService(repos, config.social, new SecretBox(config.sessionSecret, "social-tokens"), { fetch: socialFetch });
   const integrations = new IntegrationService(repos, webhookSecrets, bus, (msg) => app.log.error(msg));
   integrations.start();
   const webhookWorker = new WebhookWorker(repos, webhookSecrets, { log: (msg) => app.log.error(msg) });
@@ -197,6 +202,7 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   await app.register(linkedinRoutes, { linkedin, timeZone: config.timeZone });
   await app.register(contactRoutes, { contacts, channelTemplates, logs: campaignLogs });
   await app.register(linkedinOutreachRoutes, { outreach: linkedinOutreach });
+  await app.register(socialRoutes, { social });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 

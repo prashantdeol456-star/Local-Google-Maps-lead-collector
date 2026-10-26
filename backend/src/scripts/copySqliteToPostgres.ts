@@ -36,6 +36,7 @@ export const TABLES = [
   "OutreachContact",
   "LinkedInCampaign",
   "LinkedInMessage",
+  "SocialAccount",
 ] as const;
 
 const BATCH = 500;

@@ -725,6 +725,41 @@ export interface CampaignLogRepository {
   events(take: number): Promise<{ id: string; action: string; status: string; message: string | null; createdAt: Date }[]>;
 }
 
+// ---- Social accounts (OAuth) ----
+
+export type SocialPlatform = "facebook_page" | "instagram" | "linkedin";
+
+export interface SocialAccountRecord {
+  id: string;
+  platform: string;
+  externalId: string;
+  name: string;
+  username: string | null;
+  pictureUrl: string | null;
+  tokenEnc: string;
+  tokenExpiresAt: Date | null;
+  scopes: string;
+  status: string;
+  lastError: string | null;
+  meta: string;
+  connectedById: string | null;
+  lastCheckedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type SocialAccountData = Omit<SocialAccountRecord, "id" | "createdAt" | "updatedAt" | "lastCheckedAt" | "status" | "lastError"> &
+  Partial<Pick<SocialAccountRecord, "status" | "lastError" | "lastCheckedAt">>;
+
+export interface SocialAccountRepository {
+  list(): Promise<SocialAccountRecord[]>;
+  findById(id: string): Promise<SocialAccountRecord | null>;
+  /** Create, or replace the token and details of the same platform account. */
+  upsert(data: SocialAccountData): Promise<SocialAccountRecord>;
+  update(id: string, data: Partial<Pick<SocialAccountRecord, "status" | "lastError" | "lastCheckedAt" | "name" | "username" | "pictureUrl">>): Promise<void>;
+  delete(id: string): Promise<boolean>;
+}
+
 export interface Repositories {
   adminUsers: AdminUserRepository;
   sessions: SessionRepository;
@@ -746,6 +781,7 @@ export interface Repositories {
   contacts: ContactRepository;
   linkedinOutreach: LinkedInOutreachRepository;
   campaignLogs: CampaignLogRepository;
+  socialAccounts: SocialAccountRepository;
   /** Runs `fn` in one database transaction; all-or-nothing. */
   transaction<T>(fn: (tx: Repositories) => Promise<T>): Promise<T>;
 }

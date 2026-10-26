@@ -15,7 +15,7 @@ import {
   PrismaSuppressionRepository,
 } from "./prisma/PrismaOutreachRepository.js";
 import { PrismaLinkedInRepository } from "./prisma/PrismaLinkedInRepository.js";
-import { PrismaCampaignLogRepository, PrismaContactRepository, PrismaLinkedInOutreachRepository } from "./prisma/PrismaContactOutreachRepository.js";
+import { PrismaCampaignLogRepository, PrismaContactRepository, PrismaLinkedInOutreachRepository, PrismaSocialAccountRepository } from "./prisma/PrismaContactOutreachRepository.js";
 import { PrismaSessionRepository } from "./prisma/PrismaSessionRepository.js";
 import { PrismaWebhookRepository } from "./prisma/PrismaWebhookRepository.js";
 import type { Repositories } from "./types.js";
@@ -42,6 +42,7 @@ function build(db: DbClient, transaction: Repositories["transaction"]): Reposito
     contacts: new PrismaContactRepository(db),
     linkedinOutreach: new PrismaLinkedInOutreachRepository(db),
     campaignLogs: new PrismaCampaignLogRepository(db),
+    socialAccounts: new PrismaSocialAccountRepository(db),
     transaction,
   };
 }

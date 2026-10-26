@@ -590,3 +590,34 @@ model LinkedInMessage {
   @@index([status, updatedAt])
   @@index([contactId])
 }
+
+// ---- Social accounts connected with the platforms' own login (OAuth). No passwords. ----
+
+model SocialAccount {
+  id             String    @id @default(cuid())
+  /** facebook_page | instagram | linkedin */
+  platform       String
+  /** Page id, Instagram account id, or LinkedIn member id ("sub") */
+  externalId     String
+  name           String
+  username       String?
+  pictureUrl     String?
+  /** Access token, AES-256-GCM encrypted (SecretBox "social-tokens"); never sent to the admin panel */
+  tokenEnc       String
+  /** null = does not expire (Facebook Page tokens from a long-lived login) */
+  tokenExpiresAt DateTime?
+  /** JSON array of granted permissions */
+  scopes         String    @default("[]")
+  /** connected | expired | error */
+  status         String    @default("connected")
+  lastError      String?
+  /** JSON: extras, e.g. the Facebook Page an Instagram account is linked to */
+  meta           String    @default("{}")
+  connectedById  String?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([platform, externalId])
+  @@index([platform])
+}

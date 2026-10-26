@@ -15,6 +15,7 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/templates", label: "Templates", icon: "❏" },
   { to: "/campaign-logs", label: "Campaign Logs", icon: "≡" },
   { to: "/opt-outs", label: "Opt-outs", icon: "⊘" },
+  { to: "/social", label: "Social Accounts", icon: "◎" },
   { to: "/integrations", label: "Integrations", icon: "⇄" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];

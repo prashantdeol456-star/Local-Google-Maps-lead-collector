@@ -46,7 +46,7 @@ export async function postgresTestDb(): Promise<{ url: string; drop: () => Promi
 
 /** Builds the app against a fresh temporary database (SQLite file, or a PostgreSQL schema) with all migrations applied. */
 
-export async function createTestApp(overrides: Partial<AppConfig> = {}, deps: Pick<AppDeps, "emailProvider" | "whatsappProvider" | "aiNavigator"> = {}) {
+export async function createTestApp(overrides: Partial<AppConfig> = {}, deps: Pick<AppDeps, "emailProvider" | "whatsappProvider" | "aiNavigator" | "socialFetch"> = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "mlc-test-"));
   let dbFile = path.join(dir, "test.db");
   let dropDb: (() => Promise<void>) | null = null;
@@ -81,6 +81,7 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, deps: Pi
     email: { provider: "log", from: "Test <noreply@test.local>" },
     whatsapp: { provider: "log" },
     ai: { provider: "off" },
+    social: { meta: null, linkedin: null, redirectBaseUrl: "http://localhost:3000" },
     publicBaseUrl: null,
     trackClicks: true,
     apiTokenTtlMs: 24 * 60 * 60 * 1000,
