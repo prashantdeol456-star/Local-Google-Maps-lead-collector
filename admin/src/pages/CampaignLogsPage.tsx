@@ -11,9 +11,9 @@ import { Badge } from "./EmailPage";
 
 const PAGE_SIZE = 50;
 
-const CHANNEL_LABEL: Record<LogChannel, string> = { email: "✉ Email", whatsapp: "✆ WhatsApp", linkedin: "in LinkedIn" };
+const CHANNEL_LABEL: Record<LogChannel, string> = { email: "✉ Email", whatsapp: "✆ WhatsApp", linkedin: "in LinkedIn", instagram: "◎ Instagram" };
 
-const CAMPAIGN_PATH: Record<LogChannel, string> = { email: "/email", whatsapp: "/whatsapp", linkedin: "/linkedin-outreach" };
+const CAMPAIGN_PATH: Record<LogChannel, string> = { email: "/email", whatsapp: "/whatsapp", linkedin: "/linkedin-outreach", instagram: "/instagram-outreach" };
 
 const STATUSES: (AttemptStatus | "")[] = ["", "queued", "sending", "sent", "delivered", "skipped", "failed", "cancelled"];
 
@@ -68,7 +68,7 @@ export function CampaignLogsPage() {
       <PageHeader title="Campaign Logs" subtitle="Every campaign and message across email, WhatsApp and LinkedIn." />
 
       <div className="mb-4 flex flex-wrap gap-1">
-        {(["", "email", "whatsapp", "linkedin"] as const).map((ch) => (
+        {(["", "email", "whatsapp", "linkedin", "instagram"] as const).map((ch) => (
           <button
             key={ch || "all"}
             className={`btn px-3 py-1 text-sm ${channel === ch ? "btn-primary" : ""}`}

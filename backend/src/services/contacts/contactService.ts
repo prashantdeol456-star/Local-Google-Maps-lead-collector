@@ -11,7 +11,7 @@ export interface ImportResult {
   total: number;
 }
 
-export type ContactUpdate = Partial<Pick<ContactData, "name" | "linkedinUrl" | "email" | "phone" | "designation" | "company" | "listName">>;
+export type ContactUpdate = Partial<Pick<ContactData, "name" | "linkedinUrl" | "instagramUrl" | "email" | "phone" | "designation" | "company" | "listName">>;
 
 const CHUNK = 200;
 
@@ -35,7 +35,7 @@ export class ContactService {
     const unique: SheetContact[] = [];
     let duplicatesInFile = 0;
     for (const { contact } of parsed.rows) {
-      const keys = [contact.linkedinUrl && `li:${contact.linkedinUrl}`, contact.email && `em:${contact.email}`].filter(Boolean) as string[];
+      const keys = [contact.linkedinUrl && `li:${contact.linkedinUrl}`, contact.instagramUrl && `ig:${contact.instagramUrl}`, contact.email && `em:${contact.email}`].filter(Boolean) as string[];
       if (keys.some((k) => seen.has(k))) {
         duplicatesInFile++;
         continue;
@@ -50,9 +50,14 @@ export class ContactService {
       const chunk = unique.slice(i, i + CHUNK);
       await this.repos.transaction(async (tx) => {
         const byUrl = new Map((await tx.contacts.findByLinkedInUrls(chunk.flatMap((c) => (c.linkedinUrl ? [c.linkedinUrl] : [])))).map((c) => [c.linkedinUrl!, c]));
+        const byIg = new Map((await tx.contacts.findByInstagramUrls(chunk.flatMap((c) => (c.instagramUrl ? [c.instagramUrl] : [])))).map((c) => [c.instagramUrl!, c]));
         const byEmail = new Map((await tx.contacts.findByEmails(chunk.flatMap((c) => (c.email ? [c.email] : [])))).map((c) => [c.email!, c]));
         for (const row of chunk) {
           let existing = row.linkedinUrl ? byUrl.get(row.linkedinUrl) : undefined;
+          if (!existing && row.instagramUrl) {
+            const candidate = byIg.get(row.instagramUrl);
+            if (candidate && (!candidate.linkedinUrl || !row.linkedinUrl)) existing = candidate;
+          }
           // Match by email only when that would not join two different LinkedIn profiles.
           if (!existing && row.email) {
             const candidate = byEmail.get(row.email);
@@ -60,7 +65,7 @@ export class ContactService {
           }
           if (existing) {
             const patch: Partial<ContactData> = {};
-            for (const key of ["name", "linkedinUrl", "email", "phone", "designation", "company"] as const) {
+            for (const key of ["name", "linkedinUrl", "instagramUrl", "email", "phone", "designation", "company"] as const) {
               const value = row[key];
               if (value && value !== existing[key]) patch[key] = value;
             }
@@ -68,12 +73,14 @@ export class ContactService {
             if (Object.keys(patch).length) {
               const saved = await tx.contacts.update(existing.id, patch);
               if (saved.linkedinUrl) byUrl.set(saved.linkedinUrl, saved);
+              if (saved.instagramUrl) byIg.set(saved.instagramUrl, saved);
               if (saved.email) byEmail.set(saved.email, saved);
             }
             updated++;
           } else {
             const saved = await tx.contacts.create({ ...row, listName, source: "sheet" });
             if (saved.linkedinUrl) byUrl.set(saved.linkedinUrl, saved);
+            if (saved.instagramUrl) byIg.set(saved.instagramUrl, saved);
             if (saved.email) byEmail.set(saved.email, saved);
             created++;
           }
@@ -108,6 +115,10 @@ export class ContactService {
     if (data.linkedinUrl) {
       const [other] = await this.repos.contacts.findByLinkedInUrls([data.linkedinUrl]);
       if (other && other.id !== id) throw Errors.conflict("DUPLICATE_CONTACT", `Another contact already has this LinkedIn URL (${other.name})`);
+    }
+    if (data.instagramUrl) {
+      const [other] = await this.repos.contacts.findByInstagramUrls([data.instagramUrl]);
+      if (other && other.id !== id) throw Errors.conflict("DUPLICATE_CONTACT", `Another contact already has this Instagram URL (${other.name})`);
     }
     return this.repos.contacts.update(id, data);
   }

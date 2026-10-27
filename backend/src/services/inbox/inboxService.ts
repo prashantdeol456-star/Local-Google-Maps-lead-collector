@@ -17,9 +17,10 @@ import type {
 import { Errors } from "../../utils/errors.js";
 import type { EventBus } from "../events.js";
 import type { SocialService } from "../social/socialService.js";
-import { ChannelError, type IncomingThread, type MetaMessaging, type TelegramBot } from "./channels.js";
+import { ChannelError, type IncomingThread, type MetaMessaging } from "./channels.js";
 import { canReplyOnPlatform, decide } from "./policy.js";
-import { ReplyWriterError, type ReplyWriter } from "./replyWriter.js";
+import { ReplyWriterError } from "./replyWriter.js";
+import type { InboxRuntime } from "./runtime.js";
 
 export const PLATFORMS: InboxPlatform[] = ["telegram", "facebook", "instagram", "linkedin"];
 export const REPLY_MODES: ReplyMode[] = ["smart", "auto", "draft", "off"];
@@ -53,9 +54,20 @@ export function parseModes(raw: string): Record<InboxPlatform, ReplyMode> {
   return defaults;
 }
 
+/** Settings for the admin panel: never the keys, the offset or other internals. */
 function publicSettings(s: AiAssistantSettingsRecord) {
-  const { telegramOffset: _offset, modes, ...rest } = s;
-  return { ...rest, modes: parseModes(modes) };
+  return {
+    id: s.id,
+    enabled: s.enabled,
+    businessProfile: s.businessProfile,
+    faqs: s.faqs,
+    style: s.style,
+    neverSay: s.neverSay,
+    modes: parseModes(s.modes),
+    minConfidence: s.minConfidence,
+    maxAutoPerChatPerDay: s.maxAutoPerChatPerDay,
+    updatedAt: s.updatedAt,
+  };
 }
 
 export class InboxService {
@@ -65,8 +77,7 @@ export class InboxService {
   constructor(
     private readonly repos: Repositories,
     private readonly opts: {
-      writer: ReplyWriter | null;
-      telegram: TelegramBot | null;
+      runtime: InboxRuntime;
       meta: MetaMessaging | null;
       social: SocialService;
       timeZone: string;
@@ -102,12 +113,25 @@ export class InboxService {
     return publicSettings(saved);
   }
 
+  /** Which AI provider, model and effort write replies. */
+  async setAiChoice(data: { aiProvider?: string; aiModel?: string; aiEffort?: string }) {
+    const before = await this.repos.inbox.getSettings();
+    // Switching provider: the other provider's model id would not work.
+    const switching = data.aiProvider && data.aiProvider !== before.aiProvider;
+    await this.repos.inbox.updateSettings({ ...data, ...(switching && data.aiModel === undefined ? { aiModel: "" } : {}) });
+    this.opts.runtime.invalidate();
+  }
+
+  async resetTelegramOffset() {
+    await this.repos.inbox.updateSettings({ telegramOffset: 0 });
+  }
+
   async status() {
     const accounts = await this.repos.socialAccounts.list();
     const meta = accounts.filter((a) => a.platform === "facebook_page" || a.platform === "instagram");
     return {
-      ai: this.opts.writer ? { configured: true, model: this.opts.writer.model } : { configured: false, model: null },
-      telegram: { configured: !!this.opts.telegram },
+      ai: await this.opts.runtime.writer().then((w) => (w ? { configured: true, model: w.model } : { configured: false, model: null })),
+      telegram: { configured: !!(await this.opts.runtime.telegram()) },
       facebook: { configured: !!this.opts.meta, accounts: meta.filter((a) => a.platform === "facebook_page").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
       instagram: { configured: !!this.opts.meta, accounts: meta.filter((a) => a.platform === "instagram").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
       linkedin: { configured: true, via: "LinkedIn Messenger extension" },
@@ -164,7 +188,7 @@ export class InboxService {
 
   /** Answers chats waiting for a reply (called every few seconds by the worker). */
   async processDue(): Promise<number> {
-    if (!this.opts.writer) return 0;
+    if (!(await this.opts.runtime.writer())) return 0;
     const settings = await this.repos.inbox.getSettings();
     if (!settings.enabled) return 0;
     const now = this.now();
@@ -183,9 +207,9 @@ export class InboxService {
    * `force`: the admin pressed "Write reply" (works even when AI replies are off).
    */
   async respond(conversationId: string, opts: { force?: boolean; settings?: AiAssistantSettingsRecord } = {}): Promise<InboxDraftRecord | null> {
-    const writer = this.opts.writer;
+    const writer = await this.opts.runtime.writer();
     if (!writer) {
-      if (opts.force) throw Errors.badRequest("AI replies are not set up: add ANTHROPIC_API_KEY to backend/.env");
+      if (opts.force) throw Errors.badRequest("AI replies are not set up: add your Claude or Gemini API key in AI Inbox → Setup");
       return null;
     }
     const settings = opts.settings ?? (await this.repos.inbox.getSettings());
@@ -280,8 +304,9 @@ export class InboxService {
   private async sendOnPlatform(c: InboxConversationRecord, text: string): Promise<{ externalId: string }> {
     if (!c.participantId) throw new ChannelError("This chat has no recipient id", false);
     if (c.platform === "telegram") {
-      if (!this.opts.telegram) throw new ChannelError("Telegram is not set up (TELEGRAM_BOT_TOKEN)", false);
-      return this.opts.telegram.send(c.participantId, text);
+      const telegram = await this.opts.runtime.telegram();
+      if (!telegram) throw new ChannelError("Telegram is not set up: add the bot token in AI Inbox → Setup", false);
+      return telegram.bot.send(c.participantId, text);
     }
     if (c.platform === "facebook" || c.platform === "instagram") {
       if (!this.opts.meta) throw new ChannelError("Facebook login is not set up (META_APP_ID / META_APP_SECRET)", false);

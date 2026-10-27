@@ -366,6 +366,7 @@ export interface Contact {
   id: string;
   name: string;
   linkedinUrl: string | null;
+  instagramUrl: string | null;
   email: string | null;
   phone: string | null;
   designation: string | null;
@@ -379,6 +380,7 @@ export interface Contact {
 export interface ContactFacets {
   total: number;
   withLinkedIn: number;
+  withInstagram: number;
   withEmail: number;
   withPhone: number;
   lists: { value: string; count: number }[];
@@ -392,7 +394,7 @@ export interface ContactImportResult {
   total: number;
 }
 
-export type ContactTemplateChannel = "sms" | "linkedin";
+export type ContactTemplateChannel = "sms" | "linkedin" | "instagram";
 
 export interface ChannelTemplate {
   id: string;
@@ -463,7 +465,7 @@ export interface LinkedInRecipientSummary {
   tooMany: boolean;
 }
 
-export type LogChannel = "email" | "whatsapp" | "linkedin";
+export type LogChannel = "email" | "whatsapp" | "linkedin" | "instagram";
 
 export interface CampaignSummary {
   id: string;

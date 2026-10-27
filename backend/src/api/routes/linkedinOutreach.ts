@@ -13,7 +13,10 @@ const Recipients = z.union([
   z.object({ filters: z.object({ listName: optionalText(100), q: optionalText(200) }) }),
 ]);
 
+const Platform = z.enum(["linkedin", "instagram"]);
+
 const CampaignBody = z.object({
+  platform: Platform.default("linkedin"),
   name: z.string().trim().min(1).max(120),
   templateId: z.string().min(1).max(64),
   mode: z.enum(["assisted", "auto"]),
@@ -39,8 +42,8 @@ export async function linkedinOutreachRoutes(app: FastifyInstance, opts: { outre
 
   // ---- Admin panel ----
   app.post("/api/linkedin-outreach/recipients", async (request) => {
-    const { recipients } = parse(z.object({ recipients: Recipients }), request.body);
-    return outreach.recipients(recipients as LinkedInRecipients);
+    const { recipients, platform } = parse(z.object({ recipients: Recipients, platform: Platform.default("linkedin") }), request.body);
+    return outreach.recipients(recipients as LinkedInRecipients, platform);
   });
 
   app.post("/api/linkedin-outreach/campaigns", async (request, reply) => {
@@ -53,8 +56,8 @@ export async function linkedinOutreachRoutes(app: FastifyInstance, opts: { outre
   });
 
   app.get("/api/linkedin-outreach/campaigns", async (request) => {
-    const page = parse(Pagination, request.query);
-    const { items, total } = await outreach.list(toSkipTake(page));
+    const page = parse(Pagination.extend({ platform: Platform.optional() }), request.query);
+    const { items, total } = await outreach.list({ ...toSkipTake(page), platform: page.platform });
     return { items, total, page: page.page, pageSize: page.pageSize };
   });
 
@@ -90,8 +93,10 @@ export async function linkedinOutreachRoutes(app: FastifyInstance, opts: { outre
   app.post("/api/linkedin-outreach/campaigns/:id/stop", async (request) => ({ campaign: await outreach.stop(parse(IdParams, request.params).id) }));
 
   // ---- LinkedIn Messenger extension ----
-  app.get("/api/linkedin-outreach/overview", async () => ({ campaigns: await outreach.overview() }));
-  app.post("/api/linkedin-outreach/next", async () => outreach.next());
+  // The LinkedIn Messenger asks without a platform (= linkedin); the Meta Helper asks for instagram.
+  const platformOf = (query: unknown) => parse(z.object({ platform: Platform.default("linkedin") }), query ?? {}).platform;
+  app.get("/api/linkedin-outreach/overview", async (request) => ({ campaigns: await outreach.overview(undefined, platformOf(request.query)) }));
+  app.post("/api/linkedin-outreach/next", async (request) => outreach.next(undefined, platformOf(request.query)));
   app.post("/api/linkedin-outreach/messages/:id/result", async (request) => {
     const { id } = parse(IdParams, request.params);
     const body = parse(ResultBody, request.body);

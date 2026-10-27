@@ -95,6 +95,9 @@ export function chatTranscript(c: ReplyContext): string {
   ].join("\n");
 }
 
+/** Models that accept the server-side `fallbacks: "default"` option (Haiku has no server-side fallback). */
+const SERVER_FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
+
 export class AnthropicReplyWriter implements ReplyWriter {
   private readonly client: Anthropic;
 
@@ -112,9 +115,8 @@ export class AnthropicReplyWriter implements ReplyWriter {
       response = await this.client.beta.messages.parse({
         model: this.options.model,
         max_tokens: 16000,
-        // A refused request is re-run on Anthropic's recommended fallback model.
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
+        // A refused request is re-run on Anthropic's recommended fallback model (where the model supports it).
+        ...(SERVER_FALLBACK_MODELS.has(this.options.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
         output_config: { effort: this.options.effort, format: betaZodOutputFormat(ReplySchema) },
         system: [{ type: "text", text: systemPrompt(context.business), cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: chatTranscript(context) }],

@@ -47,7 +47,7 @@ describe("contact sheet parsing", () => {
       ["C D", "", "abc", "", "", ""],
     ]);
     expect(rows).toEqual([
-      { line: 2, contact: { name: "A B", linkedinUrl: "https://www.linkedin.com/in/ab", phone: "98765-43210", email: "a@b.in", designation: "Lead", company: "X" } },
+      { line: 2, contact: { name: "A B", linkedinUrl: "https://www.linkedin.com/in/ab", instagramUrl: null, phone: "98765-43210", email: "a@b.in", designation: "Lead", company: "X" } },
     ]);
     expect(errors).toEqual([
       { line: 3, reason: "No name" },
@@ -66,7 +66,7 @@ describe("contacts API", () => {
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json()).toMatchObject({ created: 3, updated: 0, duplicatesInFile: 1 });
     expect(res.json().errors).toEqual([
-      { line: 4, reason: "Needs at least one of LinkedIn URL, Contact Number or Email" },
+      { line: 4, reason: "Needs at least one of LinkedIn URL, Instagram URL, Contact Number or Email" },
       { line: 5, reason: "Not a LinkedIn profile URL: https://example.com/rahul" },
     ]);
 
@@ -92,8 +92,8 @@ describe("contacts API", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(template.rawPayload as unknown as ArrayBuffer);
     const sheet = wb.getWorksheet("Contacts")!;
-    expect((sheet.getRow(1).values as string[]).slice(1)).toEqual(["Name", "LinkedIn URL", "Contact Number", "Email", "Designation", "Company"]);
-    sheet.addRow(["Neha Gupta", { text: "Neha", hyperlink: "https://www.linkedin.com/in/neha-gupta" }, "+91 90000 00000", "neha@example.com", "Director", "Gupta & Co"]);
+    expect((sheet.getRow(1).values as string[]).slice(1)).toEqual(["Name", "LinkedIn URL", "Instagram URL", "Contact Number", "Email", "Designation", "Company"]);
+    sheet.addRow(["Neha Gupta", { text: "Neha", hyperlink: "https://www.linkedin.com/in/neha-gupta" }, "", "+91 90000 00000", "neha@example.com", "Director", "Gupta & Co"]);
     const buffer = Buffer.from(await wb.xlsx.writeBuffer());
 
     const res = await upload("my sheet.xlsx", buffer);

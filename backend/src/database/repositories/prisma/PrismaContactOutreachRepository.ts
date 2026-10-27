@@ -30,11 +30,13 @@ function contactWhere(f: ContactFilters) {
             { email: containsInsensitive(f.q) },
             { phone: containsInsensitive(f.q) },
             { linkedinUrl: containsInsensitive(f.q) },
+            { instagramUrl: containsInsensitive(f.q) },
           ],
         }
       : {}),
     ...(f.listName ? { listName: f.listName } : {}),
     ...(f.hasLinkedIn !== undefined ? { linkedinUrl: f.hasLinkedIn ? { not: null } : null } : {}),
+    ...(f.hasInstagram !== undefined ? { instagramUrl: f.hasInstagram ? { not: null } : null } : {}),
     ...(f.hasEmail !== undefined ? { email: f.hasEmail ? { not: null } : null } : {}),
     ...(f.hasPhone !== undefined ? { phone: f.hasPhone ? { not: null } : null } : {}),
   };
@@ -53,6 +55,10 @@ export class PrismaContactRepository implements ContactRepository {
   findByLinkedInUrls(urls: string[]) {
     if (urls.length === 0) return Promise.resolve([]);
     return this.db.outreachContact.findMany({ where: { linkedinUrl: { in: urls } } });
+  }
+  findByInstagramUrls(urls: string[]) {
+    if (urls.length === 0) return Promise.resolve([]);
+    return this.db.outreachContact.findMany({ where: { instagramUrl: { in: urls } } });
   }
   findByEmails(emails: string[]) {
     if (emails.length === 0) return Promise.resolve([]);
@@ -81,9 +87,10 @@ export class PrismaContactRepository implements ContactRepository {
     return this.db.outreachContact.findMany({ where: contactWhere(filters), orderBy: [{ createdAt: "asc" }, { id: "asc" }], take });
   }
   async facets() {
-    const [total, withLinkedIn, withEmail, withPhone, lists] = await Promise.all([
+    const [total, withLinkedIn, withInstagram, withEmail, withPhone, lists] = await Promise.all([
       this.db.outreachContact.count(),
       this.db.outreachContact.count({ where: { linkedinUrl: { not: null } } }),
+      this.db.outreachContact.count({ where: { instagramUrl: { not: null } } }),
       this.db.outreachContact.count({ where: { email: { not: null } } }),
       this.db.outreachContact.count({ where: { phone: { not: null } } }),
       this.db.outreachContact.groupBy({ by: ["listName"], where: { listName: { not: null } }, _count: { _all: true } }),
@@ -91,6 +98,7 @@ export class PrismaContactRepository implements ContactRepository {
     return {
       total,
       withLinkedIn,
+      withInstagram,
       withEmail,
       withPhone,
       lists: lists
@@ -112,15 +120,16 @@ export class PrismaLinkedInOutreachRepository implements LinkedInOutreachReposit
   findCampaign(id: string) {
     return this.db.linkedInCampaign.findUnique({ where: { id } });
   }
-  async listCampaigns(page: { skip: number; take: number }) {
+  async listCampaigns(page: { skip: number; take: number; platform?: string }) {
+    const where = page.platform ? { platform: page.platform } : {};
     const [items, total] = await Promise.all([
-      this.db.linkedInCampaign.findMany({ orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: page.skip, take: page.take }),
-      this.db.linkedInCampaign.count(),
+      this.db.linkedInCampaign.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: page.skip, take: page.take }),
+      this.db.linkedInCampaign.count({ where }),
     ]);
     return { items, total };
   }
-  listCampaignsByStatus(status: CampaignStatus) {
-    return this.db.linkedInCampaign.findMany({ where: { status }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+  listCampaignsByStatus(status: CampaignStatus, platform?: string) {
+    return this.db.linkedInCampaign.findMany({ where: { status, ...(platform ? { platform } : {}) }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
   }
   async updateCampaignStatus(id: string, from: CampaignStatus[], data: Partial<Pick<LinkedInCampaignRecord, "status" | "statusReason" | "startedAt" | "completedAt">>) {
     const { count } = await this.db.linkedInCampaign.updateMany({ where: { id, status: { in: from } }, data });
@@ -165,8 +174,8 @@ export class PrismaLinkedInOutreachRepository implements LinkedInOutreachReposit
     const { count } = await this.db.linkedInMessage.updateMany({ where: { id, status: "sending" }, data: { status: "queued", claimedAt: null, error } });
     return count > 0;
   }
-  inFlight() {
-    return this.db.linkedInMessage.findFirst({ where: { status: "sending" }, orderBy: { claimedAt: "asc" } });
+  inFlight(platform?: string) {
+    return this.db.linkedInMessage.findFirst({ where: { status: "sending", ...(platform ? { campaign: { platform } } : {}) }, orderBy: { claimedAt: "asc" } });
   }
   async failStale(before: Date, error: string, at: Date) {
     const { count } = await this.db.linkedInMessage.updateMany({ where: { status: "sending", claimedAt: { lt: before } }, data: { status: "failed", error, failedAt: at } });
@@ -187,21 +196,22 @@ export const MAX_MERGED_LOG_ROWS = 5000;
 export class PrismaCampaignLogRepository implements CampaignLogRepository {
   constructor(private readonly db: DbClient) {}
 
-  async list(query: { channel?: Channel | "linkedin"; status?: AttemptStatus; campaignId?: string; q?: string; skip: number; take: number }) {
-    const wantAttempts = query.channel !== "linkedin";
-    const wantLinkedIn = query.channel === undefined || query.channel === "linkedin";
+  async list(query: { channel?: Channel | "linkedin" | "instagram"; status?: AttemptStatus; campaignId?: string; q?: string; skip: number; take: number }) {
+    const wantAttempts = query.channel !== "linkedin" && query.channel !== "instagram";
+    const wantLinkedIn = query.channel === undefined || query.channel === "linkedin" || query.channel === "instagram";
     // Rows from both tables are merged by time, so each table must supply the first skip+take rows.
     const window = Math.min(query.skip + query.take, MAX_MERGED_LOG_ROWS);
     const single = !(wantAttempts && wantLinkedIn);
     const page = single ? { skip: query.skip, take: query.take } : { skip: 0, take: window };
 
     const attemptWhere = {
-      ...(query.channel && query.channel !== "linkedin" ? { channel: query.channel } : {}),
+      ...(query.channel === "email" || query.channel === "whatsapp" ? { channel: query.channel } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.campaignId ? { campaignId: query.campaignId } : {}),
       ...(query.q ? { OR: [{ toAddress: containsInsensitive(query.q) }, { lead: { name: containsInsensitive(query.q) } }] } : {}),
     };
     const messageWhere = {
+      ...(query.channel === "linkedin" || query.channel === "instagram" ? { campaign: { platform: query.channel } } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.campaignId ? { campaignId: query.campaignId } : {}),
       ...(query.q ? { OR: [{ contactName: containsInsensitive(query.q) }, { profileUrl: containsInsensitive(query.q) }] } : {}),
@@ -220,7 +230,7 @@ export class PrismaCampaignLogRepository implements CampaignLogRepository {
       wantLinkedIn
         ? this.db.linkedInMessage.findMany({
             where: messageWhere,
-            include: { campaign: { select: { name: true } } },
+            include: { campaign: { select: { name: true, platform: true } } },
             orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
             ...page,
           })
@@ -243,7 +253,7 @@ export class PrismaCampaignLogRepository implements CampaignLogRepository {
       })),
       ...messages.map((m) => ({
         id: m.id,
-        channel: "linkedin" as const,
+        channel: (m.campaign.platform === "instagram" ? "instagram" : "linkedin") as "instagram" | "linkedin",
         campaignId: m.campaignId,
         campaignName: m.campaign.name,
         recipient: m.contactName,

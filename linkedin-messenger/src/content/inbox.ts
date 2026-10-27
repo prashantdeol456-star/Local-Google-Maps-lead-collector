@@ -2,7 +2,7 @@
 // logged-in browser), and types the AI's draft into the reply box for you to send. It never
 // presses Send itself: LinkedIn does not allow automated messaging.
 
-import { composerText, findComposer, isVisible, typeInto, waitFor, type Timing } from "./messenger";
+import { composerText, findComposer, isVisible, textStays, typeInto, waitFor, type Timing } from "./messenger";
 
 export interface UnreadThread {
   url: string;
@@ -102,7 +102,9 @@ export async function typeReplyAndWait(doc: Document, text: string, participantN
   if (signal?.aborted) return { status: "skipped", reason: "Skipped by you" };
   if (!composer) return { status: "skipped", reason: "The reply box was not found" };
   if (composerText(composer.box)) return { status: "skipped", reason: "The reply box already has text you typed; not overwritten" };
-  if (!typeInto(composer.box, text)) return { status: "skipped", reason: "Could not type into LinkedIn's reply box" };
+  if (!typeInto(composer.box, text) || !(await textStays(composer.box, text, Math.min(600, timing.findMs)))) {
+    return { status: "skipped", reason: "Could not type into LinkedIn's reply box (its editor did not accept the text)" };
+  }
 
   let lastText = composerText(composer.box);
   let userSent = false;

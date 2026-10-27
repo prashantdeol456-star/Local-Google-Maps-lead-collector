@@ -487,6 +487,209 @@ function Step({ ok, title, children }: { ok: boolean; title: string; children: R
   );
 }
 
+// ---- AI model & keys (entered here, stored encrypted on the backend) ----
+
+type Provider = "anthropic" | "gemini";
+type SecretName = "anthropicKey" | "geminiKey" | "telegramToken";
+interface KeyInfo {
+  set: boolean;
+  source: "admin" | "env" | null;
+  hint: string | null;
+}
+interface AiConfig {
+  provider: Provider;
+  model: string;
+  effort: "low" | "medium" | "high";
+  ready: boolean;
+  models: Record<Provider, { id: string; label: string; note: string }[]>;
+  keys: Record<SecretName, KeyInfo>;
+}
+
+const PROVIDER_LABEL: Record<Provider, string> = { anthropic: "Claude (Anthropic)", gemini: "Google Gemini" };
+const KEY_HELP: Record<SecretName, ReactNode> = {
+  anthropicKey: (
+    <>
+      From <strong>console.anthropic.com → API keys</strong> (starts with <code>sk-ant-</code>). The account needs credit.
+    </>
+  ),
+  geminiKey: (
+    <>
+      From <strong>aistudio.google.com → Get API key</strong>.
+    </>
+  ),
+  telegramToken: (
+    <>
+      In Telegram, open <strong>@BotFather</strong> → <code>/newbot</code>, then copy the token it gives you.
+    </>
+  ),
+};
+
+function KeyField({ name, label, info, onSaved }: { name: SecretName; label: string; info: KeyInfo; onSaved: (c: AiConfig) => void }) {
+  const [value, setValue] = useState("");
+  const save = useMutation({
+    mutationFn: (v: string | null) => api<AiConfig>(`/inbox/secrets/${name}`, { method: "PUT", body: { value: v } }),
+    onSuccess: (c) => {
+      setValue("");
+      onSaved(c);
+    },
+  });
+  return (
+    <div className="space-y-1">
+      <span className="label">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          className="input min-w-64 flex-1 font-mono text-sm"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={info.set ? `Saved (${info.hint}) · paste a new one to replace` : "Paste here"}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          aria-label={label}
+        />
+        <button type="button" className="btn btn-primary" disabled={!value.trim() || save.isPending} onClick={() => save.mutate(value)}>
+          {save.isPending ? "Saving…" : "Save"}
+        </button>
+        {info.set && info.source === "admin" && (
+          <button type="button" className="btn" disabled={save.isPending} onClick={() => save.mutate(null)}>
+            Remove
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-slate-500">
+        {info.set ? (info.source === "env" ? `Using the one in backend/.env (${info.hint}). A key saved here takes priority. ` : `Saved here (${info.hint}), encrypted. `) : "Not set. "}
+        {KEY_HELP[name]}
+      </p>
+      {save.error && <ErrorBox error={save.error} />}
+    </div>
+  );
+}
+
+function TestButton({ what, label }: { what: "ai" | "telegram"; label: string }) {
+  const test = useMutation({ mutationFn: () => api<{ ok: boolean; detail: string }>(`/inbox/test/${what}`, { method: "POST" }) });
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button type="button" className="btn" disabled={test.isPending} onClick={() => test.mutate()}>
+        {test.isPending ? "Testing…" : label}
+      </button>
+      {test.data && (
+        <span className={`text-sm ${test.data.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          {test.data.ok ? "✓ " : "✕ "}
+          {test.data.detail}
+        </span>
+      )}
+      {test.error && <span className="text-sm text-red-600">{(test.error as Error).message}</span>}
+    </span>
+  );
+}
+
+function AiKeysCard() {
+  const client = useQueryClient();
+  const config = useQuery({ queryKey: ["inbox", "ai-config"], queryFn: () => api<AiConfig>("/inbox/ai-config") });
+  const [custom, setCustom] = useState(false);
+  const apply = (c: AiConfig) => {
+    client.setQueryData(["inbox", "ai-config"], c);
+    client.invalidateQueries({ queryKey: ["inbox", "status"] });
+  };
+  const choose = useMutation({
+    mutationFn: (body: Partial<Pick<AiConfig, "provider" | "model" | "effort">>) => api<AiConfig>("/inbox/ai-config", { method: "PUT", body }),
+    onSuccess: apply,
+  });
+  if (config.isPending) return <Spinner />;
+  if (config.error) return <ErrorBox error={config.error} />;
+  const c = config.data;
+  const list = c.models[c.provider];
+  const known = list.some((m) => m.id === c.model);
+  const current = list.find((m) => m.id === c.model);
+
+  return (
+    <section className="card mb-6 space-y-5 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-medium">AI model & keys</h2>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            c.ready ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+          }`}
+        >
+          {c.ready ? `Ready · ${c.model}` : "Add an API key"}
+        </span>
+      </div>
+
+      <fieldset>
+        <legend className="label mb-1">Which AI writes the replies</legend>
+        <div className="flex flex-wrap gap-2">
+          {(["anthropic", "gemini"] as Provider[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={c.provider === p}
+              className={`btn ${c.provider === p ? "btn-primary" : ""}`}
+              disabled={choose.isPending}
+              onClick={() => {
+                setCustom(false);
+                if (p !== c.provider) choose.mutate({ provider: p });
+              }}
+            >
+              {p === "anthropic" ? "✦ " : "◆ "}
+              {PROVIDER_LABEL[p]}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block space-y-1">
+          <span className="label">Model</span>
+          {custom || !known ? (
+            <input
+              className="input font-mono text-sm"
+              defaultValue={c.model}
+              placeholder={c.provider === "anthropic" ? "claude-…" : "gemini-…"}
+              onBlur={(e) => e.target.value.trim() !== c.model && choose.mutate({ model: e.target.value.trim() })}
+              aria-label="Custom model id"
+            />
+          ) : (
+            <select className="input" value={c.model} onChange={(e) => (e.target.value === "__custom" ? setCustom(true) : choose.mutate({ model: e.target.value }))}>
+              {list.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label} ({m.id})
+                </option>
+              ))}
+              <option value="__custom">Other model id…</option>
+            </select>
+          )}
+          <span className="block text-xs text-slate-500">{current?.note ?? "Custom model id. Use Test to check it works with your key."}</span>
+        </label>
+        <label className="block space-y-1">
+          <span className="label">Thinking effort</span>
+          <select className="input" value={c.effort} onChange={(e) => choose.mutate({ effort: e.target.value as AiConfig["effort"] })}>
+            <option value="low">Low: fastest, cheapest</option>
+            <option value="medium">Medium: balanced (recommended)</option>
+            <option value="high">High: most careful, slower</option>
+          </select>
+        </label>
+      </div>
+      {choose.error && <ErrorBox error={choose.error} />}
+
+      {c.provider === "anthropic" ? (
+        <KeyField key="anthropicKey" name="anthropicKey" label="Claude API key" info={c.keys.anthropicKey} onSaved={apply} />
+      ) : (
+        <KeyField key="geminiKey" name="geminiKey" label="Gemini API key" info={c.keys.geminiKey} onSaved={apply} />
+      )}
+      <TestButton key={`test-${c.provider}-${c.model}`} what="ai" label={`Test ${c.provider === "anthropic" ? "Claude" : "Gemini"} key`} />
+
+      <hr className="border-slate-200 dark:border-slate-800" />
+      <KeyField name="telegramToken" label="Telegram bot token" info={c.keys.telegramToken} onSaved={apply} />
+      <TestButton what="telegram" label="Test Telegram bot" />
+
+      <p className="text-xs text-slate-500">
+        Keys are encrypted on the backend and never shown again (only the last 4 characters). Changes work at once, with no restart. The test buttons make a free
+        check: no message is written or sent.
+      </p>
+    </section>
+  );
+}
+
 function SetupTab() {
   const status = useQuery({ queryKey: ["inbox", "status"], queryFn: () => api<Status>("/inbox/status") });
   if (status.isPending) return <Spinner />;
@@ -496,18 +699,16 @@ function SetupTab() {
   const igOk = s.instagram.accounts.some((a) => a.status === "connected");
   const problems = [...s.facebook.accounts, ...s.instagram.accounts].filter((a) => a.lastError);
   return (
+    <>
+    <AiKeysCard />
     <div className="card">
       <ol className="divide-y divide-slate-100 dark:divide-slate-800">
-        <Step ok={s.ai.configured} title={s.ai.configured ? `AI: Claude (${s.ai.model})` : "AI: add your Claude API key"}>
-          <p>
-            Put <code>ANTHROPIC_API_KEY</code> in <code>backend/.env</code> (from console.anthropic.com → API keys) and restart the backend. Optional: <code>INBOX_AI_MODEL</code>{" "}
-            (default <code>claude-opus-5-5</code>), <code>INBOX_AI_EFFORT</code> (low / medium / high).
-          </p>
+        <Step ok={s.ai.configured} title={s.ai.configured ? `AI ready (${s.ai.model})` : "AI: choose Claude or Gemini and add its API key (above)"}>
+          <p>Pick the AI and model in the box above, paste its API key, and press Test.</p>
         </Step>
         <Step ok={s.telegram.configured} title="Telegram bot">
           <p>
-            In Telegram, open <strong>@BotFather</strong> → <code>/newbot</code> → copy the token into <code>TELEGRAM_BOT_TOKEN</code> in <code>backend/.env</code>, and restart. Share
-            your bot link (t.me/your_bot) with customers. The AI replies in private chats only, never in groups.
+            Paste the token from <strong>@BotFather</strong> above. Share your bot link (t.me/your_bot) with customers. The AI replies in private chats only, never in groups.
           </p>
         </Step>
         <Step ok={fbOk} title="Facebook Page messages">
@@ -545,6 +746,7 @@ function SetupTab() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

@@ -4,7 +4,8 @@
 // - every few seconds: answer chats that are waiting (InboxService.processDue).
 
 import type { Repositories } from "../database/repositories/index.js";
-import { ChannelError, type MetaMessaging, type TelegramBot } from "../services/inbox/channels.js";
+import { ChannelError, type MetaMessaging } from "../services/inbox/channels.js";
+import type { InboxRuntime } from "../services/inbox/runtime.js";
 import type { InboxService } from "../services/inbox/inboxService.js";
 import type { SocialService } from "../services/social/socialService.js";
 
@@ -22,7 +23,7 @@ export class InboxWorker {
     private readonly repos: Repositories,
     private readonly inbox: InboxService,
     private readonly opts: {
-      telegram: TelegramBot | null;
+      runtime: InboxRuntime;
       meta: MetaMessaging | null;
       social: SocialService;
       pollSeconds: number;
@@ -38,7 +39,7 @@ export class InboxWorker {
       this.timers.push(setInterval(() => void this.pollMetaOnce(), this.opts.pollSeconds * 1000));
       void this.pollMetaOnce();
     }
-    if (this.opts.telegram) this.telegramLoop = this.runTelegram();
+    this.telegramLoop = this.runTelegram();
   }
 
   async stop() {
@@ -57,29 +58,42 @@ export class InboxWorker {
     return this.processing;
   }
 
+  /** Keeps reading the bot; follows a token added or changed in the admin panel. */
   private async runTelegram() {
-    const bot = this.opts.telegram!;
-    try {
-      const me = await bot.me();
-      this.opts.log(`AI inbox: Telegram bot @${me.username ?? me.first_name} is listening`);
-    } catch (err) {
-      this.opts.log(`AI inbox: Telegram bot not available: ${err instanceof Error ? err.message : String(err)}`);
-      if (err instanceof ChannelError && !err.retryable) return;
-    }
+    let announced: string | null = null;
     while (!this.stopped) {
+      const telegram = await this.opts.runtime.telegram().catch(() => null);
+      if (!telegram) {
+        announced = null;
+        await this.sleep(15_000);
+        continue;
+      }
+      if (announced !== telegram.token) {
+        announced = telegram.token;
+        try {
+          const me = await telegram.bot.me();
+          this.opts.log(`AI inbox: Telegram bot @${me.username ?? me.first_name} is listening`);
+        } catch (err) {
+          this.opts.log(`AI inbox: Telegram bot not available: ${err instanceof Error ? err.message : String(err)}`);
+          await this.sleep(err instanceof ChannelError && !err.retryable ? 60_000 : 10_000);
+          announced = null;
+          continue;
+        }
+      }
       try {
         await this.telegramOnce(25);
       } catch (err) {
         const retryable = !(err instanceof ChannelError) || err.retryable;
         this.opts.log(`AI inbox: Telegram: ${err instanceof Error ? err.message : String(err)}`);
-        await this.sleep(retryable ? 10_000 : 120_000);
+        await this.sleep(retryable ? 10_000 : 60_000);
+        announced = null;
       }
     }
   }
 
   /** One long-poll round (also used by tests with waitSec 0). */
   async telegramOnce(waitSec: number) {
-    const bot = this.opts.telegram;
+    const bot = (await this.opts.runtime.telegram())?.bot;
     if (!bot) return 0;
     const settings = await this.repos.inbox.getSettings();
     const { nextOffset, threads } = await bot.updates(settings.telegramOffset, waitSec);

@@ -34,6 +34,7 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.5",
+    "@google/genai": "^2.31.0",
     "@platform/shared": "*",
     "@prisma/adapter-better-sqlite3": "^7.10.0",
     "@prisma/adapter-pg": "^7.10.0",

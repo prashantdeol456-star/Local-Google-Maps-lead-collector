@@ -185,6 +185,7 @@ const TABS = [
   { id: "sms", label: "💬 SMS" },
   { id: "whatsapp", label: "✆ WhatsApp" },
   { id: "linkedin", label: "in LinkedIn message" },
+  { id: "instagram", label: "◎ Instagram message" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -214,6 +215,7 @@ export function TemplatesPage() {
       {tab === "sms" && <ChannelTemplatesSection key="sms" channel="sms" />}
       {tab === "whatsapp" && <WhatsAppTemplatesPage />}
       {tab === "linkedin" && <ChannelTemplatesSection key="linkedin" channel="linkedin" />}
+      {tab === "instagram" && <ChannelTemplatesSection key="instagram" channel="instagram" />}
     </>
   );
 }

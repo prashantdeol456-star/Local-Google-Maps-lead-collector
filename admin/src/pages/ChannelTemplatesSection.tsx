@@ -28,6 +28,13 @@ const INFO: Record<ContactTemplateChannel, { title: string; noun: string; limit:
     },
     hint: "Sent by the LinkedIn Messenger extension from your own LinkedIn account, to people you are connected with. Keep it short and personal.",
   },
+  instagram: {
+    title: "Instagram message templates",
+    noun: "Instagram message",
+    limit: 1000,
+    starter: { name: "Instagram intro", body: "Hi {{first_name}}! Loved your page. We help businesses like yours get more customers online. Can I share a quick idea?" },
+    hint: "Sent by the Meta Helper extension from your own Instagram account. People who don't follow you see it under Message requests. Keep it short, personal and without links in the first message.",
+  },
 };
 
 function Preview({ channel, body }: { channel: ContactTemplateChannel; body: string }) {
@@ -164,7 +171,11 @@ export function ChannelTemplatesSection({ channel }: { channel: ContactTemplateC
       <PageHeader
         title={info.title}
         subtitle={
-          channel === "linkedin" ? (
+          channel === "instagram" ? (
+            <>
+              Used by <Link to="/instagram-outreach" className="text-brand-600 hover:underline">Instagram Outreach</Link> campaigns. Variables come from your contacts.
+            </>
+          ) : channel === "linkedin" ? (
             <>
               Used by <Link to="/linkedin-outreach" className="text-brand-600 hover:underline">LinkedIn Outreach</Link> campaigns. Variables come from your uploaded contacts.
             </>

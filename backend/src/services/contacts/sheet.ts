@@ -3,12 +3,13 @@
 // Headers are matched loosely (case, spaces, common synonyms) so a sheet made by hand works too.
 
 import ExcelJS from "exceljs";
-import { normalizeLinkedInProfileUrl } from "@platform/shared";
+import { normalizeInstagramUrl, normalizeLinkedInProfileUrl } from "@platform/shared";
 import { parseCsv } from "../linkedin/csvImport.js";
 
 export const SHEET_COLUMNS = [
   { key: "name", header: "Name", example: "Priya Sharma", width: 26 },
   { key: "linkedinUrl", header: "LinkedIn URL", example: "https://www.linkedin.com/in/priya-sharma-example", width: 46 },
+  { key: "instagramUrl", header: "Instagram URL", example: "https://www.instagram.com/priya.sharma.example/", width: 40 },
   { key: "phone", header: "Contact Number", example: "+91 98765 43210", width: 18 },
   { key: "email", header: "Email", example: "priya@example.com", width: 28 },
   { key: "designation", header: "Designation", example: "HR Manager", width: 22 },
@@ -29,6 +30,15 @@ const ALIASES: Record<string, SheetField> = {
   "linkedin profile url": "linkedinUrl",
   "profile url": "linkedinUrl",
   url: "linkedinUrl",
+  "instagram url": "instagramUrl",
+  instagram: "instagramUrl",
+  "instagram profile": "instagramUrl",
+  "instagram profile url": "instagramUrl",
+  "instagram id": "instagramUrl",
+  "instagram username": "instagramUrl",
+  "insta id": "instagramUrl",
+  insta: "instagramUrl",
+  ig: "instagramUrl",
   "contact number": "phone",
   "contact no": "phone",
   contact: "phone",
@@ -65,6 +75,7 @@ const headerKey = (cell: string) =>
 export interface SheetContact {
   name: string;
   linkedinUrl: string | null;
+  instagramUrl: string | null;
   email: string | null;
   phone: string | null;
   designation: string | null;
@@ -102,7 +113,7 @@ export function parseSheetTable(table: string[][]): ParsedSheet {
   if (headerIndex < 0) throw new Error('No header row found. The sheet needs a "Name" column (download the template to see the format)');
   const columns = table[headerIndex]!.map((c) => ALIASES[headerKey(c)]);
   if (!columns.some((c) => c && c !== "name")) {
-    throw new Error("The sheet has a Name column but none of: LinkedIn URL, Contact Number, Email, Designation, Company");
+    throw new Error("The sheet has a Name column but none of: LinkedIn URL, Instagram URL, Contact Number, Email, Designation, Company");
   }
 
   const rows: ParsedSheet["rows"] = [];
@@ -130,6 +141,14 @@ export function parseSheetTable(table: string[][]): ParsedSheet {
         continue;
       }
     }
+    let instagramUrl: string | null = null;
+    if (v.instagramUrl) {
+      instagramUrl = normalizeInstagramUrl(v.instagramUrl);
+      if (!instagramUrl) {
+        errors.push({ line, reason: `Not an Instagram profile URL or username: ${v.instagramUrl.slice(0, 80)}` });
+        continue;
+      }
+    }
     // A cell may hold several addresses ("a@x.com; b@y.com"): the first valid one is used.
     const email = (v.email ?? "")
       .split(/[;,\s]+/)
@@ -144,11 +163,11 @@ export function parseSheetTable(table: string[][]): ParsedSheet {
       errors.push({ line, reason: `Not a phone number: ${v.phone.slice(0, 40)}` });
       continue;
     }
-    if (!linkedinUrl && !email && !phone) {
-      errors.push({ line, reason: "Needs at least one of LinkedIn URL, Contact Number or Email" });
+    if (!linkedinUrl && !instagramUrl && !email && !phone) {
+      errors.push({ line, reason: "Needs at least one of LinkedIn URL, Instagram URL, Contact Number or Email" });
       continue;
     }
-    rows.push({ line, contact: { name, linkedinUrl, email, phone, designation: text(v.designation, 300), company: text(v.company, 300) } });
+    rows.push({ line, contact: { name, linkedinUrl, instagramUrl, email, phone, designation: text(v.designation, 300), company: text(v.company, 300) } });
   }
   return { rows, errors };
 }
@@ -210,7 +229,8 @@ export async function templateXlsx(): Promise<Buffer> {
   help.columns = [{ width: 110 }];
   for (const line of [
     "One contact per row on the Contacts sheet. Keep the header row; replace the example row.",
-    "Name is required, plus at least one of LinkedIn URL, Contact Number or Email.",
+    "Name is required, plus at least one of LinkedIn URL, Instagram URL, Contact Number or Email.",
+    "Instagram URL: the profile link (https://www.instagram.com/username/) or just the username (needed for Instagram messages).",
     "LinkedIn URL: the profile link, e.g. https://www.linkedin.com/in/someone (needed for LinkedIn messages).",
     "Contact Number: with country code, e.g. +91 98765 43210.",
     "Uploading the same LinkedIn URL (or email) again updates that contact instead of adding a copy.",

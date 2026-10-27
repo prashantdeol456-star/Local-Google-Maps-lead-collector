@@ -82,7 +82,7 @@ const enable = (extra: Record<string, unknown> = {}) =>
 beforeAll(async () => {
   t = await createTestApp(
     {
-      inbox: { ai: null, telegramBotToken: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij", pollSeconds: 60 },
+      inbox: { ai: null, geminiApiKey: null, telegramBotToken: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij", pollSeconds: 60 },
       social: { meta: { appId: "1", appSecret: "s", graphVersion: "v26.0", scopes: [] }, linkedin: null, redirectBaseUrl: "http://localhost:3000" },
     },
     { replyWriter: writer, inboxFetch: fakeFetch },

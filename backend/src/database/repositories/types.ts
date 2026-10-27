@@ -273,7 +273,7 @@ export interface AgentLogRepository {
 
 export type Channel = "email" | "whatsapp";
 /** Templates can be written for more channels than Campaign/ContactAttempt send. */
-export type TemplateChannel = Channel | "sms" | "linkedin";
+export type TemplateChannel = Channel | "sms" | "linkedin" | "instagram";
 export type CampaignStatus = "draft" | "running" | "paused" | "completed" | "stopped";
 export type AttemptStatus = "queued" | "sending" | "sent" | "delivered" | "failed" | "skipped" | "cancelled";
 
@@ -610,6 +610,7 @@ export interface ContactRecord {
   id: string;
   name: string;
   linkedinUrl: string | null;
+  instagramUrl: string | null;
   email: string | null;
   phone: string | null;
   designation: string | null;
@@ -626,6 +627,7 @@ export interface ContactFilters {
   q?: string;
   listName?: string;
   hasLinkedIn?: boolean;
+  hasInstagram?: boolean;
   hasEmail?: boolean;
   hasPhone?: boolean;
 }
@@ -634,6 +636,7 @@ export interface ContactRepository {
   findById(id: string): Promise<ContactRecord | null>;
   findByIds(ids: string[]): Promise<ContactRecord[]>;
   findByLinkedInUrls(urls: string[]): Promise<ContactRecord[]>;
+  findByInstagramUrls(urls: string[]): Promise<ContactRecord[]>;
   findByEmails(emails: string[]): Promise<ContactRecord[]>;
   create(data: ContactData): Promise<ContactRecord>;
   update(id: string, data: Partial<ContactData>): Promise<ContactRecord>;
@@ -641,13 +644,17 @@ export interface ContactRepository {
   list(filters: ContactFilters & { skip: number; take: number }): Promise<{ items: ContactRecord[]; total: number }>;
   /** All matching contacts, oldest first, up to `take`. */
   listAll(filters: ContactFilters, take: number): Promise<ContactRecord[]>;
-  facets(): Promise<{ total: number; withLinkedIn: number; withEmail: number; withPhone: number; lists: { value: string; count: number }[] }>;
+  facets(): Promise<{ total: number; withLinkedIn: number; withInstagram: number; withEmail: number; withPhone: number; lists: { value: string; count: number }[] }>;
 }
 
 export type LinkedInSendMode = "assisted" | "auto";
 
+/** Which extension sends a campaign's messages. */
+export type OutreachPlatform = "linkedin" | "instagram";
+
 export interface LinkedInCampaignRecord {
   id: string;
+  platform: string;
   name: string;
   templateId: string;
   status: CampaignStatus;
@@ -669,7 +676,7 @@ export interface LinkedInCampaignRecord {
 
 export type LinkedInCampaignCreateData = Pick<
   LinkedInCampaignRecord,
-  "name" | "templateId" | "mode" | "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd" | "timeZone" | "startAt" | "createdById"
+  "platform" | "name" | "templateId" | "mode" | "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd" | "timeZone" | "startAt" | "createdById"
 >;
 
 export interface LinkedInMessageRecord {
@@ -691,8 +698,8 @@ export interface LinkedInMessageRecord {
 export interface LinkedInOutreachRepository {
   createCampaign(data: LinkedInCampaignCreateData, messages: Pick<LinkedInMessageRecord, "contactId" | "profileUrl" | "contactName" | "renderedBody">[]): Promise<LinkedInCampaignRecord>;
   findCampaign(id: string): Promise<LinkedInCampaignRecord | null>;
-  listCampaigns(page: { skip: number; take: number }): Promise<{ items: LinkedInCampaignRecord[]; total: number }>;
-  listCampaignsByStatus(status: CampaignStatus): Promise<LinkedInCampaignRecord[]>;
+  listCampaigns(page: { skip: number; take: number; platform?: OutreachPlatform }): Promise<{ items: LinkedInCampaignRecord[]; total: number }>;
+  listCampaignsByStatus(status: CampaignStatus, platform?: OutreachPlatform): Promise<LinkedInCampaignRecord[]>;
   updateCampaignStatus(id: string, from: CampaignStatus[], data: Partial<Pick<LinkedInCampaignRecord, "status" | "statusReason" | "startedAt" | "completedAt">>): Promise<LinkedInCampaignRecord | null>;
   touchLastSent(id: string, at: Date): Promise<void>;
   updateCampaignSchedule(id: string, data: Partial<Pick<LinkedInCampaignRecord, "intervalSec" | "dailyLimit" | "windowStart" | "windowEnd">>): Promise<LinkedInCampaignRecord>;
@@ -709,7 +716,7 @@ export interface LinkedInOutreachRepository {
   /** sending → queued (the extension gave it back untouched, e.g. LinkedIn needed a login). */
   release(id: string, error: string): Promise<boolean>;
   /** A message currently handed to the extension, if any. */
-  inFlight(): Promise<LinkedInMessageRecord | null>;
+  inFlight(platform?: OutreachPlatform): Promise<LinkedInMessageRecord | null>;
   /** Messages handed out before `before` with no report back: failed (never re-sent). */
   failStale(before: Date, error: string, at: Date): Promise<number>;
   cancelQueued(campaignId: string): Promise<number>;
@@ -719,7 +726,7 @@ export interface LinkedInOutreachRepository {
 /** One message of any channel, for the campaign logs page. */
 export interface CampaignLogEntry {
   id: string;
-  channel: Channel | "linkedin";
+  channel: Channel | "linkedin" | "instagram";
   campaignId: string | null;
   campaignName: string | null;
   recipient: string;
@@ -732,7 +739,7 @@ export interface CampaignLogEntry {
 
 export interface CampaignLogRepository {
   /** Newest first. */
-  list(query: { channel?: Channel | "linkedin"; status?: AttemptStatus; campaignId?: string; q?: string; skip: number; take: number }): Promise<{ items: CampaignLogEntry[]; total: number }>;
+  list(query: { channel?: Channel | "linkedin" | "instagram"; status?: AttemptStatus; campaignId?: string; q?: string; skip: number; take: number }): Promise<{ items: CampaignLogEntry[]; total: number }>;
   /** Campaign events (started, paused, completed…) from the activity log, newest first. */
   events(take: number): Promise<{ id: string; action: string; status: string; message: string | null; createdAt: Date }[]>;
 }
@@ -837,6 +844,15 @@ export interface AiAssistantSettingsRecord {
   minConfidence: number;
   maxAutoPerChatPerDay: number;
   telegramOffset: number;
+  aiProvider: string;
+  aiModel: string;
+  aiEffort: string;
+  anthropicKeyEnc: string | null;
+  anthropicKeyHint: string | null;
+  geminiKeyEnc: string | null;
+  geminiKeyHint: string | null;
+  telegramTokenEnc: string | null;
+  telegramTokenHint: string | null;
   updatedAt: Date;
 }
 

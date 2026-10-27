@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { normalizeLinkedInProfileUrl } from "@platform/shared";
+import { normalizeInstagramUrl, normalizeLinkedInProfileUrl } from "@platform/shared";
 import type { ContactService } from "../../services/contacts/contactService.js";
 import { BODY_LIMIT, type ChannelTemplateService } from "../../services/contacts/channelTemplates.js";
 import { templateCsv, templateXlsx } from "../../services/contacts/sheet.js";
@@ -26,6 +26,7 @@ const ContactFilters = z.object({
   q: optionalText(200),
   listName: optionalText(100),
   hasLinkedIn: bool,
+  hasInstagram: bool,
   hasEmail: bool,
   hasPhone: bool,
 });
@@ -53,6 +54,17 @@ const UpdateBody = z
         if (!url) ctx.addIssue({ code: "custom", message: "Not a LinkedIn profile URL" });
         return url;
       }),
+    instagramUrl: z
+      .string()
+      .trim()
+      .max(2000)
+      .nullable()
+      .transform((v, ctx) => {
+        if (!v) return null;
+        const url = normalizeInstagramUrl(v);
+        if (!url) ctx.addIssue({ code: "custom", message: "Not an Instagram profile URL or username" });
+        return url;
+      }),
     email: z
       .union([z.email().max(254), z.literal(""), z.null()])
       .transform((v) => (v ? v.toLowerCase() : null)),
@@ -66,13 +78,13 @@ const UpdateBody = z
 
 const DeleteBody = z.object({ ids: z.array(z.string().min(1).max(64)).min(1).max(5000) });
 
-const TemplateChannel = z.enum(["sms", "linkedin"]);
+const TemplateChannel = z.enum(["sms", "linkedin", "instagram"]);
 const TemplateBody = z.object({
   name: z.string().trim().min(1).max(120),
   body: z.string().trim().min(1).max(Math.max(BODY_LIMIT.sms, BODY_LIMIT.linkedin)),
 });
 
-const LogChannel = z.enum(["email", "whatsapp", "linkedin"]);
+const LogChannel = z.enum(["email", "whatsapp", "linkedin", "instagram"]);
 const AttemptStatus = z.enum(["queued", "sending", "sent", "delivered", "failed", "skipped", "cancelled"]);
 
 export async function contactRoutes(app: FastifyInstance, opts: { contacts: ContactService; channelTemplates: ChannelTemplateService; logs: CampaignLogService }) {

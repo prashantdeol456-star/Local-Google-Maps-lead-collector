@@ -82,7 +82,7 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, deps: Pi
     whatsapp: { provider: "log" },
     ai: { provider: "off" },
     social: { meta: null, linkedin: null, redirectBaseUrl: "http://localhost:3000" },
-    inbox: { ai: null, telegramBotToken: null, pollSeconds: 60 },
+    inbox: { ai: null, geminiApiKey: null, telegramBotToken: null, pollSeconds: 60 },
     publicBaseUrl: null,
     trackClicks: true,
     apiTokenTtlMs: 24 * 60 * 60 * 1000,

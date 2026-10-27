@@ -2,7 +2,7 @@
 
 import type { AttemptStatus, Channel, Repositories } from "../../database/repositories/index.js";
 
-export type LogChannel = Channel | "linkedin";
+export type LogChannel = Channel | "linkedin" | "instagram";
 
 export interface CampaignSummary {
   id: string;
@@ -36,11 +36,11 @@ export class CampaignLogService {
         out.push({ ...pick(c), channel: ch, mode: null, counts, total: sum(counts) });
       }
     }
-    if (!channel || channel === "linkedin") {
-      const { items } = await this.repos.linkedinOutreach.listCampaigns({ skip: 0, take: PER_CHANNEL });
+    if (!channel || channel === "linkedin" || channel === "instagram") {
+      const { items } = await this.repos.linkedinOutreach.listCampaigns({ skip: 0, take: PER_CHANNEL, ...(channel ? { platform: channel } : {}) });
       for (const c of items) {
         const counts = await this.repos.linkedinOutreach.countByStatus(c.id);
-        out.push({ ...pick(c), channel: "linkedin", mode: c.mode, counts, total: sum(counts) });
+        out.push({ ...pick(c), channel: c.platform === "instagram" ? "instagram" : "linkedin", mode: c.mode, counts, total: sum(counts) });
       }
     }
     return out.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

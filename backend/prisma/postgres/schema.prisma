@@ -38,6 +38,7 @@ enum TemplateChannel {
   whatsapp
   sms
   linkedin
+  instagram
 }
 
 enum CampaignStatus {
@@ -523,6 +524,8 @@ model OutreachContact {
   name        String
   /** Canonical https://www.linkedin.com/in/<slug>; the key used to merge re-uploads */
   linkedinUrl String?           @unique
+  /** Canonical https://www.instagram.com/<username>/ */
+  instagramUrl String?          @unique
   /** Lowercase */
   email       String?
   phone       String?
@@ -543,6 +546,8 @@ model OutreachContact {
 
 model LinkedInCampaign {
   id           String            @id @default(cuid())
+  /** linkedin | instagram: which extension sends it (LinkedIn Messenger or Meta Helper) */
+  platform     String            @default("linkedin")
   name         String
   templateId   String
   status       CampaignStatus    @default(draft)
@@ -566,6 +571,7 @@ model LinkedInCampaign {
   messages     LinkedInMessage[]
 
   @@index([status])
+  @@index([platform, status])
 }
 
 /** One LinkedIn message to one contact: the extension's work queue and the send log. */
@@ -726,5 +732,55 @@ model AiAssistantSettings {
   maxAutoPerChatPerDay Int      @default(5)
   /** Telegram getUpdates offset, so a restart does not re-read old messages */
   telegramOffset       Int      @default(0)
+  /** anthropic | gemini */
+  aiProvider           String   @default("anthropic")
+  /** Model id; empty = the provider's default */
+  aiModel              String   @default("")
+  /** low | medium | high (thinking effort) */
+  aiEffort             String   @default("medium")
+  /** Keys entered in the admin panel, AES-256-GCM encrypted (SecretBox "inbox-secrets"); .env is the fallback */
+  anthropicKeyEnc      String?
+  anthropicKeyHint     String?
+  geminiKeyEnc         String?
+  geminiKeyHint        String?
+  telegramTokenEnc     String?
+  telegramTokenHint    String?
   updatedAt            DateTime @updatedAt
+}
+
+// ---- Social leads: Instagram profiles, Facebook Pages, groups and profiles saved by the Meta
+// Helper extension from keyword searches the user runs (public details only; no member lists). ----
+
+model SocialLead {
+  id          String   @id @default(cuid())
+  /** instagram | facebook */
+  platform    String
+  /** profile | page | group */
+  kind        String
+  /** Canonical link (unique) */
+  url         String   @unique
+  /** Instagram username or Facebook vanity name, when known */
+  handle      String?
+  name        String
+  /** Bio, Page category line or group description, as shown */
+  bio         String?
+  category    String?
+  followers   Int?
+  /** Followers/members as shown, e.g. "21.7K followers" */
+  audienceText String?
+  /** Groups: public | private */
+  privacy     String?
+  email       String?
+  phone       String?
+  website     String?
+  location    String?
+  /** The search keyword it was found with */
+  keyword     String?
+  tag         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([platform, kind])
+  @@index([keyword])
+  @@index([createdAt])
 }

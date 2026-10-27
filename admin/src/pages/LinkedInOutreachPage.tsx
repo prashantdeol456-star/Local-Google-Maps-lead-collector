@@ -17,8 +17,32 @@ import type {
 } from "../lib/types";
 import { Badge } from "./EmailPage";
 
-// LinkedIn message campaigns. Sending happens in the LinkedIn Messenger extension, in your own
-// browser and LinkedIn account: this page queues the messages and sets the pace.
+// LinkedIn and Instagram message campaigns. Sending happens in the LinkedIn Messenger or Meta Helper
+// extension, in your own browser and account: this page queues the messages and sets the pace.
+
+export type OutreachPlatform = "linkedin" | "instagram";
+
+const P = {
+  linkedin: {
+    name: "LinkedIn",
+    path: "/linkedin-outreach",
+    extension: "LinkedIn Messenger",
+    build: "npm run build:messenger",
+    dist: "linkedin-messenger/dist",
+    rules: "LinkedIn's User Agreement does not allow tools that automate sending messages. Accounts that use them can be restricted.",
+    defaultDaily: 20,
+  },
+  instagram: {
+    name: "Instagram",
+    path: "/instagram-outreach",
+    extension: "Meta Helper",
+    build: "npm run build:meta",
+    dist: "meta-helper/dist",
+    rules:
+      "Instagram does not allow automated messaging, and blocks or disables accounts that use it. Messages to people who don't follow you go to their Message requests, and Instagram limits how many new chats you can start each day.",
+    defaultDaily: 15,
+  },
+} as const;
 
 const MODE_LABEL: Record<LinkedInSendMode, string> = { assisted: "Assisted (you click Send)", auto: "Automatic" };
 
@@ -27,7 +51,7 @@ const WAITING_TEXT: Record<NonNullable<LinkedInCampaignDetail["waitingFor"]>, st
   outside_window: "outside the sending hours (press Edit timing → Any time to send now)",
   daily_limit: "daily limit reached",
   interval: "waiting for the gap between messages",
-  extension: "ready — waiting for the LinkedIn Messenger extension to pick it up",
+  extension: "ready: waiting for the extension to pick it up",
 };
 
 /** Same start and end = no hours limit. */
@@ -116,63 +140,63 @@ function TimingEditor({ campaign, onSaved }: { campaign: LinkedInCampaign; onSav
   );
 }
 
-export function RiskNotice() {
+export function RiskNotice({ platform = "linkedin" }: { platform?: OutreachPlatform }) {
   return (
     <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-      <strong>Your LinkedIn account is at risk.</strong> LinkedIn&apos;s User Agreement does not allow tools that automate sending messages. Accounts that use them
-      can be restricted. Assisted mode (you press Send for each message) is the safer choice. Keep the daily limit low and only message people who would
+      <strong>Your {P[platform].name} account is at risk.</strong> {P[platform].rules} Assisted mode (you press Send for each message) is the safer choice. Keep the daily limit low and only message people who would
       want to hear from you.
     </div>
   );
 }
 
-function ExtensionHint() {
+function ExtensionHint({ platform }: { platform: OutreachPlatform }) {
   return (
     <p className="text-sm text-slate-500">
-      Messages are sent by the <strong>LinkedIn Messenger</strong> extension (<code>npm run build:messenger</code>, then load <code>linkedin-messenger/dist</code> in{" "}
-      <code>chrome://extensions</code>). Log in to it with your admin account, open LinkedIn in the same browser, and press <em>Start</em> in its side panel.
+      Messages are sent by the <strong>{P[platform].extension}</strong> extension (<code>{P[platform].build}</code>, then load <code>{P[platform].dist}</code> in{" "}
+      <code>chrome://extensions</code>). Log in to it with your admin account, open {P[platform].name} in the same browser, and press <em>Start</em> in its side panel.
     </p>
   );
 }
 
-export function LinkedInCampaignsPage() {
+export function LinkedInCampaignsPage({ platform = "linkedin" }: { platform?: OutreachPlatform }) {
+  const info = P[platform];
   const params = useSearchParams();
   const page = Number(params.get("page") ?? 1) || 1;
   const list = useQuery({
-    queryKey: ["linkedin-campaigns", page],
-    queryFn: () => api<Page<LinkedInCampaign>>(`/linkedin-outreach/campaigns${qs({ page, pageSize: 25 })}`),
+    queryKey: ["linkedin-campaigns", platform, page],
+    queryFn: () => api<Page<LinkedInCampaign>>(`/linkedin-outreach/campaigns${qs({ page, pageSize: 25, platform })}`),
     placeholderData: keepPreviousData,
   });
   return (
     <>
       <PageHeader
-        title="LinkedIn Outreach"
-        subtitle={<ExtensionHint />}
+        title={`${info.name} Outreach`}
+        subtitle={<ExtensionHint platform={platform} />}
         actions={
           <>
-            <Link to="/templates?channel=linkedin" className="btn">
+            <Link to={`/templates?channel=${platform}`} className="btn">
               Templates
             </Link>
-            <Link to="/linkedin-outreach/new" className="btn btn-primary">
+            <Link to={`${info.path}/new`} className="btn btn-primary">
               + New campaign
             </Link>
           </>
         }
       />
-      <RiskNotice />
+      <RiskNotice platform={platform} />
       <div className="card">
         {list.isPending && <Spinner />}
         {list.error && <div className="p-4"><ErrorBox error={list.error} /></div>}
         {list.data?.total === 0 && (
-          <EmptyState title="No LinkedIn campaigns yet">
+          <EmptyState title={`No ${info.name} campaigns yet`}>
             Upload contacts in <Link to="/contacts" className="text-brand-600 hover:underline">Contacts (Sheets)</Link>, write a{" "}
-            <Link to="/templates?channel=linkedin" className="text-brand-600 hover:underline">LinkedIn template</Link>, then create a campaign.
+            <Link to={`/templates?channel=${platform}`} className="text-brand-600 hover:underline">{info.name} template</Link>, then create a campaign.
           </EmptyState>
         )}
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {list.data?.items.map((c) => (
             <li key={c.id}>
-              <Link to={`/linkedin-outreach/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <Link to={`${info.path}/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div>
                   <p className="font-medium">{c.name}</p>
                   <p className="text-xs text-slate-500">
@@ -203,13 +227,14 @@ function Field({ label, hint, children }: { label: string; hint?: ReactNode; chi
   );
 }
 
-export function NewLinkedInCampaignPage() {
+export function NewLinkedInCampaignPage({ platform = "linkedin" }: { platform?: OutreachPlatform }) {
+  const info = P[platform];
   const params = useSearchParams();
   const preselected = (params.get("contactIds") ?? "").split(",").filter(Boolean);
   const client = useQueryClient();
   const templates = useQuery({
-    queryKey: ["channel-templates", "linkedin"],
-    queryFn: () => api<{ items: ChannelTemplate[] }>("/channel-templates?channel=linkedin").then((r) => r.items),
+    queryKey: ["channel-templates", platform],
+    queryFn: () => api<{ items: ChannelTemplate[] }>(`/channel-templates?channel=${platform}`).then((r) => r.items),
   });
   const facets = useQuery({ queryKey: ["contacts", "facets"], queryFn: () => api<ContactFacets>("/contacts/facets") });
 
@@ -218,7 +243,7 @@ export function NewLinkedInCampaignPage() {
   const [listName, setListName] = useState(params.get("list") ?? "");
   const [mode, setMode] = useState<LinkedInSendMode>("assisted");
   const [intervalMin, setIntervalMin] = useState(5);
-  const [dailyLimit, setDailyLimit] = useState(20);
+  const [dailyLimit, setDailyLimit] = useState<number>(info.defaultDaily);
   const [windowStart, setWindowStart] = useState("00:00"); // any time
   const [windowEnd, setWindowEnd] = useState("00:00");
 
@@ -228,19 +253,19 @@ export function NewLinkedInCampaignPage() {
 
   const recipients = preselected.length ? { contactIds: preselected } : { filters: { listName: listName || undefined } };
   const summary = useQuery({
-    queryKey: ["linkedin-recipients", recipients],
-    queryFn: () => api<LinkedInRecipientSummary>("/linkedin-outreach/recipients", { method: "POST", body: { recipients } }),
+    queryKey: ["linkedin-recipients", platform, recipients],
+    queryFn: () => api<LinkedInRecipientSummary>("/linkedin-outreach/recipients", { method: "POST", body: { recipients, platform } }),
   });
 
   const create = useMutation({
     mutationFn: () =>
       api<{ campaign: LinkedInCampaign; queued: number }>("/linkedin-outreach/campaigns", {
         method: "POST",
-        body: { name, templateId, mode, recipients, intervalSec: Math.round(intervalMin * 60), dailyLimit, windowStart, windowEnd },
+        body: { platform, name, templateId, mode, recipients, intervalSec: Math.round(intervalMin * 60), dailyLimit, windowStart, windowEnd },
       }),
     onSuccess: ({ campaign }) => {
       client.invalidateQueries({ queryKey: ["linkedin-campaigns"] });
-      navigate(`/linkedin-outreach/${campaign.id}`);
+      navigate(`${info.path}/${campaign.id}`);
     },
   });
 
@@ -253,16 +278,16 @@ export function NewLinkedInCampaignPage() {
 
   return (
     <>
-      <Link to="/linkedin-outreach" className="mb-2 inline-block text-sm text-brand-600 hover:underline">
-        ← LinkedIn campaigns
+      <Link to={info.path} className="mb-2 inline-block text-sm text-brand-600 hover:underline">
+        ← {info.name} campaigns
       </Link>
-      <PageHeader title="New LinkedIn campaign" subtitle="It is saved as a draft; nothing is sent until you press Start and the extension is running." />
-      <RiskNotice />
+      <PageHeader title={`New ${info.name} campaign`} subtitle="It is saved as a draft; nothing is sent until you press Start and the extension is running." />
+      <RiskNotice platform={platform} />
       {templates.data?.length === 0 ? (
         <div className="card p-5 text-sm">
-          First write a LinkedIn message template:{" "}
-          <Link to="/templates?channel=linkedin" className="text-brand-600 hover:underline">
-            Templates → LinkedIn message
+          First write a {info.name} message template:{" "}
+          <Link to={`/templates?channel=${platform}`} className="text-brand-600 hover:underline">
+            Templates → {info.name} message
           </Link>
           .
         </div>
@@ -284,12 +309,12 @@ export function NewLinkedInCampaignPage() {
             {preselected.length ? (
               <p className="text-sm">
                 Recipients: <strong>{preselected.length}</strong> contacts selected on the Contacts page.{" "}
-                <Link to="/linkedin-outreach/new" className="text-brand-600 hover:underline">
+                <Link to={`${info.path}/new`} className="text-brand-600 hover:underline">
                   Use a list instead
                 </Link>
               </p>
             ) : (
-              <Field label="Contacts" hint="Only contacts with a LinkedIn URL are messaged.">
+              <Field label="Contacts" hint={`Only contacts with a ${info.name} URL are messaged.`}>
                 <select className="input" value={listName} onChange={(e) => setListName(e.target.value)}>
                   <option value="">All contacts</option>
                   {facets.data?.lists.map((l) => (
@@ -303,7 +328,7 @@ export function NewLinkedInCampaignPage() {
             {summary.data && (
               <p className="text-sm text-slate-600 dark:text-slate-300" role="status">
                 <strong>{formatNumber(summary.data.eligible)}</strong> will get a message
-                {summary.data.noLinkedIn > 0 && ` · ${formatNumber(summary.data.noLinkedIn)} have no LinkedIn URL`}
+                {summary.data.noLinkedIn > 0 && ` · ${formatNumber(summary.data.noLinkedIn)} have no ${info.name} URL`}
                 {summary.data.tooMany && " · too many: at most 2000 per campaign"}
               </p>
             )}
@@ -318,7 +343,7 @@ export function NewLinkedInCampaignPage() {
               <label className="flex items-start gap-2 text-sm">
                 <input type="radio" name="mode" checked={mode === "auto"} onChange={() => setMode("auto")} className="mt-1" />
                 <span>
-                  <strong>Automatic</strong>: the extension also presses Send. Higher risk of LinkedIn restricting your account.
+                  <strong>Automatic</strong>: the extension also presses Send. Higher risk of {info.name} restricting your account.
                 </span>
               </label>
             </fieldset>
@@ -328,7 +353,7 @@ export function NewLinkedInCampaignPage() {
               <Field label="Minutes between messages" hint="At least 1 minute.">
                 <input className="input" type="number" min={1} max={1440} step={0.5} required value={intervalMin} onChange={(e) => setIntervalMin(Number(e.target.value))} />
               </Field>
-              <Field label="Messages per day" hint="At most 100. 20–25 is a common cautious limit.">
+              <Field label="Messages per day" hint={platform === "instagram" ? "Keep it low: 10–20 new chats a day." : "At most 100. 20–25 is a common cautious limit."}>
                 <input className="input" type="number" min={1} max={100} required value={dailyLimit} onChange={(e) => setDailyLimit(Number(e.target.value))} />
               </Field>
               <HoursFields
@@ -359,7 +384,8 @@ export function NewLinkedInCampaignPage() {
 
 const MESSAGE_FILTERS: (AttemptStatus | "")[] = ["", "queued", "sending", "sent", "skipped", "failed", "cancelled"];
 
-export function LinkedInCampaignDetailPage({ id }: { id: string }) {
+export function LinkedInCampaignDetailPage({ id, platform = "linkedin" }: { id: string; platform?: OutreachPlatform }) {
+  const info = P[platform];
   const client = useQueryClient();
   const params = useSearchParams();
   const page = Number(params.get("page") ?? 1) || 1;
@@ -386,8 +412,8 @@ export function LinkedInCampaignDetailPage({ id }: { id: string }) {
 
   return (
     <>
-      <Link to="/linkedin-outreach" className="mb-2 inline-block text-sm text-brand-600 hover:underline">
-        ← LinkedIn campaigns
+      <Link to={info.path} className="mb-2 inline-block text-sm text-brand-600 hover:underline">
+        ← {info.name} campaigns
       </Link>
       <PageHeader
         title={c.name}
@@ -422,7 +448,7 @@ export function LinkedInCampaignDetailPage({ id }: { id: string }) {
       )}
       {c.status === "paused" && c.statusReason && c.statusReason !== "paused_by_admin" && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          Paused: {c.statusReason}. Fix it in your browser (log in to LinkedIn, finish any security check yourself), then press Resume.
+          Paused: {c.statusReason}. Fix it in your browser (log in to {info.name}, finish any security check yourself), then press Resume.
         </div>
       )}
       {c.status === "running" && waitingFor && (

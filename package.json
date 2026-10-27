@@ -7,6 +7,7 @@
     "extension",
     "linkedin-extension",
     "linkedin-messenger",
+    "meta-helper",
     "admin"
   ],
   "scripts": {
@@ -17,6 +18,8 @@
     "build:linkedin": "npm run build -w linkedin-extension",
     "dev:messenger": "npm run dev -w linkedin-messenger",
     "build:messenger": "npm run build -w linkedin-messenger",
+    "dev:meta": "npm run dev -w meta-helper",
+    "build:meta": "npm run build -w meta-helper",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "dev:admin": "npm run dev -w admin",

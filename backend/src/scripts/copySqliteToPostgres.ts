@@ -41,6 +41,7 @@ export const TABLES = [
   "InboxMessage",
   "InboxDraft",
   "AiAssistantSettings",
+  "SocialLead",
 ] as const;
 
 const BATCH = 500;

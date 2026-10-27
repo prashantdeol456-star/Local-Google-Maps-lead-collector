@@ -43,12 +43,35 @@ export async function waitFor<T>(fn: () => T | null | undefined | false, timeout
   }
 }
 
-/** Rendered and not hidden (happy-dom has no layout, so only explicit hiding counts there). */
-export function isVisible(el: Element): boolean {
-  if (!(el instanceof HTMLElement)) return false;
+/**
+ * Elements matching `selector`, including inside open shadow roots. LinkedIn renders its chat
+ * pop-ups inside a shadow root, where document.querySelectorAll does not look.
+ */
+export function deepQueryAll<T extends Element = HTMLElement>(root: ParentNode, selector: string): T[] {
+  const out: T[] = [...root.querySelectorAll<T>(selector)];
+  for (const el of root.querySelectorAll("*")) {
+    if (el.shadowRoot) out.push(...deepQueryAll<T>(el.shadowRoot, selector));
+  }
+  return out;
+}
+
+/** In a real browser: actually rendered (no hidden ancestor, not display:none). */
+const hasLayout = () => typeof navigator !== "undefined" && !/HappyDOM/i.test(navigator.userAgent);
+
+/** Rendered and not hidden (the test DOM has no layout, so only explicit hiding counts there). */
+export function isVisible(node: Element): boolean {
+  // Not `instanceof HTMLElement`: LinkedIn builds its chat pop-up with elements from another
+  // frame, which fail that check although they are ordinary, visible elements.
+  if (node.nodeType !== 1 || typeof (node as HTMLElement).focus !== "function") return false;
+  const el = node as HTMLElement;
   if (el.hidden || el.closest("[hidden], [aria-hidden='true']")) return false;
   const style = el.ownerDocument.defaultView?.getComputedStyle(el);
   if (style && (style.display === "none" || style.visibility === "hidden")) return false;
+  if (hasLayout()) {
+    // Catches hidden ancestors too (e.g. a minimized or stale chat editor).
+    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ visibilityProperty: true })) return false;
+    if (el.getClientRects().length === 0) return false;
+  }
   return true;
 }
 
@@ -136,9 +159,17 @@ function sendButtonIn(form: HTMLElement): HTMLButtonElement | null {
   return buttons.find((b) => /^send( now)?$/i.test(label(b))) ?? buttons.find((b) => b.type === "submit") ?? null;
 }
 
+/** How many message boxes the page has, for an explanation when none can be used. */
+export function composerDiagnostics(doc: Document): string {
+  const all = deepQueryAll<HTMLElement>(doc, BOX);
+  const visible = all.filter(isVisible).length;
+  const inShadow = all.filter((b) => b.getRootNode() !== doc).length;
+  return `${all.length} message box(es) on the page, ${visible} visible, ${inShadow} inside LinkedIn's chat pop-up`;
+}
+
 /** The newest message box for this person (several chat bubbles can be open). */
 export function findComposer(doc: Document, contactName?: string): Composer | null {
-  const boxes = [...doc.querySelectorAll<HTMLElement>(BOX)].filter(isVisible);
+  const boxes = deepQueryAll<HTMLElement>(doc, BOX).filter(isVisible);
   if (boxes.length === 0) return null;
   const first = norm(contactName).split(" ")[0]?.toLowerCase();
   const withContainer = boxes.map((box) => {
@@ -162,7 +193,9 @@ export const composerText = (box: HTMLElement) => norm(box.innerText ?? box.text
 export function typeInto(box: HTMLElement, text: string): boolean {
   const doc = box.ownerDocument;
   box.focus();
-  const selection = doc.getSelection();
+  // Inside a shadow root the selection belongs to that root (Chrome).
+  const root = box.getRootNode() as Document | (ShadowRoot & { getSelection?: () => Selection | null });
+  const selection = (root !== doc && "getSelection" in root && typeof root.getSelection === "function" ? root.getSelection() : null) ?? doc.getSelection();
   if (selection) {
     const range = doc.createRange();
     range.selectNodeContents(box);
@@ -176,6 +209,7 @@ export function typeInto(box: HTMLElement, text: string): boolean {
     inserted = false;
   }
   const expected = norm(text).slice(0, 40);
+  if (!inserted || !composerText(box).includes(expected)) inserted = pasteInto(box, text) && composerText(box).includes(expected);
   if (!inserted || !composerText(box).includes(expected)) {
     box.replaceChildren(
       ...text.split("\n").map((line) => {
@@ -190,11 +224,30 @@ export function typeInto(box: HTMLElement, text: string): boolean {
   return composerText(box).includes(expected);
 }
 
+/** LinkedIn's editor handles a paste reliably when it ignores insertText. */
+function pasteInto(box: HTMLElement, text: string): boolean {
+  try {
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The text is still there a moment later (some editors re-render and drop programmatic input). */
+export async function textStays(box: HTMLElement, text: string, ms: number): Promise<boolean> {
+  const expected = norm(text).slice(0, 40);
+  await sleep(ms);
+  return box.isConnected && composerText(box).includes(expected);
+}
+
 const isEnabled = (b: HTMLButtonElement | null): b is HTMLButtonElement => !!b && !b.disabled && b.getAttribute("aria-disabled") !== "true";
 
 /** Error toast shown by LinkedIn when a message did not go out. */
 function sendError(doc: Document): string | null {
-  const alerts = [...doc.querySelectorAll("[role='alert'], .artdeco-toast-item, .msg-s-event-listitem--error")].map((e) => norm(e.textContent));
+  const alerts = deepQueryAll(doc, "[role='alert'], .artdeco-toast-item, .msg-s-event-listitem--error").map((e) => norm(e.textContent));
   return alerts.find((t) => /couldn.t send|failed to send|not sent|try again/i.test(t)) ?? null;
 }
 
@@ -225,11 +278,18 @@ export async function sendFromProfile(doc: Document, getUrl: () => string, job: 
   if (!composer) {
     const late = detectBlock(doc, getUrl());
     if (late) return { status: "blocked", reason: late };
-    return { status: "failed", reason: "The message box did not open" };
+    return { status: "failed", reason: `The message box did not open (${composerDiagnostics(doc)})` };
   }
   if (composer.isInMail) return { status: "skipped", reason: "Would be an InMail (paid message to a non-connection); not sent" };
 
-  if (!typeInto(composer.box, job.body)) return { status: "failed", reason: "Could not type into LinkedIn's message box" };
+  if (!typeInto(composer.box, job.body)) return { status: "failed", reason: `Could not type into LinkedIn's message box (${composerDiagnostics(doc)})` };
+  // LinkedIn's editor can drop text it did not see typed: check, and try once more.
+  if (!(await textStays(composer.box, job.body, Math.min(600, timing.findMs)))) {
+    typeInto(composer.box, job.body);
+    if (!(await textStays(composer.box, job.body, Math.min(600, timing.findMs)))) {
+      return { status: "failed", reason: "LinkedIn cleared the typed message (its editor did not accept it)" };
+    }
+  }
 
   if (job.mode === "auto") {
     const send = await waitFor(() => {

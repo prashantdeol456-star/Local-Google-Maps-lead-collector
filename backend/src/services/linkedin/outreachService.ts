@@ -9,6 +9,7 @@
 // (not re-sent) so a contact is never messaged twice.
 
 import type {
+  OutreachPlatform,
   AttemptStatus,
   ContactRecord,
   LinkedInCampaignRecord,
@@ -32,6 +33,8 @@ export const CLAIM_TIMEOUT_MS = 15 * 60_000;
 export type LinkedInRecipients = { contactIds: string[] } | { filters: { listName?: string; q?: string } };
 
 export interface LinkedInCampaignInput {
+  /** linkedin (default) or instagram */
+  platform?: OutreachPlatform;
   name: string;
   templateId: string;
   mode: LinkedInSendMode;
@@ -95,34 +98,36 @@ export class LinkedInOutreachService {
     return this.repos.agentLogs.create({ jobId: null, action: `linkedin_campaign_${action}`, status, message });
   }
 
-  private async selectContacts(selection: LinkedInRecipients): Promise<ContactRecord[]> {
+  private async selectContacts(selection: LinkedInRecipients, platform: OutreachPlatform): Promise<ContactRecord[]> {
     const contacts =
       "contactIds" in selection
         ? await this.repos.contacts.findByIds([...new Set(selection.contactIds)])
-        : await this.repos.contacts.listAll({ ...selection.filters, hasLinkedIn: true }, MAX_LINKEDIN_RECIPIENTS + 1);
+        : await this.repos.contacts.listAll({ ...selection.filters, ...(platform === "instagram" ? { hasInstagram: true } : { hasLinkedIn: true }) }, MAX_LINKEDIN_RECIPIENTS + 1);
     return contacts;
   }
 
-  /** Who would receive it: contacts without a LinkedIn URL are left out. */
-  async recipients(selection: LinkedInRecipients) {
-    const contacts = await this.selectContacts(selection);
-    const withUrl = contacts.filter((c) => c.linkedinUrl);
-    return { selected: contacts.length, eligible: withUrl.length, noLinkedIn: contacts.length - withUrl.length, tooMany: withUrl.length > MAX_LINKEDIN_RECIPIENTS };
+  /** Who would receive it: contacts without a profile URL for the platform are left out. */
+  async recipients(selection: LinkedInRecipients, platform: OutreachPlatform = "linkedin") {
+    const contacts = await this.selectContacts(selection, platform);
+    const withUrl = contacts.filter((c) => profileUrlOf(c, platform));
+    return { selected: contacts.length, eligible: withUrl.length, noLinkedIn: contacts.length - withUrl.length, noProfileUrl: contacts.length - withUrl.length, tooMany: withUrl.length > MAX_LINKEDIN_RECIPIENTS };
   }
 
   async create(input: LinkedInCampaignInput, adminId: string | null) {
     checkSchedule(input);
 
+    const platform: OutreachPlatform = input.platform ?? "linkedin";
+    const label = platform === "instagram" ? "Instagram" : "LinkedIn";
     const template = await this.repos.templates.findById(input.templateId);
-    if (!template || template.channel !== "linkedin") throw Errors.badRequest("Choose a LinkedIn message template");
+    if (!template || template.channel !== platform) throw Errors.badRequest(`Choose a ${label} message template`);
 
-    const contacts = (await this.selectContacts(input.recipients)).filter((c) => c.linkedinUrl);
-    if (contacts.length === 0) throw Errors.badRequest("None of the selected contacts has a LinkedIn URL");
+    const contacts = (await this.selectContacts(input.recipients, platform)).filter((c) => profileUrlOf(c, platform));
+    if (contacts.length === 0) throw Errors.badRequest(`None of the selected contacts has a ${label} URL`);
     if (contacts.length > MAX_LINKEDIN_RECIPIENTS) throw Errors.badRequest(`At most ${MAX_LINKEDIN_RECIPIENTS} contacts per LinkedIn campaign; narrow the selection`);
 
-    const messages = [...new Map(contacts.map((c) => [c.linkedinUrl!, c])).values()].map((c) => ({
+    const messages = [...new Map(contacts.map((c) => [profileUrlOf(c, platform)!, c])).values()].map((c) => ({
       contactId: c.id,
-      profileUrl: c.linkedinUrl!,
+      profileUrl: profileUrlOf(c, platform)!,
       contactName: c.name,
       renderedBody: renderContactText(template.body, contactData(c)),
     }));
@@ -131,6 +136,7 @@ export class LinkedInOutreachService {
 
     const campaign = await this.repos.linkedinOutreach.createCampaign(
       {
+        platform,
         name: input.name,
         templateId: template.id,
         mode: input.mode,
@@ -144,11 +150,11 @@ export class LinkedInOutreachService {
       },
       messages,
     );
-    await this.log("created", "info", `"${campaign.name}": ${messages.length} LinkedIn messages queued (${input.mode} mode)`);
+    await this.log("created", "info", `"${campaign.name}": ${messages.length} ${label} messages queued (${input.mode} mode)`);
     return { campaign, queued: messages.length };
   }
 
-  list(page: { skip: number; take: number }) {
+  list(page: { skip: number; take: number; platform?: OutreachPlatform }) {
     return this.repos.linkedinOutreach.listCampaigns(page);
   }
 
@@ -219,8 +225,8 @@ export class LinkedInOutreachService {
   }
 
   /** Running campaigns and what each is waiting for (the extension's status view). */
-  async overview(now = this.now()) {
-    const running = await this.repos.linkedinOutreach.listCampaignsByStatus("running");
+  async overview(now = this.now(), platform: OutreachPlatform = "linkedin") {
+    const running = await this.repos.linkedinOutreach.listCampaignsByStatus("running", platform);
     return Promise.all(
       running.map(async (c) => {
         const { counts, sentToday, nextSendAt, waitingFor } = await this.get(c.id, now);
@@ -230,15 +236,15 @@ export class LinkedInOutreachService {
   }
 
   /** The extension asks for the next message to send. Hands out at most one at a time. */
-  async next(now = this.now()): Promise<NextResponse> {
+  async next(now = this.now(), platform: OutreachPlatform = "linkedin"): Promise<NextResponse> {
     const stale = await this.repos.linkedinOutreach.failStale(new Date(now.getTime() - CLAIM_TIMEOUT_MS), STALE_ERROR, now);
     if (stale) await this.log("message_timeout", "warning", `${stale} LinkedIn message(s) got no result from the extension and were marked failed`);
 
-    const inFlight = await this.repos.linkedinOutreach.inFlight();
+    const inFlight = await this.repos.linkedinOutreach.inFlight(platform);
     if (inFlight) return { wait: { reason: "in_flight", nextCheckAt: new Date((inFlight.claimedAt ?? now).getTime() + CLAIM_TIMEOUT_MS).toISOString() } };
 
     let earliest: { reason: PacingWaitReason; at: Date; campaignName: string } | null = null;
-    const running = await this.repos.linkedinOutreach.listCampaignsByStatus("running");
+    const running = await this.repos.linkedinOutreach.listCampaignsByStatus("running", platform);
     for (const listed of running) {
       const campaign = await this.repos.linkedinOutreach.findCampaign(listed.id);
       if (!campaign || campaign.status !== "running") continue;
@@ -291,11 +297,12 @@ export class LinkedInOutreachService {
     if (status === "blocked") {
       const reason = detail ?? "LinkedIn is not available";
       if (await this.repos.linkedinOutreach.release(id, reason)) {
-        for (const c of await this.repos.linkedinOutreach.listCampaignsByStatus("running")) {
+        // Only the campaigns of the same platform: a LinkedIn problem does not stop Instagram.
+        for (const c of await this.repos.linkedinOutreach.listCampaignsByStatus("running", campaign?.platform === "instagram" ? "instagram" : "linkedin")) {
           const paused = await this.repos.linkedinOutreach.updateCampaignStatus(c.id, ["running"], { status: "paused", statusReason: reason.slice(0, 500) });
           if (paused) this.changed(paused);
         }
-        await this.log("paused", "error", `LinkedIn campaigns paused: ${reason}`);
+        await this.log("paused", "error", `${campaign?.platform === "instagram" ? "Instagram" : "LinkedIn"} campaigns paused: ${reason}`);
       }
     } else {
       const done = await this.repos.linkedinOutreach.finish(id, {
@@ -309,4 +316,9 @@ export class LinkedInOutreachService {
     if (campaign) this.changed(campaign);
     return (await this.repos.linkedinOutreach.findMessage(id))!;
   }
+}
+
+/** The profile link a campaign of this platform messages. */
+function profileUrlOf(c: Pick<ContactRecord, "linkedinUrl" | "instagramUrl">, platform: OutreachPlatform): string | null {
+  return platform === "instagram" ? c.instagramUrl : c.linkedinUrl;
 }

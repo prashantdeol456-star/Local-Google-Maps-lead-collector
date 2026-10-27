@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { InboxWorker } from "../../jobs/inboxWorker.js";
 import { PLATFORMS, REPLY_MODES, type InboxService } from "../../services/inbox/inboxService.js";
+import type { InboxRuntime, SecretName } from "../../services/inbox/runtime.js";
+import { Errors } from "../../utils/errors.js";
 import { requireSession } from "../middleware/auth.js";
 import { IdParams, optionalText, Pagination, parse, toSkipTake } from "../validation.js";
 
@@ -46,8 +48,51 @@ const LinkedInSync = z.object({
     .max(20),
 });
 
-export async function inboxRoutes(app: FastifyInstance, opts: { inbox: InboxService; worker: InboxWorker }) {
-  const { inbox } = opts;
+const AiConfigBody = z
+  .object({
+    provider: z.enum(["anthropic", "gemini"]),
+    // Empty = the provider's default model; a custom id may be typed.
+    model: z.string().trim().max(100).regex(/^[a-z0-9.\-]*$/i, "model id: letters, digits, dots and dashes"),
+    effort: z.enum(["low", "medium", "high"]),
+  })
+  .partial()
+  .strict();
+
+const SecretParams = z.object({ name: z.enum(["anthropicKey", "geminiKey", "telegramToken"]) });
+
+export async function inboxRoutes(app: FastifyInstance, opts: { inbox: InboxService; worker: InboxWorker; runtime: InboxRuntime }) {
+  const { inbox, runtime, worker } = opts;
+
+  // ---- AI provider, model and keys (entered in the admin panel) ----
+  app.get("/api/inbox/ai-config", async () => runtime.describe());
+  app.put("/api/inbox/ai-config", async (request) => {
+    requireSession(request);
+    const body = parse(AiConfigBody, request.body);
+    await inbox.setAiChoice({
+      ...(body.provider ? { aiProvider: body.provider } : {}),
+      ...(body.model !== undefined ? { aiModel: body.model } : {}),
+      ...(body.effort ? { aiEffort: body.effort } : {}),
+    });
+    return runtime.describe();
+  });
+  app.put("/api/inbox/secrets/:name", async (request) => {
+    requireSession(request);
+    const { name } = parse(SecretParams, request.params);
+    const { value } = parse(z.object({ value: z.string().max(500).nullable() }), request.body);
+    try {
+      await runtime.setSecret(name as SecretName, value);
+    } catch (err) {
+      throw Errors.badRequest(err instanceof Error ? err.message : String(err));
+    }
+    // A new bot starts reading its own messages from the beginning.
+    if (name === "telegramToken") await inbox.resetTelegramOffset();
+    return runtime.describe();
+  });
+  app.post("/api/inbox/test/:what", async (request) => {
+    requireSession(request);
+    const { what } = parse(z.object({ what: z.enum(["ai", "telegram"]) }), request.params);
+    return runtime.test(what);
+  });
 
   // ---- Settings ----
   app.get("/api/inbox/settings", async () => ({ settings: await inbox.settings() }));
@@ -84,8 +129,8 @@ export async function inboxRoutes(app: FastifyInstance, opts: { inbox: InboxServ
 
   // "Check now" in the admin panel (instead of waiting for the next poll).
   app.post("/api/inbox/refresh", async () => {
-    await Promise.all([opts.worker.pollMetaOnce(), opts.worker.telegramOnce(0).catch(() => 0)]);
-    await opts.worker.processOnce();
+    await Promise.all([worker.pollMetaOnce(), worker.telegramOnce(0).catch(() => 0)]);
+    await worker.processOnce();
     return { ok: true };
   });
 

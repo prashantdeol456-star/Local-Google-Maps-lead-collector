@@ -46,7 +46,7 @@ function UploadCard({ lists }: { lists: string[] }) {
         <div>
           <h2 className="font-medium">Upload a contacts sheet</h2>
           <p className="text-sm text-slate-500">
-            Columns: <strong>Name</strong>, LinkedIn URL, Contact Number, Email, Designation, Company. Excel (.xlsx) or CSV. The same LinkedIn URL (or email) uploaded
+            Columns: <strong>Name</strong>, LinkedIn URL, Instagram URL, Contact Number, Email, Designation, Company. Excel (.xlsx) or CSV. The same LinkedIn URL (or email) uploaded
             again updates that contact instead of adding a copy.
           </p>
         </div>
@@ -129,6 +129,15 @@ function ContactRow({ c, selected, onToggle }: { c: Contact; selected: boolean; 
           <span className="text-slate-400">—</span>
         )}
       </td>
+      <td className="px-4 py-2">
+        {safeHref(c.instagramUrl) ? (
+          <a href={safeHref(c.instagramUrl)} target="_blank" rel="noreferrer noopener" className="text-brand-600 hover:underline">
+            @{c.instagramUrl!.replace("https://www.instagram.com/", "").replace(/\/$/, "")}
+          </a>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
       <td className="px-4 py-2">{c.email ?? "—"}</td>
       <td className="px-4 py-2 whitespace-nowrap">{c.phone ?? "—"}</td>
       <td className="px-4 py-2">{c.listName ?? "—"}</td>
@@ -141,14 +150,14 @@ export function ContactsPage() {
   const client = useQueryClient();
   const params = useSearchParams();
   const page = Number(params.get("page") ?? 1) || 1;
-  const filters = { q: params.get("q") ?? "", listName: params.get("list") ?? "", hasLinkedIn: params.get("hasLinkedIn") ?? "" };
+  const filters = { q: params.get("q") ?? "", listName: params.get("list") ?? "", hasLinkedIn: params.get("hasLinkedIn") ?? "", hasInstagram: params.get("hasInstagram") ?? "" };
   const [q, setQ] = useState(filters.q);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const facets = useQuery({ queryKey: ["contacts", "facets"], queryFn: () => api<ContactFacets>("/contacts/facets") });
   const list = useQuery({
     queryKey: ["contacts", "list", page, filters],
-    queryFn: () => api<Page<Contact>>(`/contacts${qs({ page, pageSize: PAGE_SIZE, q: filters.q, listName: filters.listName, hasLinkedIn: filters.hasLinkedIn })}`),
+    queryFn: () => api<Page<Contact>>(`/contacts${qs({ page, pageSize: PAGE_SIZE, q: filters.q, listName: filters.listName, hasLinkedIn: filters.hasLinkedIn, hasInstagram: filters.hasInstagram })}`),
     placeholderData: keepPreviousData,
   });
   const remove = useMutation({
@@ -175,6 +184,19 @@ export function ContactsPage() {
         title="Contacts (Sheets)"
         subtitle="Contacts uploaded from your own sheets. Message them on LinkedIn with the LinkedIn Messenger extension."
         actions={
+          <>
+          <button
+            className="btn"
+            onClick={() =>
+              navigate(
+                selected.size
+                  ? `/instagram-outreach/new?contactIds=${[...selected].join(",")}`
+                  : `/instagram-outreach/new${filters.listName ? `?list=${encodeURIComponent(filters.listName)}` : ""}`,
+              )
+            }
+          >
+            ◎ Message on Instagram
+          </button>
           <button
             className="btn btn-primary"
             onClick={() =>
@@ -187,12 +209,14 @@ export function ContactsPage() {
           >
             in Message on LinkedIn{selected.size ? ` (${selectedWithLinkedIn} selected)` : ""}
           </button>
+          </>
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Contacts" value={facets.data?.total} icon="☰" />
         <StatCard label="With LinkedIn URL" value={facets.data?.withLinkedIn} icon="in" tone="green" />
+        <StatCard label="With Instagram URL" value={facets.data?.withInstagram} icon="◎" tone="red" />
         <StatCard label="With email" value={facets.data?.withEmail} icon="✉" tone="amber" />
         <StatCard label="With phone" value={facets.data?.withPhone} icon="✆" tone="slate" />
       </div>
@@ -230,6 +254,14 @@ export function ContactsPage() {
               <option value="false">No URL</option>
             </select>
           </label>
+          <label className="block space-y-1">
+            <span className="label">Instagram URL</span>
+            <select className="input" value={filters.hasInstagram} onChange={(e) => setSearchParams({ hasInstagram: e.target.value, page: null })}>
+              <option value="">Any</option>
+              <option value="true">Has URL</option>
+              <option value="false">No URL</option>
+            </select>
+          </label>
           <button className="btn">Search</button>
           {selected.size > 0 && (
             <ConfirmButton label={`Delete ${selected.size} selected`} confirmLabel={`Delete ${selected.size}?`} onConfirm={() => remove.mutate([...selected])} />
@@ -259,6 +291,7 @@ export function ContactsPage() {
                   <th className="px-4 py-2">Name</th>
                   <th className="px-4 py-2">Company</th>
                   <th className="px-4 py-2">LinkedIn</th>
+                  <th className="px-4 py-2">Instagram</th>
                   <th className="px-4 py-2">Email</th>
                   <th className="px-4 py-2">Contact number</th>
                   <th className="px-4 py-2">List</th>

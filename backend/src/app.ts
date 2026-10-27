@@ -36,11 +36,14 @@ import { ChannelTemplateService } from "./services/contacts/channelTemplates.js"
 import { CampaignLogService } from "./services/outreach/campaignLogService.js";
 import { LinkedInOutreachService } from "./services/linkedin/outreachService.js";
 import { socialRoutes } from "./api/routes/social.js";
+import { socialLeadRoutes } from "./api/routes/socialLeads.js";
+import { SocialLeadService } from "./services/social/socialLeadService.js";
 import { SocialService } from "./services/social/socialService.js";
 import { inboxRoutes } from "./api/routes/inbox.js";
 import { InboxService } from "./services/inbox/inboxService.js";
-import { AnthropicReplyWriter, type ReplyWriter } from "./services/inbox/replyWriter.js";
-import { MetaMessaging, TelegramBot } from "./services/inbox/channels.js";
+import type { ReplyWriter } from "./services/inbox/replyWriter.js";
+import { MetaMessaging } from "./services/inbox/channels.js";
+import { InboxRuntime } from "./services/inbox/runtime.js";
 import { InboxWorker } from "./jobs/inboxWorker.js";
 import { WebhookWorker } from "./jobs/webhookWorker.js";
 import { MaintenanceWorker } from "./jobs/maintenanceWorker.js";
@@ -136,11 +139,10 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   const linkedinOutreach = new LinkedInOutreachService(repos, { timeZone: config.timeZone, bus });
   const webhookSecrets = new SecretBox(config.sessionSecret, "webhook-secrets");
   const social = new SocialService(repos, config.social, new SecretBox(config.sessionSecret, "social-tokens"), { fetch: socialFetch });
-  const telegram = config.inbox.telegramBotToken ? new TelegramBot(config.inbox.telegramBotToken, inboxFetch) : null;
   const metaMessaging = config.social.meta ? new MetaMessaging(config.social.meta.graphVersion, inboxFetch) : null;
-  const writer = replyWriter !== undefined ? replyWriter : config.inbox.ai ? new AnthropicReplyWriter(config.inbox.ai) : null;
-  const inbox = new InboxService(repos, { writer, telegram, meta: metaMessaging, social, timeZone: config.timeZone, bus });
-  const inboxWorker = new InboxWorker(repos, inbox, { telegram, meta: metaMessaging, social, pollSeconds: config.inbox.pollSeconds, log: (msg) => app.log.info(msg) });
+  const inboxRuntime = new InboxRuntime(repos, new SecretBox(config.sessionSecret, "inbox-secrets"), config.inbox, { writerOverride: replyWriter, fetch: inboxFetch });
+  const inbox = new InboxService(repos, { runtime: inboxRuntime, meta: metaMessaging, social, timeZone: config.timeZone, bus });
+  const inboxWorker = new InboxWorker(repos, inbox, { runtime: inboxRuntime, meta: metaMessaging, social, pollSeconds: config.inbox.pollSeconds, log: (msg) => app.log.info(msg) });
   const integrations = new IntegrationService(repos, webhookSecrets, bus, (msg) => app.log.error(msg));
   integrations.start();
   const webhookWorker = new WebhookWorker(repos, webhookSecrets, { log: (msg) => app.log.error(msg) });
@@ -216,7 +218,8 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   await app.register(contactRoutes, { contacts, channelTemplates, logs: campaignLogs });
   await app.register(linkedinOutreachRoutes, { outreach: linkedinOutreach });
   await app.register(socialRoutes, { social });
-  await app.register(inboxRoutes, { inbox, worker: inboxWorker });
+  await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
+  await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  isVisible,
   connectionState,
   detectBlock,
   findComposer,
@@ -37,7 +38,7 @@ const CHAT = `
     </div>
   </aside>`;
 
-const FAST: Timing = { pageLoadMs: 300, findMs: 300, sendConfirmMs: 500, assistedMs: 600, pollMs: 10 };
+const FAST: Timing = { pageLoadMs: 300, findMs: 300, sendConfirmMs: 500, assistedMs: 1200, pollMs: 10 };
 const URL_ = "https://www.linkedin.com/in/priya-sharma/";
 const job = (mode: "assisted" | "auto") => ({ body: "Hi Priya,\n\nNice to meet you.", mode, contactName: "Priya Sharma" });
 
@@ -120,7 +121,7 @@ describe("sendFromProfile", () => {
     document.body.innerHTML = PROFILE(`<button aria-label="Message Priya Sharma">Message</button>`);
     wireLinkedIn();
     const pending = sendFromProfile(document, () => URL_, job("assisted"), FAST);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 450));
     const box = document.querySelector<HTMLElement>("[contenteditable]")!;
     expect(box.textContent).toContain("Nice to meet you.");
     document.querySelector<HTMLButtonElement>(".msg-form__send-button")!.click(); // the user
@@ -131,7 +132,7 @@ describe("sendFromProfile", () => {
     document.body.innerHTML = PROFILE(`<button aria-label="Message Priya Sharma">Message</button>`);
     wireLinkedIn();
     const pending = sendFromProfile(document, () => URL_, job("assisted"), FAST);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 450));
     document.querySelector<HTMLElement>("[contenteditable]")!.replaceChildren(); // cleared by hand, not sent
     expect(await pending).toEqual({ status: "skipped", reason: "Not sent within 0 minutes" });
   });
@@ -159,5 +160,77 @@ describe("sendFromProfile", () => {
 
     document.body.innerHTML = `<main>Let's do a quick security check</main>`;
     expect(await sendFromProfile(document, () => URL_, job("auto"), FAST)).toMatchObject({ status: "blocked" });
+  });
+});
+
+describe("LinkedIn's newer chat pop-up (inside a shadow root)", () => {
+  /** Opens the "New message" pop-up inside a shadow root, like linkedin.com does now. */
+  function wireShadowChat(opts: { dropsText?: boolean } = {}) {
+    const host = document.createElement("div");
+    host.id = "interop-outlet";
+    document.body.append(host);
+    const root = host.attachShadow({ mode: "open" });
+    // An old, hidden editor in the normal page that must never be used.
+    document.body.insertAdjacentHTML("beforeend", `<div hidden><div class="msg-form__contenteditable" contenteditable="true" role="textbox" id="stale"></div></div>`);
+    document.querySelector<HTMLElement>("main section button[aria-label^='Message Priya']")!.addEventListener("click", () => {
+      root.innerHTML = `
+        <div class="msg-overlay-conversation-bubble">
+          <header>New message <span>Priya Sharma ✕</span></header>
+          <form class="msg-form">
+            <div class="msg-form__contenteditable" contenteditable="true" role="textbox" aria-label="Write a message…"></div>
+            <button type="submit" class="msg-form__send-button" disabled>Send</button>
+          </form>
+        </div>`;
+      const box = root.querySelector<HTMLElement>("[contenteditable]")!;
+      const send = root.querySelector<HTMLButtonElement>("button")!;
+      box.addEventListener("input", () => {
+        send.disabled = !box.textContent?.trim();
+        if (opts.dropsText) setTimeout(() => box.replaceChildren(), 20); // an editor that throws programmatic text away
+      });
+      send.addEventListener("click", (e) => {
+        e.preventDefault();
+        box.replaceChildren();
+      });
+    });
+    return root;
+  }
+
+  it("finds the box inside the pop-up, ignores the hidden one, and sends", async () => {
+    document.body.innerHTML = PROFILE(`<button aria-label="Message Priya Sharma">Message</button>`);
+    wireShadowChat();
+    expect(await sendFromProfile(document, () => URL_, job("auto"), FAST)).toEqual({ status: "sent" });
+    expect(document.getElementById("stale")!.textContent).toBe(""); // never typed into
+  });
+
+  it("reports clearly when LinkedIn's editor drops the typed text", async () => {
+    document.body.innerHTML = PROFILE(`<button aria-label="Message Priya Sharma">Message</button>`);
+    wireShadowChat({ dropsText: true });
+    expect(await sendFromProfile(document, () => URL_, job("auto"), FAST)).toEqual({ status: "failed", reason: "LinkedIn cleared the typed message (its editor did not accept it)" });
+  });
+
+  it("explains what it saw when no usable box opens", async () => {
+    document.body.innerHTML = PROFILE(`<button aria-label="Message Priya Sharma">Message</button>`) + `<div hidden><div contenteditable="true" role="textbox"></div></div>`;
+    const res = await sendFromProfile(document, () => URL_, job("auto"), FAST);
+    expect(res).toEqual({ status: "failed", reason: "The message box did not open (1 message box(es) on the page, 0 visible, 0 inside LinkedIn's chat pop-up)" });
+  });
+});
+
+describe("elements from another frame", () => {
+  it("counts LinkedIn's chat box as visible even though it is not this page's HTMLElement", () => {
+    // LinkedIn creates its chat pop-up with another frame's document, so `el instanceof HTMLElement`
+    // is false on linkedin.com. Recreate that by swapping this page's HTMLElement for a moment.
+    const box = document.createElement("div");
+    box.setAttribute("contenteditable", "true");
+    document.body.append(box);
+    const real = globalThis.HTMLElement;
+    (globalThis as { HTMLElement: unknown }).HTMLElement = class {};
+    try {
+      expect(box instanceof HTMLElement).toBe(false);
+      expect(isVisible(box)).toBe(true);
+      box.setAttribute("hidden", "");
+      expect(isVisible(box)).toBe(false);
+    } finally {
+      (globalThis as { HTMLElement: unknown }).HTMLElement = real;
+    }
   });
 });

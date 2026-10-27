@@ -35,7 +35,7 @@ const PAGE = `
     </div>
   </main>`;
 
-const FAST: Timing = { pageLoadMs: 300, findMs: 300, sendConfirmMs: 300, assistedMs: 600, pollMs: 10 };
+const FAST: Timing = { pageLoadMs: 300, findMs: 300, sendConfirmMs: 300, assistedMs: 1200, pollMs: 10 };
 
 beforeEach(() => {
   document.body.innerHTML = PAGE;
@@ -69,7 +69,7 @@ describe("typing the AI reply", () => {
       box.replaceChildren();
     });
     const pending = typeReplyAndWait(document, "Sure! Thursday 11am?", "Priya Sharma", FAST);
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 450));
     expect(box.textContent).toContain("Sure! Thursday 11am?");
     box.textContent = "Sure! Thursday 11am works?"; // you edit it
     await new Promise((r) => setTimeout(r, 50));

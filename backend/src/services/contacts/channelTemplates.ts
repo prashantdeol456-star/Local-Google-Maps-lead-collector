@@ -5,13 +5,13 @@
 import type { ContactRecord, Repositories, TemplateRecord } from "../../database/repositories/index.js";
 import { Errors } from "../../utils/errors.js";
 
-export type ContactTemplateChannel = "sms" | "linkedin";
+export type ContactTemplateChannel = "sms" | "linkedin" | "instagram";
 
 export const CONTACT_VARIABLES = ["first_name", "name", "company", "designation", "email", "phone"] as const;
 export type ContactVariable = (typeof CONTACT_VARIABLES)[number];
 
 /** LinkedIn's limit for one message; SMS is long enough for 10 concatenated parts. */
-export const BODY_LIMIT: Record<ContactTemplateChannel, number> = { linkedin: 8000, sms: 1600 };
+export const BODY_LIMIT: Record<ContactTemplateChannel, number> = { linkedin: 8000, sms: 1600, instagram: 1000 };
 
 const VARIABLE = /\{\{\s*([a-zA-Z_]+)\s*(?:\|\s*([^}]*?)\s*)?\}\}/g;
 
@@ -65,7 +65,8 @@ export class ChannelTemplateService {
     if (unknown.length) {
       throw Errors.badRequest(`Unknown variable ${unknown.map((v) => `{{${v}}}`).join(", ")}. Available: ${CONTACT_VARIABLES.map((v) => `{{${v}}}`).join(" ")}`);
     }
-    if (body.length > BODY_LIMIT[channel]) throw Errors.badRequest(`At most ${BODY_LIMIT[channel]} characters for ${channel === "sms" ? "an SMS" : "a LinkedIn message"}`);
+    const noun = channel === "sms" ? "an SMS" : channel === "instagram" ? "an Instagram message" : "a LinkedIn message";
+    if (body.length > BODY_LIMIT[channel]) throw Errors.badRequest(`At most ${BODY_LIMIT[channel]} characters for ${noun}`);
   }
 
   list(channel: ContactTemplateChannel) {
@@ -74,7 +75,7 @@ export class ChannelTemplateService {
 
   async get(id: string, channel?: ContactTemplateChannel): Promise<TemplateRecord & { channel: ContactTemplateChannel }> {
     const t = await this.repos.templates.findById(id);
-    if (!t || (t.channel !== "sms" && t.channel !== "linkedin") || (channel && t.channel !== channel)) throw Errors.notFound("Template not found");
+    if (!t || (t.channel !== "sms" && t.channel !== "linkedin" && t.channel !== "instagram") || (channel && t.channel !== channel)) throw Errors.notFound("Template not found");
     return t as TemplateRecord & { channel: ContactTemplateChannel };
   }
 

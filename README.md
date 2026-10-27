@@ -184,10 +184,50 @@ The send decision is made in code (`backend/src/services/inbox/policy.ts`), not 
 Nothing is sent until you turn **AI replies** on. None of the platforms allows cold messages to
 strangers; this only answers people who wrote to you.
 
-Setup: `ANTHROPIC_API_KEY` in `backend/.env` (optionally `INBOX_AI_MODEL`, default
-`claude-opus-5-5`, and `INBOX_AI_EFFORT`), `TELEGRAM_BOT_TOKEN`, and your Facebook Page connected
-with the messaging permissions. Instagram also needs *Allow access to messages* turned on in the
+Setup is in **AI Inbox → Setup → AI model & keys**:
+- Choose **Claude** (Opus 5.5 by default; also Sonnet 5.5, Haiku 5.5, Fable 5.1) or **Google
+  Gemini** (3.8 Flash by default; also 4 Argon, 3.6 Flash, 3.5 Flash-Lite, or any model id).
+- Choose the thinking effort, then paste the API key and the Telegram bot token.
+- Keys are stored encrypted (key derived from `SESSION_SECRET`), shown only by their last 4
+  characters, and used at once without a restart.
+- **Test** buttons check the key or bot with a free call.
+
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY` and `TELEGRAM_BOT_TOKEN` in `backend/.env` still work as
+fallbacks. Facebook/Instagram also need your Page connected with the messaging permissions. Instagram also needs *Allow access to messages* turned on in the
 Instagram app. The AI Inbox → Setup tab shows what is done.
+
+### Meta Helper: Instagram & Facebook collector + Instagram messages
+
+```bash
+npm run build:meta
+```
+
+Load `meta-helper/dist` with **Load unpacked**, log in with the admin email and password, and keep
+Instagram / Facebook logged in in the same Chrome.
+
+**Collect** tab: choose *Instagram accounts*, *Facebook Pages*, *Facebook groups* or *Facebook
+people*, type a keyword, then press **Search** and **Add all on this page**. Tick what to keep and
+press **Save selected**. Everything appears in **Admin → Social Leads**, with filters by type and
+keyword and a CSV export.
+- Only what the page shows is saved: name, username, link, bio, followers/members, category,
+  privacy, location, website.
+- Groups are saved as groups. Their **member lists are never read**.
+
+**Instagram messages**:
+1. Add an **Instagram URL** column to your contacts sheet (a profile link or just the username), or
+   select Instagram profiles in Social Leads and press **Add to contacts**.
+2. Write an **Instagram message** template.
+3. Create a campaign in **Admin → Instagram Outreach**: assisted (you press Send) or automatic,
+   with a gap, a daily cap (default 15) and sending hours.
+4. Press **Start** in the extension's *Instagram messages* tab. For each contact it opens the
+   profile, clicks **Message**, pastes the text and presses Send (automatic) or waits for you.
+
+LinkedIn and Instagram queues are separate. A login page, a challenge or "Try again later" on
+Instagram pauses only the Instagram campaigns.
+
+> **Risk:** Instagram and Facebook do not allow automated messaging or data collection. They
+> block or disable accounts that use them. Messages to people who don't follow you land in their
+> Message requests. Keep daily limits low and prefer assisted mode.
 
 ## Scripts (root)
 
@@ -200,6 +240,7 @@ Instagram app. The AI Inbox → Setup tab shows what is done.
 | `npm run build:extension` | Production build into `extension/dist` |
 | `npm run build:messenger` | Production build of the LinkedIn Messenger into `linkedin-messenger/dist` |
 | `npm run dev:messenger` | LinkedIn Messenger dev build with HMR |
+| `npm run build:meta` | Production build of the Meta Helper into `meta-helper/dist` |
 | `npm run build:linkedin` | Production build of the LinkedIn Helper into `linkedin-extension/dist` |
 | `npm run dev:admin` | Admin panel dev server with hot reload |
 | `npm run build:admin` | Production build of the admin panel |
