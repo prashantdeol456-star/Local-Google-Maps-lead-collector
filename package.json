@@ -23,7 +23,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "dev:admin": "npm run dev -w admin",
-    "build:admin": "npm run build -w admin"
+    "build:admin": "npm run build -w admin",
+    "build:extensions": "npm run build -w extension && npm run build -w linkedin-extension && npm run pack:extensions -w backend"
   },
   "allowScripts": {
     "@prisma/engines@7.10.0": true,

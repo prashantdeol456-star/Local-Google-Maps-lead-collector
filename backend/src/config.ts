@@ -72,6 +72,8 @@ export const config = {
   databaseUrl: resolveDatabaseUrl(env.DATABASE_URL),
   /** Built admin panel (npm run build:admin writes here). */
   adminDir: path.resolve(backendRoot, "public/admin") as string,
+  /** Extension zips for the admin panel's Extensions page (npm run build:extensions writes here). */
+  extensionsDir: path.resolve(backendRoot, "public/extensions") as string,
   sessionSecret: env.SESSION_SECRET,
   sessionTtlMs: env.SESSION_TTL_HOURS * 60 * 60 * 1000,
   loginRateLimitPerMinute: 5 as number,

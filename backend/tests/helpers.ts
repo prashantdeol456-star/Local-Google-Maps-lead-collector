@@ -74,6 +74,7 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, deps: Pi
     startupWarnings: [],
     databaseUrl: dbFile,
     adminDir: path.join(dir, "no-admin-build"),
+    extensionsDir: path.join(dir, "extensions"),
     sessionSecret: "test-secret-test-secret-test-secret-123",
     sessionTtlMs: 60 * 60 * 1000,
     loginRateLimitPerMinute: 5,

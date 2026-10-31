@@ -20,6 +20,7 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/opt-outs", label: "Opt-outs", icon: "⊘" },
   { to: "/social", label: "Social Accounts", icon: "◎" },
   { to: "/integrations", label: "Integrations", icon: "⇄" },
+  { to: "/extensions", label: "Extensions", icon: "⬇" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];
 

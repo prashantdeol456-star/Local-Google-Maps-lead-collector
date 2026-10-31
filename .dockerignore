@@ -10,3 +10,4 @@ extension/dist
 .git
 *.log
 backend/src/generated
+linkedin-extension/dist

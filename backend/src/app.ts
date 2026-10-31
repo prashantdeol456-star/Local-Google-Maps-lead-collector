@@ -7,6 +7,7 @@ import { healthRoutes } from "./api/routes/health.js";
 import { jobRoutes } from "./api/routes/jobs.js";
 import { leadRoutes } from "./api/routes/leads.js";
 import { adminRoutes, isAdminPageRequest, sendAdminIndex } from "./api/routes/admin.js";
+import { extensionRoutes } from "./api/routes/extensions.js";
 import { eventRoutes } from "./api/routes/events.js";
 import { campaignRoutes } from "./api/routes/campaigns.js";
 import { emailRoutes } from "./api/routes/email.js";
@@ -221,6 +222,7 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
+  await app.register(extensionRoutes, { extensionsDir: config.extensionsDir });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 
   app.decorate("authService", auth);

@@ -14,7 +14,8 @@
     "admin:password": "tsx src/scripts/setAdminPassword.ts",
     "db:pg:schema": "tsx src/scripts/syncPostgresSchema.ts",
     "db:copy-to-postgres": "tsx src/scripts/copySqliteToPostgres.ts",
-    "db:backup": "tsx src/scripts/backupSqlite.ts"
+    "db:backup": "tsx src/scripts/backupSqlite.ts",
+    "pack:extensions": "tsx src/scripts/packExtensions.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
@@ -43,6 +44,7 @@
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "fastify": "^5.12.5",
+    "jszip": "^3.10.2",
     "nodemailer": "^10.0.15",
     "pg": "^8.23.1",
     "svix": "^2.6.1",
