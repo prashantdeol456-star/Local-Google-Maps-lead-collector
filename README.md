@@ -37,7 +37,13 @@ npx prisma migrate deploy
 npm run dev               # http://127.0.0.1:3000
 ```
 
-The first start creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` if no admin exists.
+The first start creates the admin (a **super admin**) from `ADMIN_EMAIL` / `ADMIN_PASSWORD` if no admin exists.
+
+Other people sign up on the login page (**Create an account**: email, phone, user id,
+password). Their account waits until a super admin approves it on the **Users** page. Each
+user then has their own Google Maps leads, collections and LinkedIn leads, and can download
+the extensions from the **Extensions** page; super admins see everyone's data (the "Data"
+selector at the top). Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 8c.
 Changing those values later does **not** change the password. To change it:
 
 ```bash

@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { ownerScope } from "../database/ownerScope.js";
 
 // In-process event bus for live admin updates (Server-Sent Events).
 // Events carry only ids and small summaries; clients refetch what they display.
@@ -17,6 +18,9 @@ export type AppEvent =
   /** A chat in the AI Inbox changed (new message, draft, reply). */
   | { type: "inbox.updated"; conversationId: string };
 
+/** An event as delivered: with the user who caused it (from the request's data scope), if any. */
+export type ScopedAppEvent = AppEvent & { ownerId?: string };
+
 export class EventBus {
   private readonly emitter = new EventEmitter();
 
@@ -26,7 +30,9 @@ export class EventBus {
   }
 
   publish(event: AppEvent): void {
-    this.emitter.emit("event", event);
+    // Customers' live streams only get events of their own data (see api/routes/events.ts).
+    const ownerId = ownerScope.getStore()?.userId;
+    this.emitter.emit("event", ownerId ? { ...event, ownerId } : event);
   }
 
   subscribe(listener: (event: AppEvent) => void): () => void {

@@ -41,11 +41,11 @@ export function LoginPage({ status, onLoggedIn, onRetry }: Props) {
 
       <form className="card form" onSubmit={submit}>
         <h2 className="form__title">Admin login</h2>
-        <p className="form__hint">Use the same email and password as the admin panel.</p>
+        <p className="form__hint">Use the same email (or user id) and password as the admin panel.</p>
 
         <label className="field">
-          <span>Email</span>
-          <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <span>Email or user id</span>
+          <input type="text" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
 
         <label className="field">

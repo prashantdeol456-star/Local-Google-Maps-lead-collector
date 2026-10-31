@@ -4,6 +4,21 @@ export interface Admin {
   id: string;
   email: string;
   name: string | null;
+  /** super_admin manages users and sees everyone's data; customer sees only their own */
+  role: "super_admin" | "customer";
+}
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  username: string | null;
+  phone: string | null;
+  name: string | null;
+  role: "super_admin" | "customer";
+  status: "pending" | "active" | "disabled";
+  approvedAt: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
 }
 
 export interface Lead {

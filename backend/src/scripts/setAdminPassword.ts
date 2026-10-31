@@ -48,7 +48,7 @@ try {
     ]);
     console.log(`Password changed for ${email}. Existing logins (admin panel and extensions) were signed out.`);
   } else {
-    await db.adminUser.create({ data: { email, name: "Admin", passwordHash } });
+    await db.adminUser.create({ data: { email, name: "Admin", passwordHash, role: "super_admin", status: "active", approvedAt: new Date() } });
     console.log(`Admin ${email} created.`);
   }
 } catch (err) {

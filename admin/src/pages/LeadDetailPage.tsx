@@ -4,7 +4,7 @@ import { ConfirmButton, ErrorBox, PageHeader, Spinner } from "../components/ui";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatNumber, hostOf, safeHref } from "../lib/format";
 import { Link, navigate } from "../lib/router";
-import type { Attempt, CommunicationPreference, EmailEvent, Lead, LeadPreferences, WhatsAppEvent } from "../lib/types";
+import type { Admin, Attempt, CommunicationPreference, EmailEvent, Lead, LeadPreferences, WhatsAppEvent } from "../lib/types";
 import { PreferencesCard } from "../components/PreferencesCard";
 import { Badge } from "./EmailPage";
 
@@ -189,9 +189,14 @@ export function LeadDetailPage({ id }: { id: string }) {
         </section>
       </div>
 
-      <PreferencesCard leadId={l.id} hasEmail={!!l.email} />
-      <WhatsAppConsent leadId={l.id} hasPhone={!!l.phone} />
-      <CommunicationHistory leadId={l.id} />
+      {/* Outreach (opt-outs, consent, history) is not separated per user yet: super admins only. */}
+      {client.getQueryData<Admin>(["me"])?.role === "super_admin" && (
+        <>
+          <PreferencesCard leadId={l.id} hasEmail={!!l.email} />
+          <WhatsAppConsent leadId={l.id} hasPhone={!!l.phone} />
+          <CommunicationHistory leadId={l.id} />
+        </>
+      )}
     </>
   );
 }

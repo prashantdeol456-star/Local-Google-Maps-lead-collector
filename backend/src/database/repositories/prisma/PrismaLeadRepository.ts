@@ -87,7 +87,7 @@ export class PrismaLeadRepository implements LeadRepository {
   }
 
   findByPlaceId(placeId: string) {
-    return this.db.lead.findUnique({ where: { placeId } });
+    return this.db.lead.findFirst({ where: { placeId } }); // unique per owner (ownerScope adds the owner)
   }
 
   findByNormalizedPhone(phone: string) {

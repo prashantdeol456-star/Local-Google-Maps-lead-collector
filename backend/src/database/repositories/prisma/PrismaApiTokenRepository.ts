@@ -30,4 +30,9 @@ export class PrismaApiTokenRepository implements ApiTokenRepository {
   async touchLastUsed(id: string, at: Date) {
     await this.db.apiToken.update({ where: { id }, data: { lastUsedAt: at } });
   }
+
+  async revokeAllByUser(userId: string, at: Date) {
+    const { count } = await this.db.apiToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: at } });
+    return count;
+  }
 }

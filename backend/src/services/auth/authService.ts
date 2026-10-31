@@ -1,12 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Errors } from "../../utils/errors.js";
-import type { AdminUserRecord, ApiTokenRecord, Repositories } from "../../database/repositories/index.js";
+import type { AdminUserRecord, ApiTokenRecord, Repositories, UserRole } from "../../database/repositories/index.js";
 import { hashPassword, verifyPassword } from "./password.js";
 
 export interface AuthenticatedAdmin {
   id: string;
   email: string;
   name: string | null;
+  /** super_admin manages users and sees every user's data; customer sees only their own */
+  role: UserRole;
 }
 
 export interface LoginResult {
@@ -51,8 +53,8 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function toAdmin(u: { id: string; email: string; name: string | null }): AuthenticatedAdmin {
-  return { id: u.id, email: u.email, name: u.name };
+function toAdmin(u: { id: string; email: string; name: string | null; role: string }): AuthenticatedAdmin {
+  return { id: u.id, email: u.email, name: u.name, role: u.role === "super_admin" ? "super_admin" : "customer" };
 }
 
 function toTokenInfo(t: ApiTokenRecord): ApiTokenInfo {
@@ -73,14 +75,22 @@ export class AuthService {
       email: initial.email.toLowerCase(),
       name: "Admin",
       passwordHash: await hashPassword(initial.password),
+      role: "super_admin",
+      status: "active",
+      approvedAt: new Date(),
     });
     return "created";
   }
 
-  private async verifyCredentials(email: string, password: string): Promise<AdminUserRecord> {
-    const user = await this.repos.adminUsers.findByEmail(email.trim().toLowerCase());
+  /** `login` is the email or the user id chosen at registration. Only active accounts may log in. */
+  private async verifyCredentials(login: string, password: string): Promise<AdminUserRecord> {
+    const key = login.trim().toLowerCase();
+    const user = key.includes("@") ? await this.repos.adminUsers.findByEmail(key) : await this.repos.adminUsers.findByUsername(key);
     const ok = await verifyPassword(password, user?.passwordHash ?? null);
     if (!user || !ok) throw Errors.invalidCredentials();
+    // Told only after the password matched, so the status of other accounts is not revealed.
+    if (user.status === "pending") throw Errors.forbidden("Your account is waiting for approval by the administrator", "ACCOUNT_PENDING");
+    if (user.status !== "active") throw Errors.forbidden("Your account is disabled. Contact the administrator.", "ACCOUNT_DISABLED");
     return user;
   }
 
@@ -109,7 +119,7 @@ export class AuthService {
       return null;
     }
     const user = await this.repos.adminUsers.findById(session.userId);
-    return user ? toAdmin(user) : null;
+    return user?.status === "active" ? toAdmin(user) : null;
   }
 
   async logout(token: string | undefined): Promise<void> {
@@ -163,7 +173,7 @@ export class AuthService {
     if (record.expiresAt && record.expiresAt <= now) return null;
 
     const user = await this.repos.adminUsers.findById(record.userId);
-    if (!user) return null;
+    if (user?.status !== "active") return null;
 
     if (!record.lastUsedAt || now.getTime() - record.lastUsedAt.getTime() > LAST_USED_WRITE_INTERVAL_MS) {
       await this.repos.apiTokens.touchLastUsed(record.id, now);

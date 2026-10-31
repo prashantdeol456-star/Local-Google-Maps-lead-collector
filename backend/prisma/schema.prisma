@@ -67,8 +67,16 @@ enum LogLevel {
 model AdminUser {
   id           String          @id @default(cuid())
   email        String          @unique
+  /** Login id chosen at registration (lowercase); email works too */
+  username     String?         @unique
+  phone        String?
   name         String?
   passwordHash String
+  /** super_admin | customer */
+  role         String          @default("customer")
+  /** pending (registered, waiting for approval) | active | disabled */
+  status       String          @default("pending")
+  approvedAt   DateTime?
   createdAt    DateTime        @default(now())
   lastLoginAt  DateTime?
   sessions     Session[]
@@ -108,7 +116,9 @@ model ApiToken {
 
 model Lead {
   id                String    @id @default(cuid())
-  placeId           String?   @unique
+  /** User whose collection this lead belongs to (see database/ownerScope.ts) */
+  ownerId           String?
+  placeId           String?
   name              String
   category          String?
   phone             String?
@@ -131,7 +141,7 @@ model Lead {
   normalizedPhone   String?
   normalizedWebsite String?
   normalizedAddress String?
-  dedupeKey         String    @unique
+  dedupeKey         String
 
   firstSeenAt       DateTime  @default(now())
   lastSeenAt        DateTime  @default(now())
@@ -150,10 +160,14 @@ model Lead {
   @@index([category])
   @@index([searchKeyword])
   @@index([createdAt])
+  @@unique([ownerId, placeId])
+  @@unique([ownerId, dedupeKey])
+  @@index([ownerId])
 }
 
 model CollectionJob {
   id               String     @id @default(cuid())
+  ownerId          String?
   searchKeyword    String
   location         String?
   maxRecords       Int?
@@ -178,6 +192,7 @@ model CollectionJob {
   @@index([status])
   @@index([createdAt])
   @@index([queueId, position])
+  @@index([ownerId])
 }
 
 model JobItem {
@@ -478,7 +493,8 @@ model WebhookDelivery {
 model LinkedInLead {
   id             String   @id @default(cuid())
   /** https://www.linkedin.com/in/<slug> (lowercase slug, no query) */
-  profileUrl     String   @unique
+  ownerId        String?
+  profileUrl     String
   name           String
   /** Headline / designation */
   headline       String?
@@ -510,6 +526,8 @@ model LinkedInLead {
   updatedAt      DateTime @updatedAt
 
   @@index([createdAt])
+  @@unique([ownerId, profileUrl])
+  @@index([ownerId])
   @@index([company])
   @@index([tag])
 }

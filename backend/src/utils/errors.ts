@@ -12,8 +12,8 @@ export class AppError extends Error {
 export const Errors = {
   badRequest: (message = "Invalid request") => new AppError(400, "BAD_REQUEST", message),
   unauthorized: (message = "Login required") => new AppError(401, "UNAUTHORIZED", message),
-  invalidCredentials: () => new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password"),
-  forbidden: (message = "Not allowed") => new AppError(403, "FORBIDDEN", message),
+  invalidCredentials: () => new AppError(401, "INVALID_CREDENTIALS", "Invalid email/user id or password"),
+  forbidden: (message = "Not allowed", code = "FORBIDDEN") => new AppError(403, code, message),
   notFound: (message = "Not found") => new AppError(404, "NOT_FOUND", message),
   conflict: (code: string, message: string) => new AppError(409, code, message),
 };

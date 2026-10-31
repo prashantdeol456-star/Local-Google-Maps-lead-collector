@@ -1,7 +1,12 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { api, getViewOwner, setViewOwner } from "../lib/api";
 import type { LiveState } from "../lib/live";
 import { Link, usePath } from "../lib/router";
-import type { Admin } from "../lib/types";
+import type { Admin, UserAccount } from "../lib/types";
+
+/** Pages a customer can use; the rest is for super admins until it is separated per user. */
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions"]);
 
 const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: "▦" },
@@ -21,8 +26,49 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/social", label: "Social Accounts", icon: "◎" },
   { to: "/integrations", label: "Integrations", icon: "⇄" },
   { to: "/extensions", label: "Extensions", icon: "⬇" },
+  { to: "/users", label: "Users", icon: "☺" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];
+
+export function canOpen(admin: Admin, path: string): boolean {
+  if (admin.role === "super_admin") return true;
+  const top = `/${path.split("/")[1] ?? ""}`;
+  return CUSTOMER_PAGES.has(top);
+}
+
+/** Super admin: whose data the pages show (all users, or one). */
+function ViewOwnerSelect() {
+  const client = useQueryClient();
+  const users = useQuery({ queryKey: ["users", "active-list"], queryFn: () => api<{ items: UserAccount[]; pendingCount: number }>("/users?status=active") });
+  const current = getViewOwner() ?? "";
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-500">
+      <span className="hidden md:inline">Data:</span>
+      <select
+        className="input h-9 w-44 py-1 text-sm"
+        value={current}
+        onChange={(e) => {
+          setViewOwner(e.target.value || null);
+          client.clear(); // every page refetches for the chosen user
+        }}
+        aria-label="Whose data to show"
+      >
+        <option value="">All users</option>
+        {users.data?.items.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.username ?? u.email}
+            {u.role === "super_admin" ? " (super admin)" : ""}
+          </option>
+        ))}
+      </select>
+      {!!users.data?.pendingCount && (
+        <Link to="/users?status=pending" className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-medium text-white" title="Accounts waiting for approval">
+          {users.data.pendingCount} new
+        </Link>
+      )}
+    </label>
+  );
+}
 
 function isActive(path: string, to: string) {
   return to === "/" ? path === "/" : path === to || path.startsWith(`${to}/`);
@@ -45,7 +91,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
         <span className="font-semibold">Lead Platform</span>
       </div>
       <ul className="flex-1 space-y-1 px-3 py-2">
-        {NAV.map((item) => {
+        {NAV.filter((item) => canOpen(admin, item.to)).map((item) => {
           const active = isActive(path, item.to);
           return (
             <li key={item.to}>
@@ -90,11 +136,15 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
         <button className="btn lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
           ☰
         </button>
+        {admin.role === "super_admin" && <ViewOwnerSelect />}
         <span className="ml-auto flex items-center gap-2 text-xs text-slate-500" title="Live updates from the backend">
           <span className={`h-2 w-2 rounded-full ${LIVE_LABEL[live].dot}`} />
           {LIVE_LABEL[live].text}
         </span>
-        <span className="hidden text-sm text-slate-600 sm:inline dark:text-slate-300">{admin.email}</span>
+        <span className="hidden text-sm text-slate-600 sm:inline dark:text-slate-300">
+          {admin.email}
+          {admin.role === "super_admin" && <span className="ml-1 text-xs text-brand-600">· super admin</span>}
+        </span>
         <button className="btn" onClick={onLogout}>
           Log out
         </button>

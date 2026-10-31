@@ -105,7 +105,8 @@ describe("live events", () => {
         "lead.updated",
         "lead.deleted",
       ]);
-      expect(events[2]).toEqual({ type: "lead.saved", leadId: saved.lead.id, result: "new", jobId: job.id });
+      const admin = await t.db.adminUser.findFirstOrThrow();
+      expect(events[2]).toEqual({ type: "lead.saved", leadId: saved.lead.id, result: "new", jobId: job.id, ownerId: admin.id });
     } finally {
       off();
     }
@@ -138,7 +139,7 @@ describe("live events", () => {
 
     await inject("POST", "/api/leads", { lead: { name: "Streamed University", placeId: "ChIJstream" } });
     await readUntil("event: lead.saved");
-    expect(text).toMatch(/event: lead\.saved\ndata: \{"type":"lead\.saved","leadId":"[^"]+","result":"new","jobId":null\}/);
+    expect(text).toMatch(/event: lead\.saved\ndata: \{"type":"lead\.saved","leadId":"[^"]+","result":"new","jobId":null,"ownerId":"[^"]+"\}/);
 
     controller.abort();
     await new Promise((r) => setTimeout(r, 100));

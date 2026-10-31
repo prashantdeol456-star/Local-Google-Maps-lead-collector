@@ -1,4 +1,5 @@
 import type { Repositories } from "../database/repositories/index.js";
+import { ownerScope } from "../database/ownerScope.js";
 import { startOfDayInZone } from "../utils/time.js";
 
 export class StatsService {
@@ -19,6 +20,8 @@ export class StatsService {
       this.repos.attempts.countSentTotal("email"),
       this.repos.attempts.countSentTotal("whatsapp"),
     ]);
+    // Campaigns are not separated per user yet: a customer sees no sending totals.
+    const customer = ownerScope.getStore()?.customer === true;
     return {
       totalLeads,
       todayLeads,
@@ -26,8 +29,8 @@ export class StatsService {
       totalCollections,
       completedJobs,
       activeJob,
-      emailsSent,
-      whatsappSent,
+      emailsSent: customer ? 0 : emailsSent,
+      whatsappSent: customer ? 0 : whatsappSent,
       timeZone: this.timeZone,
       todayStartsAt: todayStart,
     };

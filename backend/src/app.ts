@@ -8,6 +8,9 @@ import { jobRoutes } from "./api/routes/jobs.js";
 import { leadRoutes } from "./api/routes/leads.js";
 import { adminRoutes, isAdminPageRequest, sendAdminIndex } from "./api/routes/admin.js";
 import { extensionRoutes } from "./api/routes/extensions.js";
+import { userRoutes } from "./api/routes/users.js";
+import { UserService } from "./services/auth/userService.js";
+import { withOwnerScope } from "./database/ownerScope.js";
 import { eventRoutes } from "./api/routes/events.js";
 import { campaignRoutes } from "./api/routes/campaigns.js";
 import { emailRoutes } from "./api/routes/email.js";
@@ -87,7 +90,7 @@ export interface AppDeps {
   inboxFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -109,6 +112,8 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
     if (config.isProduction && request.protocol === "https") reply.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   });
 
+  // Every query goes through the per-user data scope (database/ownerScope.ts).
+  const db = withOwnerScope(rawDb);
   const repos = createRepositories(db);
   const auth = new AuthService(repos, { sessionTtlMs: config.sessionTtlMs, apiTokenTtlMs: config.apiTokenTtlMs });
   const bus = new EventBus();
@@ -222,6 +227,7 @@ export async function buildApp({ config, db, logger = true, emailProvider, whats
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
+  await app.register(userRoutes, { users: new UserService(repos), registerRateLimitPerMinute: config.loginRateLimitPerMinute });
   await app.register(extensionRoutes, { extensionsDir: config.extensionsDir });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 

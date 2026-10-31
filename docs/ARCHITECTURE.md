@@ -190,6 +190,25 @@ background collection.
   import of LinkedIn's own `Connections.csv`.
 - Admin: *LinkedIn Leads* page, separate from Google Maps leads (no dedupe or campaigns with them).
 
+## 8c. Users and access
+
+- Accounts (`AdminUser`): `role` super_admin | customer, `status` pending | active | disabled.
+  The admin from `.env` (and every admin that existed before) is a super admin.
+- `POST /api/auth/register` (public, rate-limited): email, phone, user id, password → `pending`.
+  A super admin approves it on the **Users** page; then the user logs in with email or user id.
+  Disable and password reset sign the user out everywhere (sessions and extension tokens).
+- Data separation (`backend/src/database/ownerScope.ts`): every request runs in an
+  AsyncLocalStorage scope set by the auth guard. A Prisma query extension adds the owner to
+  every query on `Lead`, `CollectionJob`, `LinkedInLead` (and `JobItem`/`AgentLog` through their
+  collection) and sets `ownerId` on new rows. Dedupe keys are unique per owner, so each user
+  has their own collection. Customers' live events only carry their own data.
+- Super admins see all data, or one user's with the `X-View-Owner` header (`?viewOwner=` for
+  download links): the "Data" selector in the admin panel.
+- Customers can use: dashboard, Google Maps leads, collections, LinkedIn leads, export and the
+  Extensions page (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`). Campaigns, templates,
+  contacts, opt-outs, inbox, social accounts, integrations and settings stay with super admins
+  until they are separated per user (phases B–D).
+
 ## 9. Security
 
 - Backend binds to `127.0.0.1`. CORS allows only the extension ID and admin origin.

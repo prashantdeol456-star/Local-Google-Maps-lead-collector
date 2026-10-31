@@ -1,6 +1,6 @@
 import type { ServerResponse } from "node:http";
 import type { FastifyInstance } from "fastify";
-import type { EventBus } from "../../services/events.js";
+import type { EventBus, ScopedAppEvent } from "../../services/events.js";
 
 const HEARTBEAT_MS = 25_000;
 
@@ -26,7 +26,10 @@ export async function eventRoutes(app: FastifyInstance, opts: { bus: EventBus })
     res.write("event: ready\ndata: {}\n\n");
     open.add(res);
 
-    const unsubscribe = opts.bus.subscribe((event) => {
+    // A customer only hears about their own data; super admins hear everything.
+    const onlyOwner = request.admin?.role === "super_admin" ? null : (request.admin?.id ?? "");
+    const unsubscribe = opts.bus.subscribe((event: ScopedAppEvent) => {
+      if (onlyOwner !== null && event.ownerId !== onlyOwner) return;
       res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
     });
     // Comment lines keep proxies and the browser from closing an idle connection.

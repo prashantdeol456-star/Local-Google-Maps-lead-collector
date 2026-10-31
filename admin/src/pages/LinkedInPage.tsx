@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner, StatCard } from "../components/ui";
-import { api, qs } from "../lib/api";
+import { api, qs, withViewOwner } from "../lib/api";
 import { formatDate, formatNumber, safeHref } from "../lib/format";
 import { Link, navigate, setSearchParams, useSearchParams } from "../lib/router";
 import type { LinkedInFacets, LinkedInImportResult, LinkedInLead, LinkedInLeadPage } from "../lib/types";
@@ -131,7 +131,7 @@ export function LinkedInLeadsPage() {
                 Import CSV
               </button>
             )}
-            <a className="btn btn-primary" href={`/api/linkedin/export.csv${qs(filters)}`} download title={filtered ? "Exports all profiles matching the filters" : "Exports all profiles"}>
+            <a className="btn btn-primary" href={withViewOwner(`/api/linkedin/export.csv${qs(filters)}`)} download title={filtered ? "Exports all profiles matching the filters" : "Exports all profiles"}>
               Export CSV{filtered ? " (filtered)" : ""}
             </a>
           </>

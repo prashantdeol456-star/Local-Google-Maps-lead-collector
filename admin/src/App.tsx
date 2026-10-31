@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layout } from "./components/Layout";
+import { canOpen, Layout } from "./components/Layout";
 import { EmptyState, ErrorBox, Spinner } from "./components/ui";
 import { api, ApiError } from "./lib/api";
 import { useLiveUpdates } from "./lib/live";
-import { Link, matchPath, usePath } from "./lib/router";
+import { Link, matchPath, navigate, usePath } from "./lib/router";
 import type { Admin } from "./lib/types";
 import { CollectionDetailPage, CollectionsPage } from "./pages/CollectionsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -25,10 +25,14 @@ import { CampaignLogsPage } from "./pages/CampaignLogsPage";
 import { LinkedInCampaignDetailPage, LinkedInCampaignsPage, NewLinkedInCampaignPage } from "./pages/LinkedInOutreachPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ExtensionsPage } from "./pages/ExtensionsPage";
+import { UsersPage } from "./pages/UsersPage";
 
 function Routes({ admin }: { admin: Admin }) {
   const path = usePath();
   let params: Record<string, string> | null;
+  if (!canOpen(admin, path)) {
+    return <EmptyState title="Not available for your account">Ask the administrator if you need this part.</EmptyState>;
+  }
   if (path === "/") return <DashboardPage />;
   if (path === "/leads") return <LeadsPage />;
   if ((params = matchPath("/leads/:id", path))) return <LeadDetailPage key={params.id} id={params.id!} />;
@@ -58,6 +62,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/opt-outs") return <OptOutsPage />;
   if (path === "/integrations") return <IntegrationsPage />;
   if (path === "/extensions") return <ExtensionsPage />;
+  if (path === "/users") return <UsersPage admin={admin} />;
   if (path === "/settings") return <SettingsPage admin={admin} />;
   return (
     <EmptyState title="Page not found">
@@ -108,6 +113,7 @@ export function App() {
       <LoginPage
         onLogin={async (email, password) => {
           const { admin } = await api<{ admin: Admin }>("/auth/login", { method: "POST", body: { email, password } });
+          if (window.location.pathname.endsWith("/register")) navigate("/", { replace: true });
           client.setQueryData(["me"], admin);
         }}
       />

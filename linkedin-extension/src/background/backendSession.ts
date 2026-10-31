@@ -77,7 +77,7 @@ export async function login(backendUrlInput: string, email: string, password: st
     body: { email: email.trim(), password, name: TOKEN_NAME },
   });
   if (!res.ok) {
-    if (res.error.code === "INVALID_CREDENTIALS") throw new Error("Invalid email or password");
+    if (res.error.code === "INVALID_CREDENTIALS") throw new Error("Invalid email/user id or password");
     throw new Error(res.error.message);
   }
 

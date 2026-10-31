@@ -137,11 +137,12 @@ describe("leads API", () => {
     expect(item.leadId).toBeNull();
   });
 
-  it("enforces unique placeId and dedupeKey in the database", async () => {
-    await insertLead({ name: "P1", placeId: "0x1:0x2" });
-    await expect(insertLead({ name: "P2", placeId: "0x1:0x2" })).rejects.toThrow();
-    await expect(
-      t.db.lead.create({ data: { name: "D", normalizedName: "d", dedupeKey: "test:1" } }),
-    ).rejects.toThrow();
+  it("enforces unique placeId and dedupeKey per owner in the database", async () => {
+    const ownerId = "owner-a";
+    await insertLead({ name: "P1", placeId: "0x1:0x2", ownerId, dedupeKey: "test:unique" });
+    await expect(insertLead({ name: "P2", placeId: "0x1:0x2", ownerId })).rejects.toThrow();
+    await expect(t.db.lead.create({ data: { name: "D", normalizedName: "d", dedupeKey: "test:unique", ownerId } })).rejects.toThrow();
+    // Another user may have the same place in their own collection.
+    await expect(insertLead({ name: "P1", placeId: "0x1:0x2", ownerId: "owner-b", dedupeKey: "test:unique" })).resolves.toBeTruthy();
   });
 });

@@ -1,11 +1,21 @@
 // Repository interfaces. Services depend on these, never on Prisma directly.
 import type { JobStatus } from "@platform/shared";
 
+export type UserRole = "super_admin" | "customer";
+export type UserStatus = "pending" | "active" | "disabled";
+
 export interface AdminUserRecord {
   id: string;
   email: string;
+  username: string | null;
+  phone: string | null;
   name: string | null;
   passwordHash: string;
+  /** UserRole */
+  role: string;
+  /** UserStatus */
+  status: string;
+  approvedAt: Date | null;
   createdAt: Date;
   lastLoginAt: Date | null;
 }
@@ -22,8 +32,21 @@ export interface AdminUserRepository {
   count(): Promise<number>;
   findByEmail(email: string): Promise<AdminUserRecord | null>;
   findById(id: string): Promise<AdminUserRecord | null>;
-  create(data: { email: string; name?: string | null; passwordHash: string }): Promise<AdminUserRecord>;
+  findByUsername(username: string): Promise<AdminUserRecord | null>;
+  create(data: {
+    email: string;
+    name?: string | null;
+    passwordHash: string;
+    username?: string | null;
+    phone?: string | null;
+    role?: UserRole;
+    status?: UserStatus;
+    approvedAt?: Date | null;
+  }): Promise<AdminUserRecord>;
   touchLastLogin(id: string, at: Date): Promise<void>;
+  list(query: { status?: UserStatus; q?: string }): Promise<AdminUserRecord[]>;
+  update(id: string, data: Partial<Pick<AdminUserRecord, "status" | "approvedAt" | "passwordHash" | "name" | "phone">>): Promise<AdminUserRecord>;
+  countByRole(role: UserRole, status?: UserStatus): Promise<number>;
 }
 
 export interface SessionRepository {
@@ -31,6 +54,8 @@ export interface SessionRepository {
   findByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   deleteByTokenHash(tokenHash: string): Promise<void>;
   deleteExpired(now: Date): Promise<number>;
+  /** Signs a user out of every admin-panel session. */
+  deleteByUser(userId: string): Promise<number>;
 }
 
 export interface ApiTokenRecord {
@@ -54,6 +79,8 @@ export interface ApiTokenRepository {
   /** Revokes only if the token belongs to the user; returns false otherwise. */
   revoke(id: string, userId: string, at: Date): Promise<boolean>;
   touchLastUsed(id: string, at: Date): Promise<void>;
+  /** Revokes every active token of a user (extensions, integrations). */
+  revokeAllByUser(userId: string, at: Date): Promise<number>;
 }
 
 // ---- Leads ----

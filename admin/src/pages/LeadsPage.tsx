@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
-import { api, qs } from "../lib/api";
+import { api, qs, withViewOwner } from "../lib/api";
 import { formatDate, formatNumber, hostOf, safeHref } from "../lib/format";
 import { Link, setSearchParams, useSearchParams } from "../lib/router";
 import type { Facets, Lead, Page } from "../lib/types";
@@ -119,10 +119,10 @@ export function LeadsPage() {
           selected.size > 0 ? (
             <>
               <span className="self-center text-sm text-slate-500">{selected.size} selected</span>
-              <a className="btn btn-primary" href={`/api/export/csv${exportSelected}`} download>
+              <a className="btn btn-primary" href={withViewOwner(`/api/export/csv${exportSelected}`)} download>
                 Export selected CSV
               </a>
-              <a className="btn btn-primary" href={`/api/export/xlsx${exportSelected}`} download>
+              <a className="btn btn-primary" href={withViewOwner(`/api/export/xlsx${exportSelected}`)} download>
                 Export selected XLSX
               </a>
               <Link className="btn btn-primary" to={`/email/new?leadIds=${[...selected].join(",")}`}>
@@ -137,10 +137,10 @@ export function LeadsPage() {
             </>
           ) : (
             <>
-              <a className="btn" href={`/api/export/csv${exportFiltered}`} download title={filtered ? "Exports all leads matching the filters" : "Exports all leads"}>
+              <a className="btn" href={withViewOwner(`/api/export/csv${exportFiltered}`)} download title={filtered ? "Exports all leads matching the filters" : "Exports all leads"}>
                 ⬇ Export CSV
               </a>
-              <a className="btn" href={`/api/export/xlsx${exportFiltered}`} download title={filtered ? "Exports all leads matching the filters" : "Exports all leads"}>
+              <a className="btn" href={withViewOwner(`/api/export/xlsx${exportFiltered}`)} download title={filtered ? "Exports all leads matching the filters" : "Exports all leads"}>
                 ⬇ Export XLSX
               </a>
             </>
