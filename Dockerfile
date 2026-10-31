@@ -9,6 +9,9 @@ COPY shared/package.json shared/
 COPY backend/package.json backend/
 COPY admin/package.json admin/
 COPY extension/package.json extension/
+COPY linkedin-extension/package.json linkedin-extension/
+COPY linkedin-messenger/package.json linkedin-messenger/
+COPY meta-helper/package.json meta-helper/
 RUN npm ci --workspace shared --workspace backend --workspace admin --include-workspace-root
 COPY shared shared
 COPY backend backend
