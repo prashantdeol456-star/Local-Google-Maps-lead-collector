@@ -110,6 +110,14 @@ automatically.
 - `uuid` < 11.1.1, inside `exceljs`: the bug is in `v3`/`v5`/`v6` with a buffer argument;
   exceljs only uses `v4`.
 
+## 7b. Render (Blueprint)
+
+`render.yaml` sets up the web service (from `Dockerfile`) and a PostgreSQL database:
+Render dashboard → **New → Blueprint** → choose this repository → enter `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` (12+ characters) → **Apply**. `SESSION_SECRET` is generated, and
+`PUBLIC_BASE_URL` is taken from Render's `RENDER_EXTERNAL_URL`. The free plans sleep after
+15 minutes idle and the free database expires after 30 days; switch both plans for real use.
+
 ## 8. Without Docker
 
 Any Node.js 24 host with PostgreSQL works:

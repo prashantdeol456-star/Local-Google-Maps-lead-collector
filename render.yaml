@@ -1,0 +1,47 @@
+# Render Blueprint: Render dashboard → New → Blueprint → pick this repository.
+# Creates the web service (Docker image from ./Dockerfile) and a PostgreSQL database.
+# Free plans: the service sleeps after 15 minutes without requests (campaign workers pause
+# with it) and the free database expires after 30 days. Switch both plans for real use.
+services:
+  - type: web
+    name: lead-platform
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: feature/linkedin-outreach
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lead-platform-db
+          property: connectionString
+      - key: DATABASE_PROVIDER
+        value: postgresql
+      - key: PORT
+        value: "10000"
+      - key: HOST
+        value: 0.0.0.0
+      # Render's proxy sits in front of the app (real client IPs for login rate limits).
+      - key: TRUST_PROXY
+        value: "1"
+      - key: APP_TIMEZONE
+        value: Asia/Kolkata
+      # Webhook signing secrets are encrypted with it: keep it when moving data.
+      - key: SESSION_SECRET
+        generateValue: true
+      # Asked once when the Blueprint is created; the first start creates this admin.
+      # The password needs 12+ characters.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # PUBLIC_BASE_URL is taken from RENDER_EXTERNAL_URL (https://<name>.onrender.com).
+
+databases:
+  - name: lead-platform-db
+    plan: free
+    region: singapore
+    databaseName: leads
+    user: leads
+    postgresMajorVersion: "17"

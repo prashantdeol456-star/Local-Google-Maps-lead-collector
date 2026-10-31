@@ -44,7 +44,8 @@ const EnvSchema = z.object({
 
 export type Env = z.infer<typeof EnvSchema>;
 
-const env = EnvSchema.parse(process.env);
+// On Render, the service's public https address is provided as RENDER_EXTERNAL_URL.
+const env = EnvSchema.parse({ ...process.env, PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL });
 const dbProblem = checkDatabaseUrl(env);
 if (dbProblem) throw new Error(dbProblem);
 const checks = env.NODE_ENV === "production" ? productionChecks(env) : { errors: [], warnings: [] };
