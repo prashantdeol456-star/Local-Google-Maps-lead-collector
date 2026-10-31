@@ -12,6 +12,11 @@ COPY extension/package.json extension/
 COPY linkedin-extension/package.json linkedin-extension/
 COPY linkedin-messenger/package.json linkedin-messenger/
 COPY meta-helper/package.json meta-helper/
+# backend's postinstall runs `prisma generate`, which needs the schema and its config.
+COPY backend/prisma backend/prisma
+COPY backend/prisma.config.ts backend/
+ENV DATABASE_PROVIDER=postgresql \
+    DATABASE_URL=postgresql://build:build@localhost:5432/build
 RUN npm ci --workspace shared --workspace backend --workspace admin --workspace extension --workspace linkedin-extension --include-workspace-root
 COPY shared shared
 COPY backend backend
