@@ -127,6 +127,9 @@ export function LoginPage({ onLogin }: { onLogin: (email: string, password: stri
   return (
     <div className={shell}>
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
+        <a href="/" className="text-sm text-slate-500 hover:text-brand-600">
+          ← Back to the website
+        </a>
         <Brand subtitle="Sign in" />
         <label className="block space-y-1">
           <span className="label">Email or user id</span>

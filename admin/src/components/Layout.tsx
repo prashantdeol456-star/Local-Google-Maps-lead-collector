@@ -31,13 +31,27 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/extensions", label: "Extensions", icon: "⬇" },
   { to: "/sender", label: "My sender", icon: "➚" },
   { to: "/users", label: "Users", icon: "☺" },
+  { to: "/website", label: "Website", icon: "⌂" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];
+
+/** Pages that belong to a service the super admin can switch off per customer. */
+const PAGE_SERVICE: Record<string, string> = {
+  "/leads": "google_maps",
+  "/collections": "google_maps",
+  "/linkedin": "linkedin",
+  "/contacts": "contacts",
+  "/email": "email",
+  "/whatsapp": "whatsapp",
+  "/inbox": "ai_inbox",
+  "/social": "social",
+};
 
 export function canOpen(admin: Admin, path: string): boolean {
   if (admin.role === "super_admin") return true;
   const top = `/${path.split("/")[1] ?? ""}`;
-  return CUSTOMER_PAGES.has(top);
+  const service = PAGE_SERVICE[top];
+  return CUSTOMER_PAGES.has(top) && (!service || admin.services.includes(service));
 }
 
 /** Super admin: whose data the pages show (all users, or one). */

@@ -42,6 +42,58 @@ function PasswordReset({ user, onDone }: { user: UserAccount; onDone: () => void
   );
 }
 
+interface ServiceInfo {
+  id: string;
+  label: string;
+  note: string;
+}
+
+/** Which services a customer may use; saved at once. */
+function ServicesEditor({ user, onDone }: { user: UserAccount; onDone: () => void }) {
+  const client = useQueryClient();
+  const services = useQuery({ queryKey: ["services"], queryFn: () => api<{ items: ServiceInfo[] }>("/services") });
+  const [on, setOn] = useState<string[]>(user.services);
+  const save = useMutation({
+    mutationFn: () => api(`/users/${encodeURIComponent(user.id)}/services`, { method: "PUT", body: { services: on } }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["users"] });
+      onDone();
+    },
+  });
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+      <p className="mb-3 text-sm font-medium">Services for {user.username ?? user.email}</p>
+      {services.isPending && <Spinner />}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {services.data?.items.map((s) => (
+          <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={on.includes(s.id)}
+              onChange={(e) => setOn(e.target.checked ? [...on, s.id] : on.filter((x) => x !== s.id))}
+            />
+            <span>
+              {s.label}
+              <span className="block text-xs text-slate-500">{s.note}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {save.error && <ErrorBox error={save.error} />}
+      <div className="mt-3 flex gap-2">
+        <button className="btn btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? "Saving…" : "Save services"}
+        </button>
+        <button className="btn" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Dashboard, templates, opt-outs, My sender and Extensions stay available. Switched-off services disappear from the menu at the user's next page load.</p>
+    </div>
+  );
+}
+
 export function UsersPage({ admin }: { admin: Admin }) {
   const client = useQueryClient();
   const params = useSearchParams();
@@ -49,6 +101,7 @@ export function UsersPage({ admin }: { admin: Admin }) {
   const q = params.get("q") ?? "";
   const [search, setSearch] = useState(q);
   const [resetting, setResetting] = useState<string | null>(null);
+  const [editingServices, setEditingServices] = useState<string | null>(null);
 
   const list = useQuery({
     queryKey: ["users", status, q],
@@ -144,6 +197,11 @@ export function UsersPage({ admin }: { admin: Admin }) {
                       View data
                     </button>
                   )}
+                  {u.role === "customer" && u.status !== "disabled" && (
+                    <button className="btn" onClick={() => setEditingServices(editingServices === u.id ? null : u.id)}>
+                      Services ({u.services.length})
+                    </button>
+                  )}
                   {u.id !== admin.id && (
                     <button className="btn" onClick={() => setResetting(resetting === u.id ? null : u.id)}>
                       Reset password
@@ -159,6 +217,7 @@ export function UsersPage({ admin }: { admin: Admin }) {
                   )}
                 </div>
               </div>
+              {editingServices === u.id && <ServicesEditor user={u} onDone={() => setEditingServices(null)} />}
               {resetting === u.id && (
                 <PasswordReset
                   user={u}

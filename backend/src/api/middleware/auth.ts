@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { Errors } from "../../utils/errors.js";
 import type { AuthenticatedAdmin, AuthService } from "../../services/auth/authService.js";
 import { ownerScope, type OwnerScope } from "../../database/ownerScope.js";
+import { serviceForRoute } from "../../services/auth/serviceAccess.js";
 
 export const SESSION_COOKIE = "mlc_session";
 
@@ -143,6 +144,11 @@ export function registerAuthGuard(app: FastifyInstance, auth: AuthService) {
     }
     if (request.admin.role !== "super_admin" && !CUSTOMER_ROUTES.test(request.routeOptions.url ?? "")) {
       throw Errors.forbidden("This part is not available for your account", "NOT_AVAILABLE_FOR_ACCOUNT");
+    }
+    // Services the super admin switched off for this customer
+    const service = request.admin.role === "super_admin" ? null : serviceForRoute(request.routeOptions.url ?? "");
+    if (service && !request.admin.services.includes(service)) {
+      throw Errors.forbidden("This service is not enabled for your account. Contact the administrator.", "SERVICE_DISABLED");
     }
   });
 

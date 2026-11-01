@@ -40,7 +40,7 @@ export class PrismaAdminUserRepository implements AdminUserRepository {
     });
   }
 
-  update(id: string, data: Partial<Pick<AdminUserRecord, "status" | "approvedAt" | "passwordHash" | "name" | "phone">>) {
+  update(id: string, data: Partial<Pick<AdminUserRecord, "status" | "approvedAt" | "passwordHash" | "name" | "phone" | "services">>) {
     return this.db.adminUser.update({ where: { id }, data });
   }
 

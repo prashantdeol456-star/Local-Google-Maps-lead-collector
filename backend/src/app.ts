@@ -10,6 +10,8 @@ import { adminRoutes, isAdminPageRequest, sendAdminIndex } from "./api/routes/ad
 import { extensionRoutes } from "./api/routes/extensions.js";
 import { userRoutes } from "./api/routes/users.js";
 import { senderRoutes, senderWebhookRoutes } from "./api/routes/senders.js";
+import { siteRoutes } from "./api/routes/site.js";
+import { SiteService } from "./services/site/siteService.js";
 import { UserService } from "./services/auth/userService.js";
 import { SenderService } from "./services/senders/senderService.js";
 import { withOwnerScope } from "./database/ownerScope.js";
@@ -246,6 +248,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(senderWebhookRoutes, { senders, tracking, whatsappTracking: waTracking });
   await app.register(userRoutes, { users: new UserService(repos), registerRateLimitPerMinute: config.loginRateLimitPerMinute });
   await app.register(extensionRoutes, { extensionsDir: config.extensionsDir });
+  await app.register(siteRoutes, { site: new SiteService(db), publicBaseUrl: config.publicBaseUrl, contactRateLimitPerMinute: config.loginRateLimitPerMinute });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 
   app.decorate("authService", auth);

@@ -41,8 +41,6 @@ export function sendAdminIndex(reply: FastifyReply, adminDir: string) {
 }
 
 export async function adminRoutes(app: FastifyInstance, opts: { adminDir: string }) {
-  app.get("/", (_request, reply) => reply.redirect("/admin/"));
-
   const indexFile = path.join(opts.adminDir, "index.html");
   if (!existsSync(indexFile)) {
     app.get("/admin", (_request, reply) =>

@@ -1,6 +1,7 @@
 import type { AdminUserRecord, Repositories, UserStatus } from "../../database/repositories/index.js";
 import { Errors } from "../../utils/errors.js";
 import { hashPassword } from "./password.js";
+import { ALL_SERVICES, isServiceId, parseServices, type ServiceId } from "./serviceAccess.js";
 
 // User accounts: public registration (waits for approval) and management by super admins.
 
@@ -15,6 +16,7 @@ export interface PublicUser {
   name: string | null;
   role: string;
   status: string;
+  services: ServiceId[];
   approvedAt: Date | null;
   createdAt: Date;
   lastLoginAt: Date | null;
@@ -29,6 +31,7 @@ export function toPublicUser(u: AdminUserRecord): PublicUser {
     name: u.name,
     role: u.role,
     status: u.status,
+    services: u.role === "super_admin" ? ALL_SERVICES : parseServices(u.services),
     approvedAt: u.approvedAt,
     createdAt: u.createdAt,
     lastLoginAt: u.lastLoginAt,
@@ -106,6 +109,16 @@ export class UserService {
   async enable(id: string) {
     await this.get(id);
     return toPublicUser(await this.repos.adminUsers.update(id, { status: "active" }));
+  }
+
+  /** Which services a customer may use (super admins always have all). */
+  async setServices(id: string, services: string[]) {
+    const user = await this.get(id);
+    if (user.role === "super_admin") throw Errors.badRequest("Super admins always have every service");
+    const unknown = services.filter((s) => !isServiceId(s));
+    if (unknown.length) throw Errors.badRequest(`Unknown service: ${unknown.join(", ")}`);
+    const ordered = ALL_SERVICES.filter((s) => services.includes(s));
+    return toPublicUser(await this.repos.adminUsers.update(id, { services: JSON.stringify(ordered) }));
   }
 
   /** Sets a new password and signs the user out everywhere. */

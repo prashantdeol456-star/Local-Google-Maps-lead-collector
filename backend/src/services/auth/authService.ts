@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Errors } from "../../utils/errors.js";
 import type { AdminUserRecord, ApiTokenRecord, Repositories, UserRole } from "../../database/repositories/index.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import { ALL_SERVICES, parseServices, type ServiceId } from "./serviceAccess.js";
 
 export interface AuthenticatedAdmin {
   id: string;
@@ -9,6 +10,8 @@ export interface AuthenticatedAdmin {
   name: string | null;
   /** super_admin manages users and sees every user's data; customer sees only their own */
   role: UserRole;
+  /** Services this user may use (super admins: all) */
+  services: ServiceId[];
 }
 
 export interface LoginResult {
@@ -53,8 +56,9 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function toAdmin(u: { id: string; email: string; name: string | null; role: string }): AuthenticatedAdmin {
-  return { id: u.id, email: u.email, name: u.name, role: u.role === "super_admin" ? "super_admin" : "customer" };
+function toAdmin(u: { id: string; email: string; name: string | null; role: string; services: string }): AuthenticatedAdmin {
+  const superAdmin = u.role === "super_admin";
+  return { id: u.id, email: u.email, name: u.name, role: superAdmin ? "super_admin" : "customer", services: superAdmin ? ALL_SERVICES : parseServices(u.services) };
 }
 
 function toTokenInfo(t: ApiTokenRecord): ApiTokenInfo {

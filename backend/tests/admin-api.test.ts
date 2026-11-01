@@ -152,7 +152,7 @@ describe("admin static files", () => {
     const res = await t.app.inject({ method: "GET", url: "/admin" });
     expect(res.statusCode).toBe(503);
     expect(res.body).toContain("npm run build:admin");
-    expect((await t.app.inject({ method: "GET", url: "/" })).headers.location).toBe("/admin/");
+    expect((await t.app.inject({ method: "GET", url: "/" })).body).toContain("<title>"); // the public home page
   });
 
   it("serves the built panel with SPA fallback and security headers", async () => {

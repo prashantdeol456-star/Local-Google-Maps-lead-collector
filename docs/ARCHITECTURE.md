@@ -226,7 +226,20 @@ background collection.
   Social Leads stay with super admins.
 - Customers can use: dashboard, Google Maps leads, collections, LinkedIn leads, export,
   Extensions, templates, contacts, opt-outs, email/WhatsApp campaigns, My sender, AI inbox and
-  social accounts (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`). Campaign logs, AI inbox,
+  social accounts (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`).
+- Service access (`services/auth/serviceAccess.ts`, `AdminUser.services`): super admins switch
+  google_maps, linkedin, contacts, email, whatsapp, ai_inbox and social on or off per customer
+  (Users page). A switched-off service answers `SERVICE_DISABLED`, leaves the menu and hides its
+  extension download.
+
+## 8d. Public website
+
+Server-rendered pages before login (`backend/src/site/`, routes in `api/routes/site.ts`): `/`,
+`/features`, `/pricing`, `/contact`, `/privacy`, `/terms`, plus `/sitemap.xml`, `/robots.txt`,
+`/site.css`. No JavaScript; each page has a title, description, canonical URL (from
+`PUBLIC_BASE_URL`), Open Graph tags and JSON-LD (Organization; SoftwareApplication and FAQPage on
+the home page). Brand and contact details are edited by super admins on the **Website** page
+(`SiteSettings`); the contact form (honeypot + rate limit) stores `ContactMessage`s shown there. Campaign logs, AI inbox,
   social accounts, LinkedIn/Instagram outreach, integrations and settings stay with super
   admins.
 

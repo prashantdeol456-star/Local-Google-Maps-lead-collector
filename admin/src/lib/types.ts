@@ -6,6 +6,8 @@ export interface Admin {
   name: string | null;
   /** super_admin manages users and sees everyone's data; customer sees only their own */
   role: "super_admin" | "customer";
+  /** Services this user may use (super admins: all) */
+  services: string[];
 }
 
 export interface UserAccount {
@@ -16,6 +18,7 @@ export interface UserAccount {
   name: string | null;
   role: "super_admin" | "customer";
   status: "pending" | "active" | "disabled";
+  services: string[];
   approvedAt: string | null;
   createdAt: string;
   lastLoginAt: string | null;

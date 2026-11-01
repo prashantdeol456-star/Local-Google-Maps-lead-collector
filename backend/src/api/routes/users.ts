@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { UserService } from "../../services/auth/userService.js";
 import { MIN_PASSWORD_LENGTH } from "../../services/auth/userService.js";
+import { SERVICES } from "../../services/auth/serviceAccess.js";
 import { requireSuperAdmin } from "../middleware/auth.js";
 import { IdParams, optionalText, parse } from "../validation.js";
 
@@ -49,6 +50,14 @@ export async function userRoutes(app: FastifyInstance, opts: { users: UserServic
   app.post("/api/users/:id/enable", async (request) => {
     requireSuperAdmin(request);
     return { user: await users.enable(parse(IdParams, request.params).id) };
+  });
+
+  app.get("/api/services", async () => ({ items: SERVICES }));
+
+  app.put("/api/users/:id/services", async (request) => {
+    requireSuperAdmin(request);
+    const { services } = parse(z.object({ services: z.array(z.string().max(40)).max(20) }), request.body);
+    return { user: await users.setServices(parse(IdParams, request.params).id, services) };
   });
 
   app.post("/api/users/:id/password", async (request) => {

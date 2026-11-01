@@ -86,6 +86,10 @@ model AdminUser {
    * pending (registered, waiting for approval) | active | disabled
    */
   status       String          @default("pending")
+  /**
+   * Services this user may use (JSON array, e.g. ["google_maps","linkedin"]); super admins use all
+   */
+  services     String          @default("[\"google_maps\",\"linkedin\",\"contacts\",\"email\",\"whatsapp\",\"ai_inbox\",\"social\"]")
   approvedAt   DateTime?
   createdAt    DateTime        @default(now())
   lastLoginAt  DateTime?
@@ -1118,4 +1122,37 @@ model SenderSettings {
   webhookToken    String   @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+/**
+ * Public website: editable texts and contact details (one row, id "site").
+ */
+model SiteSettings {
+  id           String   @id @default("site")
+  brandName    String   @default("Lead Platform")
+  tagline      String   @default("Find business leads on Google Maps and LinkedIn, then reach them by email and WhatsApp.")
+  contactEmail String   @default("")
+  contactPhone String   @default("")
+  whatsapp     String   @default("")
+  address      String   @default("")
+  updatedAt    DateTime @updatedAt
+}
+
+/**
+ * A message sent with the website's contact form.
+ */
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  message   String
+  /**
+   * new | read
+   */
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
 }

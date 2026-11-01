@@ -15,6 +15,8 @@ export interface AdminUserRecord {
   role: string;
   /** UserStatus */
   status: string;
+  /** JSON array of service ids (see services/auth/serviceAccess.ts) */
+  services: string;
   approvedAt: Date | null;
   createdAt: Date;
   lastLoginAt: Date | null;
@@ -45,7 +47,7 @@ export interface AdminUserRepository {
   }): Promise<AdminUserRecord>;
   touchLastLogin(id: string, at: Date): Promise<void>;
   list(query: { status?: UserStatus; q?: string }): Promise<AdminUserRecord[]>;
-  update(id: string, data: Partial<Pick<AdminUserRecord, "status" | "approvedAt" | "passwordHash" | "name" | "phone">>): Promise<AdminUserRecord>;
+  update(id: string, data: Partial<Pick<AdminUserRecord, "status" | "approvedAt" | "passwordHash" | "name" | "phone" | "services">>): Promise<AdminUserRecord>;
   countByRole(role: UserRole, status?: UserStatus): Promise<number>;
 }
 
