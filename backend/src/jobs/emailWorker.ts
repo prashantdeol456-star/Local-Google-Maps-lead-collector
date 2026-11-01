@@ -19,16 +19,21 @@ export interface EmailWorkerOptions extends CampaignWorkerOptions {
   trackClicks?: boolean;
 }
 
+/** One provider for every campaign, or the campaign owner's sender (null = none connected). */
+export type EmailProviderSource = EmailProvider | ((campaign: CampaignRecord) => Promise<EmailProvider | null>);
+
 export class EmailWorker extends CampaignWorker {
   constructor(
     repos: Repositories,
-    private readonly provider: EmailProvider,
+    private readonly provider: EmailProviderSource,
     private readonly opts: EmailWorkerOptions,
   ) {
     super(repos, "email", opts);
   }
 
   protected async send(campaign: CampaignRecord, attempt: AttemptRecord, now: Date): Promise<StepResult> {
+    const provider = typeof this.provider === "function" ? await this.provider(campaign) : this.provider;
+    if (!provider) return this.pauseForSetup(campaign, attempt, "No email sender connected for this account");
     const [lead, pref, template] = await Promise.all([
       this.repos.leads.findById(attempt.leadId),
       this.repos.preferences.find(attempt.leadId),
@@ -53,7 +58,7 @@ export class EmailWorker extends CampaignWorker {
     }
 
     try {
-      const { externalMessageId } = await this.provider.sendEmail({
+      const { externalMessageId } = await provider.sendEmail({
         to: attempt.toAddress,
         subject: rendered.subject,
         text: rendered.text,

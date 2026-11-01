@@ -4,6 +4,7 @@ import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } 
 import { api, qs } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/format";
 import { SENDER_REQUIRED_NOTE, useIsSuperAdmin } from "../lib/me";
+import { useSender } from "./SenderPage";
 import { Link, navigate, setSearchParams, useSearchParams } from "../lib/router";
 import type { Attempt, AttemptStatus, Campaign, CampaignDetail, CampaignStatus, EmailTemplate, Facets, Page, RecipientSummary } from "../lib/types";
 import { TemplatePreview } from "./TemplatesPage";
@@ -75,6 +76,7 @@ export function EmailCampaignsPage({ channel = "email" }: { channel?: CampaignCh
   const superAdmin = useIsSuperAdmin();
   // The platform's sender is the super admin's: customers do not see it (they cannot send yet).
   const provider = useQuery({ queryKey: [`${channel}-provider-summary`], queryFn: ch.provider, enabled: superAdmin });
+  const ownSender = useSender(!superAdmin);
 
   return (
     <>
@@ -82,7 +84,9 @@ export function EmailCampaignsPage({ channel = "email" }: { channel?: CampaignCh
         title={ch.title}
         subtitle={
           !superAdmin
-            ? SENDER_REQUIRED_NOTE
+            ? ownSender.data && (channel === "email" ? ownSender.data.email : ownSender.data.whatsapp)
+              ? `Sending through your own sender (${channel === "email" ? ownSender.data.email!.from : `WhatsApp ${ownSender.data.whatsapp!.phoneNumberId ?? ""}`})`
+              : SENDER_REQUIRED_NOTE
             : provider.data
               ? provider.data.real
                 ? `Sending through ${provider.data.provider}`
@@ -275,6 +279,8 @@ const ATTEMPT_FILTERS: (AttemptStatus | "")[] = ["", "queued", "sent", "failed",
 export function CampaignDetailPage({ id, channel = "email" }: { id: string; channel?: CampaignChannel }) {
   const ch = CHANNEL[channel];
   const superAdmin = useIsSuperAdmin();
+  const ownSender = useSender(!superAdmin);
+  const canSend = superAdmin || !!(channel === "email" ? ownSender.data?.email : ownSender.data?.whatsapp);
   const client = useQueryClient();
   const params = useSearchParams();
   const status = (ATTEMPT_FILTERS as string[]).includes(params.get("status") ?? "") ? params.get("status")! : "";
@@ -310,8 +316,8 @@ export function CampaignDetailPage({ id, channel = "email" }: { id: string; chan
             {(c.status === "draft" || c.status === "paused") && (
               <button
                 className="btn btn-primary"
-                disabled={action.isPending || !superAdmin}
-                title={superAdmin ? undefined : SENDER_REQUIRED_NOTE}
+                disabled={action.isPending || !canSend}
+                title={canSend ? undefined : SENDER_REQUIRED_NOTE}
                 onClick={() => action.mutate("start")}
               >
                 {c.status === "draft" ? "Start sending" : "Resume"}

@@ -14,7 +14,7 @@ import { CampaignWorker, type CampaignWorkerOptions, type StepResult } from "./c
 export class WhatsAppWorker extends CampaignWorker {
   constructor(
     repos: Repositories,
-    private readonly provider: WhatsAppProvider,
+    private readonly provider: WhatsAppProvider | ((campaign: CampaignRecord) => Promise<WhatsAppProvider | null>),
     opts: CampaignWorkerOptions = {},
   ) {
     super(repos, "whatsapp", opts);
@@ -33,8 +33,10 @@ export class WhatsAppWorker extends CampaignWorker {
     if (template.approvalStatus !== "approved") {
       return this.pauseForSetup(campaign, attempt, `Template "${template.name}" is no longer marked approved (${template.approvalStatus ?? "no status"})`);
     }
-    if (campaign.provider !== this.provider.name) {
-      return this.pauseForSetup(campaign, attempt, `Created for provider "${campaign.provider}", but the backend now uses "${this.provider.name}"`);
+    const provider = typeof this.provider === "function" ? await this.provider(campaign) : this.provider;
+    if (!provider) return this.pauseForSetup(campaign, attempt, "No WhatsApp sender connected for this account");
+    if (campaign.provider !== provider.name) {
+      return this.pauseForSetup(campaign, attempt, `Created for provider "${campaign.provider}", but the sender now uses "${provider.name}"`);
     }
     const suppressed = (await this.repos.suppressions.findByAddresses("whatsapp", [attempt.toAddress])).length > 0;
     const consent = suppressed ? "opted_out" : whatsappConsent(pref);
@@ -52,7 +54,7 @@ export class WhatsAppWorker extends CampaignWorker {
     }
 
     try {
-      const { externalMessageId } = await this.provider.sendTemplate({
+      const { externalMessageId } = await provider.sendTemplate({
         to: attempt.toAddress.replace(/^\+/, ""),
         templateName: template.name,
         language: template.language ?? "en",
@@ -74,7 +76,7 @@ export class WhatsAppWorker extends CampaignWorker {
         if (err.code === STOPPED_MARKETING) {
           await recordWhatsAppOptOut(
             this.repos,
-            { leadId: lead.id, phone: attempt.toAddress, attemptId: attempt.id, reason: "Stopped marketing messages from this business (131050)", provider: this.provider.name, source: "whatsapp_error", occurredAt: now },
+            { leadId: lead.id, phone: attempt.toAddress, attemptId: attempt.id, reason: "Stopped marketing messages from this business (131050)", provider: provider.name, source: "whatsapp_error", occurredAt: now },
             this.base.bus,
           );
           await this.repos.attempts.update(attempt.id, { status: "failed", tries: attempt.tries + 1, error: message, failedAt: now });

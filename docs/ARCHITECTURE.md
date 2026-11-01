@@ -209,10 +209,17 @@ background collection.
   same way. Rows created without a customer acting (webhooks, unsubscribe and click links,
   workers, a super admin working on a customer's lead) take the owner of their campaign,
   attempt or lead. Campaign workers process each campaign inside its owner's scope.
+- Phase C1, own senders (`services/senders/senderService.ts`, table `SenderSettings`): a
+  customer saves their Resend/SMTP and Meta WhatsApp settings on **My sender**; the config is
+  stored encrypted (SecretBox "sender-secrets") and never returned. Campaigns record the owner's
+  provider; starting needs it (`SENDER_REQUIRED`, `PROVIDER_CHANGED`), and the workers send each
+  campaign through its owner's sender (super admins and older data: the `.env` senders).
+  Webhooks for a customer's sender: `/api/webhooks/u/<token>/email/resend` and
+  `/api/webhooks/u/<token>/whatsapp/meta`, verified with their secrets and handled in their
+  data scope. Tests go through `/api/senders/test`.
 - Customers can use: dashboard, Google Maps leads, collections, LinkedIn leads, export,
-  Extensions, templates, contacts, opt-outs and email/WhatsApp campaigns (`CUSTOMER_ROUTES` in
-  `api/middleware/auth.ts`). Starting a campaign and test sends are refused with
-  `SENDER_REQUIRED` until they connect their own sender (phase C). Campaign logs, AI inbox,
+  Extensions, templates, contacts, opt-outs, email/WhatsApp campaigns and My sender
+  (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`). Campaign logs, AI inbox,
   social accounts, LinkedIn/Instagram outreach, integrations and settings stay with super
   admins.
 

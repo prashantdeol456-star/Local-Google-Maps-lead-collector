@@ -1062,3 +1062,21 @@ model SocialLead {
   @@index([keyword])
   @@index([createdAt])
 }
+
+/** A customer's own email and WhatsApp sender (phase C). Super admins use the .env senders. */
+model SenderSettings {
+  /** The user (AdminUser id) */
+  ownerId         String   @id
+  /** EmailConfig as JSON, encrypted with SecretBox("sender-secrets") */
+  emailConfig     String?
+  /** Non-secret part for display: JSON { provider, from } */
+  emailSummary    String?
+  /** WhatsAppConfig as JSON, encrypted */
+  whatsappConfig  String?
+  /** JSON { provider, phoneNumberId } */
+  whatsappSummary String?
+  /** Random part of this user's webhook URLs (/api/webhooks/u/<token>/…) */
+  webhookToken    String   @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

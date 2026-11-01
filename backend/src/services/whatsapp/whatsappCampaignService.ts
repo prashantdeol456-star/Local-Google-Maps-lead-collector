@@ -1,3 +1,4 @@
+import { ownerScope } from "../../database/ownerScope.js";
 import type { CampaignRecord, LeadRecord, Repositories, TemplateRecord } from "../../database/repositories/index.js";
 import { toWhatsAppNumber } from "../../providers/whatsapp/index.js";
 import { Errors } from "../../utils/errors.js";
@@ -25,9 +26,20 @@ export class WhatsAppCampaignService extends CampaignLifecycle {
 
   constructor(
     repos: Repositories,
-    private readonly opts: { provider: string; timeZone: string; bus?: EventBus },
+    private readonly opts: {
+      provider: string;
+      timeZone: string;
+      bus?: EventBus;
+      /** The owner's sender (phase C: customers use their own); default: `provider` for everyone */
+      senderFor?: (ownerId: string | null | undefined) => Promise<{ name: string } | null>;
+    },
   ) {
     super(repos, "whatsapp", opts.bus);
+  }
+
+  /** Provider name for campaigns of this owner, or null when they have no sender connected. */
+  private async providerOf(ownerId: string | null | undefined): Promise<string | null> {
+    return this.opts.senderFor ? ((await this.opts.senderFor(ownerId))?.name ?? null) : this.opts.provider;
   }
 
   private async approvedTemplate(id: string): Promise<TemplateRecord> {
@@ -88,12 +100,13 @@ export class WhatsAppCampaignService extends CampaignLifecycle {
       throw Errors.badRequest("None of the selected leads can get this WhatsApp message (no recorded opt-in, no mobile number, or opted out)");
     }
 
+    const provider = (await this.providerOf(ownerScope.getStore()?.userId)) ?? "none";
     const campaign = await this.repos.transaction(async (tx) => {
       const c = await tx.campaigns.create({
         channel: "whatsapp",
         name: input.name,
         templateId: template.id,
-        provider: this.opts.provider,
+        provider,
         intervalSec: input.intervalSec,
         dailyLimit: input.dailyLimit,
         windowStart: input.windowStart,
@@ -103,7 +116,7 @@ export class WhatsAppCampaignService extends CampaignLifecycle {
         createdById: adminId,
       });
       await tx.attempts.createMany(
-        eligible.map((r) => ({ leadId: r.leadId, campaignId: c.id, channel: "whatsapp", provider: this.opts.provider, templateId: template.id, toAddress: r.phone })),
+        eligible.map((r) => ({ leadId: r.leadId, campaignId: c.id, channel: "whatsapp", provider, templateId: template.id, toAddress: r.phone })),
       );
       await tx.agentLogs.create({ jobId: null, action: "whatsapp_campaign_created", status: "info", message: `"${c.name}": ${summary.eligible} recipients` });
       return c;
@@ -113,10 +126,12 @@ export class WhatsAppCampaignService extends CampaignLifecycle {
 
   protected override async checkCanStart(campaign: CampaignRecord) {
     await this.approvedTemplate(campaign.templateId);
-    if (campaign.provider !== this.opts.provider) {
+    const provider = await this.providerOf(campaign.ownerId);
+    if (!provider) throw Errors.conflict("SENDER_REQUIRED", "Connect your WhatsApp sender (My sender page) before starting a campaign");
+    if (campaign.provider !== provider) {
       throw Errors.conflict(
         "PROVIDER_CHANGED",
-        `This campaign was created for "${campaign.provider}" but the backend now uses "${this.opts.provider}". Create a new campaign.`,
+        `This campaign was created for "${campaign.provider}" but the sender now uses "${provider}". Create a new campaign.`,
       );
     }
   }

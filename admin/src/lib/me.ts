@@ -10,5 +10,5 @@ export function useIsSuperAdmin(): boolean {
   return useMe()?.role === "super_admin";
 }
 
-/** Shown where customers would send: they need their own sender first (next phase). */
-export const SENDER_REQUIRED_NOTE = "Sending starts once your own email/WhatsApp sender is connected. You can prepare templates and campaigns now.";
+/** Shown where customers would send without a sender connected. */
+export const SENDER_REQUIRED_NOTE = "Connect your own sender on the My sender page to start sending. You can prepare templates and campaigns now.";

@@ -6,7 +6,10 @@ import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts", "/sender"]);
+
+/** Customer-only pages (super admins send with the .env senders, set up in Settings). */
+const CUSTOMER_ONLY = new Set(["/sender"]);
 
 const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: "▦" },
@@ -26,6 +29,7 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/social", label: "Social Accounts", icon: "◎" },
   { to: "/integrations", label: "Integrations", icon: "⇄" },
   { to: "/extensions", label: "Extensions", icon: "⬇" },
+  { to: "/sender", label: "My sender", icon: "➚" },
   { to: "/users", label: "Users", icon: "☺" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];
@@ -91,7 +95,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
         <span className="font-semibold">Lead Platform</span>
       </div>
       <ul className="flex-1 space-y-1 px-3 py-2">
-        {NAV.filter((item) => canOpen(admin, item.to)).map((item) => {
+        {NAV.filter((item) => canOpen(admin, item.to) && !(admin.role === "super_admin" && CUSTOMER_ONLY.has(item.to))).map((item) => {
           const active = isActive(path, item.to);
           return (
             <li key={item.to}>

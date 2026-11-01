@@ -26,6 +26,7 @@ import { LinkedInCampaignDetailPage, LinkedInCampaignsPage, NewLinkedInCampaignP
 import { SettingsPage } from "./pages/SettingsPage";
 import { ExtensionsPage } from "./pages/ExtensionsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { SenderPage } from "./pages/SenderPage";
 
 function Routes({ admin }: { admin: Admin }) {
   const path = usePath();
@@ -63,6 +64,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/integrations") return <IntegrationsPage />;
   if (path === "/extensions") return <ExtensionsPage />;
   if (path === "/users") return <UsersPage admin={admin} />;
+  if (path === "/sender") return <SenderPage />;
   if (path === "/settings") return <SettingsPage admin={admin} />;
   return (
     <EmptyState title="Page not found">

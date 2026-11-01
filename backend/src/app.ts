@@ -9,7 +9,9 @@ import { leadRoutes } from "./api/routes/leads.js";
 import { adminRoutes, isAdminPageRequest, sendAdminIndex } from "./api/routes/admin.js";
 import { extensionRoutes } from "./api/routes/extensions.js";
 import { userRoutes } from "./api/routes/users.js";
+import { senderRoutes, senderWebhookRoutes } from "./api/routes/senders.js";
 import { UserService } from "./services/auth/userService.js";
+import { SenderService } from "./services/senders/senderService.js";
 import { withOwnerScope } from "./database/ownerScope.js";
 import { eventRoutes } from "./api/routes/events.js";
 import { campaignRoutes } from "./api/routes/campaigns.js";
@@ -130,12 +132,25 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     timeZone: config.timeZone,
     publicBaseUrl: config.publicBaseUrl,
     bus,
+    senderFor: (ownerId) => senders.emailFor(ownerId),
   });
   const tracking = new TrackingService(repos, bus);
   const waProvider = whatsappProvider ?? createWhatsAppProvider(config.whatsapp);
+  // Customers send with their own email/WhatsApp accounts; super admins with the .env ones.
+  const senders = new SenderService(db, new SecretBox(config.sessionSecret, "sender-secrets"), {
+    platformEmail: mailer,
+    platformWhatsApp: waProvider,
+    publicBaseUrl: config.publicBaseUrl,
+    allowLogProvider: !config.isProduction,
+  });
   const whatsapp = new WhatsAppService(waProvider, config.whatsapp, repos, config.publicBaseUrl);
   const waTemplates = new WhatsAppTemplateService(repos, waProvider.name);
-  const waCampaigns = new WhatsAppCampaignService(repos, { provider: waProvider.name, timeZone: config.timeZone, bus });
+  const waCampaigns = new WhatsAppCampaignService(repos, {
+    provider: waProvider.name,
+    timeZone: config.timeZone,
+    bus,
+    senderFor: (ownerId) => senders.whatsappFor(ownerId),
+  });
   const waConsent = new WhatsAppConsentService(repos, bus);
   const preferences = new PreferenceService(repos, bus);
   const linkedin = new LinkedInService(repos);
@@ -155,8 +170,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const maintenance = new MaintenanceWorker(repos, { log: (msg) => app.log.info(msg) });
   const navigation = new AiNavigationService(aiNavigator === undefined ? createAiNavigator(config.ai) : aiNavigator, config.ai, repos);
   const waTracking = new WhatsAppTrackingService(repos, waProvider.name, bus);
-  const whatsappWorker = new WhatsAppWorker(repos, waProvider, { bus, log: (msg) => app.log.error(msg) });
-  const emailWorker = new EmailWorker(repos, mailer, {
+  const whatsappWorker = new WhatsAppWorker(repos, (campaign) => senders.whatsappFor(campaign.ownerId), { bus, log: (msg) => app.log.error(msg) });
+  const emailWorker = new EmailWorker(repos, (campaign) => senders.emailFor(campaign.ownerId), {
     trackClicks: config.trackClicks,
     baseUrl: config.publicBaseUrl ?? `http://${config.host}:${config.port}`,
     unsubscribeSecret: config.sessionSecret,
@@ -227,6 +242,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
+  await app.register(senderRoutes, { senders });
+  await app.register(senderWebhookRoutes, { senders, tracking, whatsappTracking: waTracking });
   await app.register(userRoutes, { users: new UserService(repos), registerRateLimitPerMinute: config.loginRateLimitPerMinute });
   await app.register(extensionRoutes, { extensionsDir: config.extensionsDir });
   await app.register(adminRoutes, { adminDir: config.adminDir });

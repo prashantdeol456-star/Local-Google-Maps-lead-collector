@@ -33,6 +33,7 @@ export const TABLES = [
   "WebhookEndpoint",
   "WebhookDelivery",
   "LinkedInLead",
+  "SenderSettings",
   "OutreachContact",
   "LinkedInCampaign",
   "LinkedInMessage",

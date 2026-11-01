@@ -30,18 +30,20 @@ const CUSTOMER_ROUTES = new RegExp(
       "channel-templates|channel-templates/:id|channel-templates/preview",
       "opt-outs|opt-outs/:id",
       "contacts|contacts/:id|contacts/facets|contacts/template\\.(csv|xlsx)|contacts/delete|contacts/import",
-      "email/campaigns|email/campaigns/recipients|email/campaigns/:id|email/campaigns/:id/(attempts|pause|stop)|email/attempts/:id/reply",
+      "email/campaigns|email/campaigns/recipients|email/campaigns/:id|email/campaigns/:id/(attempts|start|pause|stop)|email/attempts/:id/reply",
       "whatsapp/templates|whatsapp/templates/:id|whatsapp/templates/preview",
-      "whatsapp/campaigns|whatsapp/campaigns/recipients|whatsapp/campaigns/:id|whatsapp/campaigns/:id/(attempts|pause|stop)",
+      "whatsapp/campaigns|whatsapp/campaigns/recipients|whatsapp/campaigns/:id|whatsapp/campaigns/:id/(attempts|start|pause|stop)",
+      // Their own sender (phase C)
+      "senders|senders/email|senders/whatsapp|senders/:channel|senders/test",
     ].join("|") +
     ")$",
 );
 
 /**
- * Sending needs the user's own email/WhatsApp sender (phase C): until then customers prepare
- * campaigns but cannot start them or send tests through the platform's accounts.
+ * Test sends through the platform's own accounts. Customers test their sender on the
+ * My sender page (/api/senders/test); starting a campaign checks that their sender is set.
  */
-const SENDING_ROUTES = /^\/api\/(email|whatsapp)\/(campaigns\/:id\/start|send-test)$/;
+const SENDING_ROUTES = /^\/api\/(email|whatsapp)\/send-test$/;
 
 /** Super admins can look at one user's data: header with that user's id. */
 export const VIEW_OWNER_HEADER = "x-view-owner";
@@ -133,7 +135,7 @@ export function registerAuthGuard(app: FastifyInstance, auth: AuthService) {
     }
 
     if (request.admin.role !== "super_admin" && SENDING_ROUTES.test(request.routeOptions.url ?? "")) {
-      throw Errors.forbidden("Sending starts once your own email/WhatsApp sender is connected. Your campaign is saved as a draft.", "SENDER_REQUIRED");
+      throw Errors.forbidden("Test your own sender on the My sender page", "SENDER_REQUIRED");
     }
     if (request.admin.role !== "super_admin" && !CUSTOMER_ROUTES.test(request.routeOptions.url ?? "")) {
       throw Errors.forbidden("This part is not available for your account", "NOT_AVAILABLE_FOR_ACCOUNT");

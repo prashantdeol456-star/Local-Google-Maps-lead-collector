@@ -1,4 +1,5 @@
-import type { Repositories } from "../../database/repositories/index.js";
+import { ownerScope } from "../../database/ownerScope.js";
+import type { CampaignRecord, Repositories } from "../../database/repositories/index.js";
 import { Errors } from "../../utils/errors.js";
 import type { EventBus } from "../events.js";
 import { CampaignLifecycle, type CampaignInput, type RecipientSelection } from "../outreach/campaignLifecycle.js";
@@ -20,9 +21,21 @@ export class CampaignService extends CampaignLifecycle {
 
   constructor(
     repos: Repositories,
-    private readonly opts: { provider: string; timeZone: string; publicBaseUrl: string | null; bus?: EventBus },
+    private readonly opts: {
+      provider: string;
+      timeZone: string;
+      publicBaseUrl: string | null;
+      bus?: EventBus;
+      /** The owner's sender (phase C: customers use their own); default: `provider` for everyone */
+      senderFor?: (ownerId: string | null | undefined) => Promise<{ name: string } | null>;
+    },
   ) {
     super(repos, "email", opts.bus);
+  }
+
+  /** Provider name for campaigns of this owner, or null when they have no sender connected. */
+  private async providerOf(ownerId: string | null | undefined): Promise<string | null> {
+    return this.opts.senderFor ? ((await this.opts.senderFor(ownerId))?.name ?? null) : this.opts.provider;
   }
 
   /** Who would receive the campaign: leads without an email, opted-out leads and repeated addresses are left out. */
@@ -55,12 +68,14 @@ export class CampaignService extends CampaignLifecycle {
     const { summary, eligible } = await this.recipients(input.recipients);
     if (eligible.length === 0) throw Errors.badRequest("None of the selected leads can be emailed (no email address or opted out)");
 
+    // Recorded now; a customer without a sender yet can still prepare the campaign.
+    const provider = (await this.providerOf(ownerScope.getStore()?.userId)) ?? "none";
     const campaign = await this.repos.transaction(async (tx) => {
       const c = await tx.campaigns.create({
         channel: "email",
         name: input.name,
         templateId: template.id,
-        provider: this.opts.provider,
+        provider,
         intervalSec: input.intervalSec,
         dailyLimit: input.dailyLimit,
         windowStart: input.windowStart,
@@ -70,7 +85,7 @@ export class CampaignService extends CampaignLifecycle {
         createdById: adminId,
       });
       await tx.attempts.createMany(
-        eligible.map((r) => ({ leadId: r.leadId, campaignId: c.id, channel: "email", provider: this.opts.provider, templateId: template.id, toAddress: r.email })),
+        eligible.map((r) => ({ leadId: r.leadId, campaignId: c.id, channel: "email", provider, templateId: template.id, toAddress: r.email })),
       );
       await tx.agentLogs.create({ jobId: null, action: "email_campaign_created", status: "info", message: `"${c.name}": ${summary.eligible} recipients` });
       return c;
@@ -91,8 +106,13 @@ export class CampaignService extends CampaignLifecycle {
     return { attempts: items, preference, events: events.map(parse), whatsappEvents: whatsappEvents.map(parse) };
   }
 
-  protected override async checkCanStart() {
-    if (this.opts.provider !== "log" && !(this.opts.publicBaseUrl && isPublicUrl(this.opts.publicBaseUrl))) {
+  protected override async checkCanStart(campaign: CampaignRecord) {
+    const provider = await this.providerOf(campaign.ownerId);
+    if (!provider) throw Errors.conflict("SENDER_REQUIRED", "Connect your email sender (My sender page) before starting a campaign");
+    if (provider !== campaign.provider) {
+      throw Errors.conflict("PROVIDER_CHANGED", `This campaign was created for "${campaign.provider}" but your sender now uses "${provider}". Create a new campaign.`);
+    }
+    if (provider !== "log" && !(this.opts.publicBaseUrl && isPublicUrl(this.opts.publicBaseUrl))) {
       throw Errors.conflict(
         "PUBLIC_URL_REQUIRED",
         "Set PUBLIC_BASE_URL in backend/.env to the public https address of this backend, so recipients can open the unsubscribe link",

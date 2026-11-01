@@ -30,7 +30,7 @@ afterAll(async () => {
 });
 
 describe("each user's own outreach", () => {
-  it("keeps templates, campaigns, opt-outs and contacts apart, and customers cannot send yet", async () => {
+  it("keeps templates, campaigns, opt-outs and contacts apart; no sending without the user's own sender", async () => {
     const a = await customer("outreach_a");
     const b = await customer("outreach_b");
 
@@ -60,9 +60,10 @@ describe("each user's own outreach", () => {
     const foreign = await req("POST", "/api/email/campaigns", b.auth, { name: "x", templateId: tpl.id, recipients: { leadIds: [] }, intervalSec: 30, dailyLimit: 10, windowStart: "00:00", windowEnd: "23:59" });
     expect(foreign.statusCode).toBeGreaterThanOrEqual(400);
 
-    // Sending waits for the user's own sender (phase C)
+    // Sending needs the user's own sender (phase C); the campaign stays a draft until then
+    expect(campaign.provider).toBe("none");
     const start = await req("POST", `/api/email/campaigns/${campaign.id}/start`, a.auth);
-    expect(start.statusCode).toBe(403);
+    expect(start.statusCode).toBe(409);
     expect(start.json().error.code).toBe("SENDER_REQUIRED");
     expect((await req("POST", "/api/email/send-test", a.auth, { to: "me@shop.in" })).json().error.code).toBe("SENDER_REQUIRED");
     expect((await req("POST", "/api/whatsapp/send-test", a.auth, { to: "+919800000000" })).json().error.code).toBe("SENDER_REQUIRED");
