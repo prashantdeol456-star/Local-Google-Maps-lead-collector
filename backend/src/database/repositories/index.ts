@@ -1,5 +1,6 @@
 import type { DbClient, PrismaClient } from "../client.js";
 import { PrismaAdminUserRepository } from "./prisma/PrismaAdminUserRepository.js";
+import { PrismaCreditRepository } from "./prisma/PrismaCreditRepository.js";
 import { PrismaAgentLogRepository } from "./prisma/PrismaAgentLogRepository.js";
 import { PrismaApiTokenRepository } from "./prisma/PrismaApiTokenRepository.js";
 import { PrismaJobItemRepository, PrismaJobRepository } from "./prisma/PrismaJobRepository.js";
@@ -45,6 +46,7 @@ function build(db: DbClient, transaction: Repositories["transaction"]): Reposito
     campaignLogs: new PrismaCampaignLogRepository(db),
     socialAccounts: new PrismaSocialAccountRepository(db),
     inbox: new PrismaInboxRepository(db),
+    credits: new PrismaCreditRepository(db),
     transaction,
   };
 }

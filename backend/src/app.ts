@@ -10,7 +10,12 @@ import { adminRoutes, isAdminPageRequest, sendAdminIndex } from "./api/routes/ad
 import { extensionRoutes } from "./api/routes/extensions.js";
 import { userRoutes } from "./api/routes/users.js";
 import { senderRoutes, senderWebhookRoutes } from "./api/routes/senders.js";
+import { billingRoutes, razorpayWebhookRoutes } from "./api/routes/billing.js";
 import { quickSendRoutes } from "./api/routes/quickSend.js";
+import { PaymentService } from "./services/billing/paymentService.js";
+import { razorpayFromEnv } from "./services/billing/razorpay.js";
+import { PlatformIntegrations } from "./services/integrations/platformIntegrations.js";
+import type { SocialConfig } from "./providers/social/config.js";
 import { siteRoutes } from "./api/routes/site.js";
 import { SiteService } from "./services/site/siteService.js";
 import { UserService } from "./services/auth/userService.js";
@@ -94,9 +99,11 @@ export interface AppDeps {
   /** Fake AI writer / network for the AI Inbox (tests). */
   replyWriter?: ReplyWriter | null;
   inboxFetch?: typeof fetch;
+  /** Fake Razorpay API (tests). */
+  razorpayFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -164,11 +171,22 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const campaignLogs = new CampaignLogService(repos);
   const linkedinOutreach = new LinkedInOutreachService(repos, { timeZone: config.timeZone, bus });
   const webhookSecrets = new SecretBox(config.sessionSecret, "webhook-secrets");
-  const social = new SocialService(repos, config.social, new SecretBox(config.sessionSecret, "social-tokens"), { fetch: socialFetch });
-  const metaMessaging = config.social.meta ? new MetaMessaging(config.social.meta.graphVersion, inboxFetch) : null;
+  // Meta / LinkedIn app keys can be changed on the Integrations page: the services share this copy.
+  const socialConfig: SocialConfig = { ...config.social };
+  const platform = new PlatformIntegrations(db, new SecretBox(config.sessionSecret, "platform-integrations"), socialConfig, {
+    razorpay: razorpayFromEnv(process.env),
+    meta: config.social.meta,
+    linkedin: config.social.linkedin,
+    metaGraphVersion: process.env.META_GRAPH_VERSION || "v26.0",
+  }, { publicBaseUrl: config.publicBaseUrl, fetch: razorpayFetch });
+  await platform.load();
+  const payments = new PaymentService(db, platform, { timeZone: config.timeZone });
+  const social = new SocialService(repos, socialConfig, new SecretBox(config.sessionSecret, "social-tokens"), { fetch: socialFetch });
+  const metaMessaging = new MetaMessaging(socialConfig.meta?.graphVersion ?? (process.env.META_GRAPH_VERSION || "v26.0"), inboxFetch);
+  const metaReady = () => !!socialConfig.meta;
   const inboxRuntime = new InboxRuntime(repos, new SecretBox(config.sessionSecret, "inbox-secrets"), config.inbox, { writerOverride: replyWriter, fetch: inboxFetch });
-  const inbox = new InboxService(repos, { runtime: inboxRuntime, meta: metaMessaging, social, timeZone: config.timeZone, bus });
-  const inboxWorker = new InboxWorker(repos, inbox, { runtime: inboxRuntime, meta: metaMessaging, social, pollSeconds: config.inbox.pollSeconds, log: (msg) => app.log.info(msg) });
+  const inbox = new InboxService(repos, { runtime: inboxRuntime, meta: metaMessaging, metaReady, social, timeZone: config.timeZone, bus });
+  const inboxWorker = new InboxWorker(repos, inbox, { runtime: inboxRuntime, meta: metaMessaging, metaReady, social, pollSeconds: config.inbox.pollSeconds, log: (msg) => app.log.info(msg) });
   const integrations = new IntegrationService(repos, webhookSecrets, bus, (msg) => app.log.error(msg));
   integrations.start();
   const webhookWorker = new WebhookWorker(repos, webhookSecrets, { log: (msg) => app.log.error(msg) });
@@ -227,6 +245,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(jobRoutes, { jobs });
   await app.register(leadRoutes, { leads, dedupe, timeZone: config.timeZone });
   await app.register(quickSendRoutes, { quickSend });
+  await app.register(billingRoutes, { payments, integrations: platform, timeZone: config.timeZone });
+  await app.register(razorpayWebhookRoutes, { payments });
   await app.register(statsRoutes, { stats });
   await app.register(eventRoutes, { bus });
   await app.register(exportRoutes, { exporter, timeZone: config.timeZone });

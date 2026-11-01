@@ -79,12 +79,18 @@ export class InboxService {
     private readonly opts: {
       runtime: InboxRuntime;
       meta: MetaMessaging | null;
+      /** Whether the platform's Meta app is set up now (it can be added later on the Integrations page) */
+      metaReady?: () => boolean;
       social: SocialService;
       timeZone: string;
       bus?: EventBus;
       now?: () => Date;
     },
   ) {}
+
+  private metaReady() {
+    return !!this.opts.meta && (this.opts.metaReady?.() ?? true);
+  }
 
   private now() {
     return this.opts.now?.() ?? new Date();
@@ -132,8 +138,8 @@ export class InboxService {
     return {
       ai: await this.opts.runtime.writer().then((w) => (w ? { configured: true, model: w.model } : { configured: false, model: null })),
       telegram: { configured: !!(await this.opts.runtime.telegram()) },
-      facebook: { configured: !!this.opts.meta, accounts: meta.filter((a) => a.platform === "facebook_page").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
-      instagram: { configured: !!this.opts.meta, accounts: meta.filter((a) => a.platform === "instagram").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
+      facebook: { configured: this.metaReady(), accounts: meta.filter((a) => a.platform === "facebook_page").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
+      instagram: { configured: this.metaReady(), accounts: meta.filter((a) => a.platform === "instagram").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
       linkedin: { configured: true, via: "LinkedIn Messenger extension" },
       counts: await this.repos.inbox.countByStatus(),
     };
@@ -309,7 +315,7 @@ export class InboxService {
       return telegram.bot.send(c.participantId, text);
     }
     if (c.platform === "facebook" || c.platform === "instagram") {
-      if (!this.opts.meta) throw new ChannelError("Facebook login is not set up (META_APP_ID / META_APP_SECRET)", false);
+      if (!this.opts.meta || !this.metaReady()) throw new ChannelError("Facebook login is not set up (Integrations page → Facebook & Instagram app)", false);
       if (!canReplyOnPlatform(c.platform, c.lastInboundAt, this.now())) {
         throw new ChannelError("Over 24 hours since their last message: reply in the Facebook/Instagram app instead", false);
       }

@@ -84,8 +84,8 @@ describe("SyncEngine", () => {
     expect(t.events[0]).toMatchObject({ type: "dropped", error: { status: 400 } });
   });
 
-  it("retries 5xx and 429 but stops (keeping items) on 401", async () => {
-    for (const status of [500, 503, 429]) {
+  it("retries 5xx, 429 and 402 (no credit) but stops (keeping items) on 401", async () => {
+    for (const status of [500, 503, 429, 402]) {
       const t = setup(() => ({ ok: false, error: { kind: "http", status, message: `HTTP ${status}` } }));
       await t.store.add(lead("A"), 0);
       expect((await t.engine.flush()).stoppedBy, String(status)).toBe("offline");

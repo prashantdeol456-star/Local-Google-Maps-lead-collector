@@ -91,6 +91,14 @@ model AdminUser {
    */
   services     String          @default("[\"google_maps\",\"linkedin\",\"contacts\",\"email\",\"whatsapp\",\"ai_inbox\",\"social\"]")
   approvedAt   DateTime?
+  /**
+   * New Google Maps / LinkedIn leads saved within the free allowance (see services/billing)
+   */
+  freeLeadsUsed      Int       @default(0)
+  /**
+   * Prepaid balance in paise (₹1 = 100); each new lead after the free ones costs from it
+   */
+  creditBalancePaise Int       @default(0)
   createdAt    DateTime        @default(now())
   lastLoginAt  DateTime?
   sessions     Session[]
@@ -1159,4 +1167,72 @@ model ContactMessage {
   createdAt DateTime @default(now())
 
   @@index([status, createdAt])
+}
+
+/**
+ * Every change of a user's credit balance: recharges, manual credits/debits by a super
+ * admin, and paid leads. amountPaise is signed (+ credit, - debit).
+ */
+model CreditEntry {
+  id                String   @id @default(cuid())
+  userId            String
+  /**
+   * recharge | manual_credit | manual_debit | lead_charge
+   */
+  type              String
+  amountPaise       Int
+  balanceAfterPaise Int
+  note              String?
+  /**
+   * Payment this recharge came from
+   */
+  paymentId         String?
+  /**
+   * Super admin who made a manual change
+   */
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}
+
+/**
+ * An online recharge (Razorpay order → payment). Credited once, when it is paid.
+ */
+model Payment {
+  id            String    @id @default(cuid())
+  userId        String
+  provider      String    @default("razorpay")
+  /**
+   * Razorpay order id (order_…)
+   */
+  orderId       String    @unique
+  /**
+   * Razorpay payment id (pay_…), once paid or failed
+   */
+  paymentId     String?   @unique
+  amountPaise   Int
+  currency      String    @default("INR")
+  /**
+   * created | paid | failed
+   */
+  status        String    @default("created")
+  method        String?
+  failureReason String?
+  createdAt     DateTime  @default(now())
+  paidAt        DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+/**
+ * Platform-wide integration keys entered in the admin panel (Razorpay, Meta app, LinkedIn
+ * app). config is encrypted JSON; values here replace the .env ones.
+ */
+model IntegrationSetting {
+  provider  String   @id
+  config    String
+  updatedAt DateTime @updatedAt
 }

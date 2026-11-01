@@ -31,6 +31,8 @@ const CUSTOMER_ROUTES = new RegExp(
       "channel-templates|channel-templates/:id|channel-templates/preview",
       "opt-outs|opt-outs/:id",
       "quick-send/contacts",
+      // Their own lead credits and online recharge
+      "billing/(me|me/entries|orders|verify)",
       "contacts|contacts/:id|contacts/facets|contacts/template\\.(csv|xlsx)|contacts/delete|contacts/import",
       "email/campaigns|email/campaigns/recipients|email/campaigns/:id|email/campaigns/:id/(attempts|start|pause|stop)|email/attempts/:id/reply",
       "whatsapp/templates|whatsapp/templates/:id|whatsapp/templates/preview",

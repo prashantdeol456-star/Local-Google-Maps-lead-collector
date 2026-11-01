@@ -28,6 +28,7 @@ export class InboxWorker {
     private readonly opts: {
       runtime: InboxRuntime;
       meta: MetaMessaging | null;
+      metaReady?: () => boolean;
       social: SocialService;
       pollSeconds: number;
       log: (msg: string) => void;
@@ -158,7 +159,7 @@ export class InboxWorker {
 
   private async pollMeta() {
     const meta = this.opts.meta;
-    if (!meta) return;
+    if (!meta || !(this.opts.metaReady?.() ?? true)) return;
     const accounts = (await this.repos.socialAccounts.list()).filter((a) => (a.platform === "facebook_page" || a.platform === "instagram") && a.status !== "expired");
     for (const account of accounts) {
       const scope = await this.scopeOf(account.ownerId);

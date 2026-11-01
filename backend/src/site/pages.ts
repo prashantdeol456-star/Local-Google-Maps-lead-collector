@@ -437,7 +437,7 @@ ${plans()}
   ${faqList([
     { q: "What counts as a lead?", a: "Each new business from Google Maps or person from LinkedIn saved to your account. Saving one you already have again is free." },
     { q: "What happens when my balance runs out?", a: "New leads are not saved until you recharge. Your existing leads, exports and campaigns keep working." },
-    { q: "How do I recharge?", a: '<a href="/contact">Contact us</a> and we add the amount to your account.' },
+    { q: "How do I recharge?", a: 'Open Billing in your account and pay online with UPI, card or netbanking (Razorpay). Prefer a bank transfer? <a href="/contact">Contact us</a> and we add the amount to your account.' },
   ])}
 </div></section>
 ${cta()}`;

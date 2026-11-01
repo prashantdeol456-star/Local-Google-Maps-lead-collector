@@ -1,3 +1,4 @@
+import type { PrismaCreditRepository } from "./prisma/PrismaCreditRepository.js";
 // Repository interfaces. Services depend on these, never on Prisma directly.
 import type { JobStatus } from "@platform/shared";
 
@@ -935,6 +936,7 @@ export interface Repositories {
   adminUsers: AdminUserRepository;
   sessions: SessionRepository;
   apiTokens: ApiTokenRepository;
+  credits: PrismaCreditRepository;
   leads: LeadRepository;
   jobs: JobRepository;
   jobItems: JobItemRepository;

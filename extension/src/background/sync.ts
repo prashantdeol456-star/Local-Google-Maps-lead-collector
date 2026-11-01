@@ -1,7 +1,8 @@
 // Sends outbox items to the backend in order. No chrome APIs here (testable with fakes).
 //
 // Failure handling:
-// - backend unreachable / 5xx / 429 → keep the item, retry later with backoff, stop this flush
+// - backend unreachable / 5xx / 429 / 402 (no lead credit left until the user recharges)
+//                                    → keep the item, retry later with backoff, stop this flush
 //   (later items wait so order is kept: a "completed" status never overtakes its leads)
 // - 401                                → keep everything, stop (user must log in again)
 // - other 4xx (invalid / not found)    → drop that item and report it; it would never succeed
@@ -46,7 +47,7 @@ function isRetryable(err: ApiError): boolean {
     err.kind === "unreachable" ||
     err.kind === "timeout" ||
     err.kind === "invalid_response" ||
-    (err.status !== undefined && (err.status >= 500 || err.status === 429))
+    (err.status !== undefined && (err.status >= 500 || err.status === 429 || err.status === 402))
   );
 }
 

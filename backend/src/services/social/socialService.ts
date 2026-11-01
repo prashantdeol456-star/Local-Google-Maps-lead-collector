@@ -123,7 +123,7 @@ export class SocialService {
 
     if (provider === "meta") {
       const meta = this.config.meta;
-      if (!meta) throw Errors.badRequest("Facebook login is not set up: add META_APP_ID and META_APP_SECRET to backend/.env");
+      if (!meta) throw Errors.badRequest("Facebook login is not set up: the administrator adds the Meta app on the Integrations page");
       this.states.set(state, { provider, adminId, expiresAt: now + STATE_TTL_MS });
       const url = new URL(`https://www.facebook.com/${meta.graphVersion}/dialog/oauth`);
       url.search = new URLSearchParams({ client_id: meta.appId, redirect_uri: this.redirectUri("meta"), state, response_type: "code", scope: meta.scopes.join(",") }).toString();

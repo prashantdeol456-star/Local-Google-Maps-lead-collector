@@ -10,7 +10,9 @@ import {
 import { isUniqueViolation } from "../../database/client.js";
 import type { JobRecord, LeadFillableData, LeadRecord, Repositories } from "../../database/repositories/index.js";
 import { Errors } from "../../utils/errors.js";
+import { chargeNewLead } from "../billing/credits.js";
 import type { EventBus } from "../events.js";
+import { QUICK_SEND_SOURCE } from "../outreach/quickSendService.js";
 
 /** A lead as submitted by the extension (already validated by the route). */
 export interface LeadInput {
@@ -157,6 +159,8 @@ export class DedupeService {
       saved = await tx.leads.update(match.record.id, { ...this.missingFields(match.record, lead, normalized), lastSeenAt: now });
       result = "duplicate";
     } else {
+      // Paid inside this transaction: no credit left → nothing is saved (HTTP 402).
+      if (lead.source !== QUICK_SEND_SOURCE) await chargeNewLead(tx, `Google Maps: ${lead.name}`);
       saved = await tx.leads.create({
         ...lead,
         ...normalized,

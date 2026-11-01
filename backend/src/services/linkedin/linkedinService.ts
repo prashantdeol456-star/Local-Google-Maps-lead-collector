@@ -6,6 +6,7 @@ import {
   type LinkedInLeadInput,
   type LinkedInWebsite,
 } from "@platform/shared";
+import { chargeNewLead } from "../billing/credits.js";
 import { isUniqueViolation } from "../../database/client.js";
 import type { LinkedInLeadData, LinkedInLeadFilters, LinkedInLeadRecord, Repositories } from "../../database/repositories/index.js";
 import { Errors } from "../../utils/errors.js";
@@ -156,7 +157,12 @@ export class LinkedInService {
         hasPhone: lists.phones.length > 0,
       };
       try {
-        return { result: "new", lead: toLinkedInView(await this.repos.linkedinLeads.create(data)) };
+        // Paid in the same transaction: no credit left → nothing is saved (HTTP 402).
+        const created = await this.repos.transaction(async (tx) => {
+          await chargeNewLead(tx, `LinkedIn: ${name}`);
+          return tx.linkedinLeads.create(data);
+        });
+        return { result: "new", lead: toLinkedInView(created) };
       } catch (err) {
         if (!isUniqueViolation(err)) throw err;
         return this.save(input, source); // saved by a parallel request a moment ago: merge into it

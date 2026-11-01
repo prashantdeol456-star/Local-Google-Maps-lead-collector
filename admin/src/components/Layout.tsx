@@ -6,12 +6,13 @@ import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 import { guideSectionFor } from "../guide/content";
 import { NAV } from "./nav";
+import { rupees, type MyBilling } from "../lib/billing";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/quick-send", "/opt-outs", "/contacts", "/sender", "/inbox", "/social", "/guide"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/quick-send", "/opt-outs", "/contacts", "/sender", "/inbox", "/social", "/guide", "/billing"]);
 
 /** Customer-only pages (super admins send with the .env senders, set up in Settings). */
-const CUSTOMER_ONLY = new Set(["/sender"]);
+const CUSTOMER_ONLY = new Set(["/sender", "/billing"]);
 
 
 
@@ -81,6 +82,12 @@ const LIVE_LABEL: Record<LiveState, { text: string; dot: string }> = {
 export function Layout({ admin, live, onLogout, children }: { admin: Admin; live: LiveState; onLogout: () => void; children: ReactNode }) {
   const path = usePath();
   const [open, setOpen] = useState(false);
+  const credits = useQuery({
+    queryKey: ["billing", "me"],
+    queryFn: () => api<MyBilling>("/billing/me"),
+    enabled: admin.role !== "super_admin",
+    refetchInterval: 60_000,
+  }).data?.credits;
   const contactUnread = useQuery({
     queryKey: ["site-messages", "unread"],
     queryFn: () => api<{ unread: number }>("/site/messages?status=new&pageSize=1"),
@@ -148,10 +155,19 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
           ☰
         </button>
         {admin.role === "super_admin" && <ViewOwnerSelect />}
+        {credits && (
+          <Link
+            to="/billing"
+            className={`ml-auto hidden rounded-full px-3 py-1 text-xs font-semibold sm:inline ${credits.leadsLeft === 0 ? "bg-red-50 text-red-700" : "bg-brand-50 text-brand-700"}`}
+            title="Free leads left and balance"
+          >
+            {credits.freeLeadsLeft > 0 ? `${credits.freeLeadsLeft.toLocaleString("en-IN")} free leads` : rupees(credits.balancePaise)} · {credits.leadsLeft.toLocaleString("en-IN")} leads left
+          </Link>
+        )}
         {path !== "/guide" && (
           <Link
             to={`/guide${guideSectionFor(path) ? `#${guideSectionFor(path)!.id}` : ""}`}
-            className="btn ml-auto h-9 border-gold-400/70 bg-gold-100/60 text-[#5a4208] hover:border-gold-600 hover:text-[#3d2c04] dark:bg-gold-600/10 dark:text-gold-300"
+            className={`btn ${credits ? "sm:ml-0 ml-auto" : "ml-auto"} h-9 border-gold-400/70 bg-gold-100/60 text-[#5a4208] hover:border-gold-600 hover:text-[#3d2c04] dark:bg-gold-600/10 dark:text-gold-300`}
             title="How this page works, with screenshots"
           >
             📘 Guide

@@ -108,6 +108,10 @@ async function seed() {
   await j("POST", "/api/email/campaigns", { name: "Hospitals Lucknow – intro", templateId: tpl.id, recipients: { leadIds }, intervalSec: 60, dailyLimit: 50, windowStart: "10:00", windowEnd: "18:00" }, cu);
   await j("POST", "/api/opt-outs", { channel: "email", addresses: "no-marketing@example.com", reason: "Asked not to be contacted" }, cu);
 
+  // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
+  await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
+  await j("POST", `/api/billing/accounts/${users[0].id}/adjust`, { amountInr: 500, note: "Paid by bank transfer" }, sa);
+
   await fetch(B + "/contact", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -168,11 +172,14 @@ async function shoot(page) {
     await clickText("Save");
   });
   await shot("19-contacts", "/admin/contacts");
+  await shot("21-billing", "/admin/billing");
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));
   await shot("17-website-settings", "/admin/website");
   await shot("20-contact-leads", "/admin/contact-leads");
+  await shot("22-payments", "/admin/payments?tab=accounts");
+  await shot("23-platform-integrations", "/admin/platform", () => page.waitForFunction(() => document.body.innerText.includes("online recharge"), { timeout: 20_000 }));
 }
 
 // ---------- PDFs ----------

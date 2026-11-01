@@ -11,8 +11,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy":
     // Profile pictures of connected social accounts come from the platforms' image servers.
-    "default-src 'self'; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://*.cdninstagram.com https://media.licdn.com; style-src 'self' 'unsafe-inline'; " +
-    "script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    // Razorpay Checkout (online recharge) loads its script and payment window from razorpay.com.
+    "default-src 'self'; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; img-src 'self' data: https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://*.cdninstagram.com https://media.licdn.com https://cdn.razorpay.com; style-src 'self' 'unsafe-inline'; " +
+    "script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
