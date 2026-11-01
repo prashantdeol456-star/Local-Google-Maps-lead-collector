@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner, StatCard } from "../components/ui";
 import { api, qs } from "../lib/api";
 import { formatDate, formatNumber, safeHref } from "../lib/format";
+import { useIsSuperAdmin } from "../lib/me";
 import { navigate, setSearchParams, useSearchParams } from "../lib/router";
 import type { Contact, ContactFacets, ContactImportResult, Page } from "../lib/types";
 
@@ -147,6 +148,7 @@ function ContactRow({ c, selected, onToggle }: { c: Contact; selected: boolean; 
 }
 
 export function ContactsPage() {
+  const superAdmin = useIsSuperAdmin(); // LinkedIn/Instagram outreach stays with super admins
   const client = useQueryClient();
   const params = useSearchParams();
   const page = Number(params.get("page") ?? 1) || 1;
@@ -182,8 +184,9 @@ export function ContactsPage() {
     <>
       <PageHeader
         title="Contacts (Sheets)"
-        subtitle="Contacts uploaded from your own sheets. Message them on LinkedIn with the LinkedIn Messenger extension."
+        subtitle={superAdmin ? "Contacts uploaded from your own sheets. Message them on LinkedIn with the LinkedIn Messenger extension." : "Contacts uploaded from your own sheets."}
         actions={
+          superAdmin && (
           <>
           <button
             className="btn"
@@ -210,6 +213,7 @@ export function ContactsPage() {
             in Message on LinkedIn{selected.size ? ` (${selectedWithLinkedIn} selected)` : ""}
           </button>
           </>
+          )
         }
       />
 

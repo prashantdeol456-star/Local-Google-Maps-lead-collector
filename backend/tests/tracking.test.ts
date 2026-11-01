@@ -61,7 +61,7 @@ beforeAll(async () => {
   const emails = ["a@uni.in", "b@college.in", "c@school.in"];
   const leadIds: string[] = [];
   for (const [i, email] of emails.entries()) {
-    const lead = await t.db.lead.create({ data: { name: `Lead ${i}`, normalizedName: `lead ${i}`, dedupeKey: `t:${i}`, email } });
+    const lead = await t.db.lead.create({ data: { name: `Lead ${i}`, normalizedName: `lead ${i}`, dedupeKey: `t:${i}`, email, ownerId: res.json().admin.id } });
     leadIds.push(lead.id);
     leadIdByEmail[email] = lead.id;
   }

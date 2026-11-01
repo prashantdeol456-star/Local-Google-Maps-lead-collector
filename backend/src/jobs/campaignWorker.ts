@@ -9,6 +9,7 @@
 //   cannot know whether the provider already delivered them.
 
 import type { AttemptRecord, CampaignRecord, Channel, Repositories } from "../database/repositories/index.js";
+import { ownerScope } from "../database/ownerScope.js";
 import type { EventBus } from "../services/events.js";
 import { MAX_TRIES, RETRY_DELAYS_MIN, decideSend } from "../services/email/pacing.js";
 import { startOfDayInZone } from "../utils/time.js";
@@ -62,7 +63,9 @@ export abstract class CampaignWorker {
     this.running ??= (async () => {
       try {
         for (const campaign of await this.repos.campaigns.listByStatus("running", this.channel)) {
-          await this.step(campaign);
+          // In the owner's data scope: their leads, templates and opt-out list.
+          if (campaign.ownerId) await ownerScope.run({ userId: campaign.ownerId, ownerId: campaign.ownerId, customer: false }, () => this.step(campaign));
+          else await this.step(campaign);
         }
       } finally {
         this.running = null;

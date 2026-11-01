@@ -32,7 +32,9 @@ enum Channel {
   whatsapp
 }
 
-/** Templates exist for more channels than the campaigns that send them. */
+/**
+ * Templates exist for more channels than the campaigns that send them.
+ */
 enum TemplateChannel {
   email
   whatsapp
@@ -69,14 +71,20 @@ enum LogLevel {
 model AdminUser {
   id           String          @id @default(cuid())
   email        String          @unique
-  /** Login id chosen at registration (lowercase); email works too */
+  /**
+   * Login id chosen at registration (lowercase); email works too
+   */
   username     String?         @unique
   phone        String?
   name         String?
   passwordHash String
-  /** super_admin | customer */
+  /**
+   * super_admin | customer
+   */
   role         String          @default("customer")
-  /** pending (registered, waiting for approval) | active | disabled */
+  /**
+   * pending (registered, waiting for approval) | active | disabled
+   */
   status       String          @default("pending")
   approvedAt   DateTime?
   createdAt    DateTime        @default(now())
@@ -108,7 +116,9 @@ model ApiToken {
   expiresAt  DateTime?
   lastUsedAt DateTime?
   revokedAt  DateTime?
-  /** full | read (read: GET requests only; for integrations such as n8n) */
+  /**
+   * full | read (read: GET requests only; for integrations such as n8n)
+   */
   scope      String    @default("full")
   createdAt  DateTime  @default(now())
   user       AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -117,27 +127,29 @@ model ApiToken {
 }
 
 model Lead {
-  id                String    @id @default(cuid())
-  /** User whose collection this lead belongs to (see database/ownerScope.ts) */
-  ownerId           String?
-  placeId           String?
-  name              String
-  category          String?
-  phone             String?
-  email             String?
-  website           String?
-  address           String?
-  city              String?
-  state             String?
-  country           String?
-  postalCode        String?
-  latitude          Float?
-  longitude         Float?
-  rating            Float?
-  reviewCount       Int?
-  mapsUrl           String?
-  searchKeyword     String?
-  source            String    @default("google_maps")
+  id            String  @id @default(cuid())
+  /**
+   * User whose collection this lead belongs to (see database/ownerScope.ts)
+   */
+  ownerId       String?
+  placeId       String?
+  name          String
+  category      String?
+  phone         String?
+  email         String?
+  website       String?
+  address       String?
+  city          String?
+  state         String?
+  country       String?
+  postalCode    String?
+  latitude      Float?
+  longitude     Float?
+  rating        Float?
+  reviewCount   Int?
+  mapsUrl       String?
+  searchKeyword String?
+  source        String  @default("google_maps")
 
   normalizedName    String
   normalizedPhone   String?
@@ -145,16 +157,18 @@ model Lead {
   normalizedAddress String?
   dedupeKey         String
 
-  firstSeenAt       DateTime  @default(now())
-  lastSeenAt        DateTime  @default(now())
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  jobItems          JobItem[]
-  attempts          ContactAttempt[]
-  emailEvents       EmailEvent[]
-  whatsappEvents    WhatsAppEvent[]
-  preference        LeadCommunicationPreference?
+  firstSeenAt    DateTime                     @default(now())
+  lastSeenAt     DateTime                     @default(now())
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  jobItems       JobItem[]
+  attempts       ContactAttempt[]
+  emailEvents    EmailEvent[]
+  whatsappEvents WhatsAppEvent[]
+  preference     LeadCommunicationPreference?
 
+  @@unique([ownerId, placeId])
+  @@unique([ownerId, dedupeKey])
   @@index([normalizedPhone])
   @@index([normalizedWebsite])
   @@index([normalizedName])
@@ -162,8 +176,6 @@ model Lead {
   @@index([category])
   @@index([searchKeyword])
   @@index([createdAt])
-  @@unique([ownerId, placeId])
-  @@unique([ownerId, dedupeKey])
   @@index([ownerId])
 }
 
@@ -227,9 +239,15 @@ model AgentLog {
 
 // ---- Outreach (Phase 10+) ----
 
-/** Per-lead consent. No row = defaults (email allowed, WhatsApp needs recorded opt-in). */
+/**
+ * Per-lead consent. No row = defaults (email allowed, WhatsApp needs recorded opt-in).
+ */
 model LeadCommunicationPreference {
   leadId              String    @id
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId             String?
   emailAllowed        Boolean   @default(true)
   whatsappAllowed     Boolean   @default(false)
   whatsappOptInAt     DateTime?
@@ -239,94 +257,134 @@ model LeadCommunicationPreference {
   optedOutAt          DateTime?
   updatedAt           DateTime  @updatedAt
   lead                Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
 }
 
 model MessageTemplate {
-  id                 String     @id @default(cuid())
+  id                 String             @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId            String?
   channel            TemplateChannel
   name               String
-  /** Email only */
+  /**
+   * Email only
+   */
   subject            String?
-  /** Plain text with {{variables}}; HTML is generated safely from it. */
+  /**
+   * Plain text with {{variables}}; HTML is generated safely from it.
+   */
   body               String
-  /** WhatsApp: the template as approved by Meta (name = template name, body uses lead variables). */
+  /**
+   * WhatsApp: the template as approved by Meta (name = template name, body uses lead variables).
+   */
   provider           String?
   language           String?
-  /** marketing | utility | authentication */
+  /**
+   * marketing | utility | authentication
+   */
   category           String?
   externalTemplateId String?
-  /** pending | approved | rejected | paused | disabled (set by the admin from WhatsApp Manager) */
+  /**
+   * pending | approved | rejected | paused | disabled (set by the admin from WhatsApp Manager)
+   */
   approvalStatus     String?
-  /** positional ({{1}}, {{2}}) or named ({{name}}) parameters */
+  /**
+   * positional ({{1}}, {{2}}) or named ({{name}}) parameters
+   */
   paramFormat        String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   campaigns          Campaign[]
   linkedinCampaigns  LinkedInCampaign[]
 
   @@index([channel])
+  @@index([ownerId])
 }
 
 model Campaign {
-  id             String           @id @default(cuid())
-  channel        Channel
-  name           String
-  templateId     String
-  provider       String
-  status         CampaignStatus   @default(draft)
-  statusReason   String?
-  /** Fixed gap between two sends (seconds). */
-  intervalSec    Int              @default(180)
-  dailyLimit     Int              @default(50)
-  /** Sending window, local time "HH:MM" in timeZone. */
-  windowStart    String           @default("10:00")
-  windowEnd      String           @default("18:00")
-  timeZone       String           @default("Asia/Kolkata")
-  startAt        DateTime?
-  lastSentAt     DateTime?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdById    String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  template       MessageTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  attempts       ContactAttempt[]
+  id           String           @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId      String?
+  channel      Channel
+  name         String
+  templateId   String
+  provider     String
+  status       CampaignStatus   @default(draft)
+  statusReason String?
+  /**
+   * Fixed gap between two sends (seconds).
+   */
+  intervalSec  Int              @default(180)
+  dailyLimit   Int              @default(50)
+  /**
+   * Sending window, local time "HH:MM" in timeZone.
+   */
+  windowStart  String           @default("10:00")
+  windowEnd    String           @default("18:00")
+  timeZone     String           @default("Asia/Kolkata")
+  startAt      DateTime?
+  lastSentAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  template     MessageTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  attempts     ContactAttempt[]
 
   @@index([status])
+  @@index([ownerId])
 }
 
-/** One message to one lead: the send queue and the communication history. */
+/**
+ * One message to one lead: the send queue and the communication history.
+ */
 model ContactAttempt {
-  id                String        @id @default(cuid())
+  id                String          @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId           String?
   leadId            String
   campaignId        String?
   channel           Channel
   provider          String
-  status            AttemptStatus @default(queued)
+  status            AttemptStatus   @default(queued)
   templateId        String?
   toAddress         String
   renderedSubject   String?
   renderedBody      String?
   externalMessageId String?
-  /** Retries after temporary provider errors. */
-  tries             Int           @default(0)
+  /**
+   * Retries after temporary provider errors.
+   */
+  tries             Int             @default(0)
   nextTryAt         DateTime?
   error             String?
   sentAt            DateTime?
   deliveredAt       DateTime?
   failedAt          DateTime?
-  /** First time each tracking event was seen (details in EmailEvent). */
+  /**
+   * First time each tracking event was seen (details in EmailEvent).
+   */
   openedAt          DateTime?
   clickedAt         DateTime?
   bouncedAt         DateTime?
   complainedAt      DateTime?
   repliedAt         DateTime?
-  /** WhatsApp: shown in an open chat (blue ticks; the recipient can turn read receipts off). */
+  /**
+   * WhatsApp: shown in an open chat (blue ticks; the recipient can turn read receipts off).
+   */
   readAt            DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  lead              Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  campaign          Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  lead              Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign          Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   emailEvents       EmailEvent[]
   whatsappEvents    WhatsAppEvent[]
   trackedLinks      TrackedLink[]
@@ -337,6 +395,7 @@ model ContactAttempt {
   @@index([leadId, createdAt])
   @@index([externalMessageId])
   @@index([status, sentAt])
+  @@index([ownerId])
 }
 
 enum EmailEventType {
@@ -352,17 +411,29 @@ enum EmailEventType {
   unsubscribed
 }
 
-/** Tracking events: provider webhooks, our click redirects, logged replies, unsubscribes. */
+/**
+ * Tracking events: provider webhooks, our click redirects, logged replies, unsubscribes.
+ */
 model EmailEvent {
   id              String          @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId         String?
   type            EmailEventType
   attemptId       String?
   leadId          String?
-  /** Id from the provider; a webhook delivered twice is stored once. */
+  /**
+   * Id from the provider; a webhook delivered twice is stored once.
+   */
   providerEventId String?         @unique
-  /** resend, click_tracking, admin, unsubscribe_link */
+  /**
+   * resend, click_tracking, admin, unsubscribe_link
+   */
   source          String
-  /** JSON: clicked link, bounce reason, reply text, user agent */
+  /**
+   * JSON: clicked link, bounce reason, reply text, user agent
+   */
   metadata        String?
   occurredAt      DateTime
   createdAt       DateTime        @default(now())
@@ -372,17 +443,25 @@ model EmailEvent {
   @@index([attemptId, occurredAt])
   @@index([leadId, occurredAt])
   @@index([type, occurredAt])
+  @@index([ownerId])
 }
 
-/** A link inside a sent email, redirected through /t/c/:id so clicks can be counted. */
+/**
+ * A link inside a sent email, redirected through /t/c/:id so clicks can be counted.
+ */
 model TrackedLink {
   id        String         @id
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId   String?
   attemptId String
   url       String
   createdAt DateTime       @default(now())
   attempt   ContactAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
+  @@index([ownerId])
 }
 
 enum WhatsAppEventType {
@@ -390,31 +469,55 @@ enum WhatsAppEventType {
   delivered
   read
   failed
-  /** A message the business received (a reply, or a message from an unknown number). */
+  /**
+   * A message the business received (a reply, or a message from an unknown number).
+   */
   received
-  /** Opt-in withdrawn: STOP reply, "stop marketing" in WhatsApp, or error 131050 */
+  /**
+   * Opt-in withdrawn: STOP reply, "stop marketing" in WhatsApp, or error 131050
+   */
   opted_out
-  /** The user resumed marketing messages in WhatsApp (does NOT restore the opt-in by itself). */
+  /**
+   * The user resumed marketing messages in WhatsApp (does NOT restore the opt-in by itself).
+   */
   marketing_resumed
 }
 
-/** WhatsApp webhook events and received messages, linked to the lead and the message when known. */
+/**
+ * WhatsApp webhook events and received messages, linked to the lead and the message when known.
+ */
 model WhatsAppEvent {
   id                String            @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId           String?
   type              WhatsAppEventType
   attemptId         String?
   leadId            String?
-  /** Other party, E.164 with "+" */
+  /**
+   * Other party, E.164 with "+"
+   */
   phone             String?
-  /** Id from the provider; a webhook delivered twice is stored once. */
+  /**
+   * Id from the provider; a webhook delivered twice is stored once.
+   */
   providerEventId   String?           @unique
-  /** WhatsApp message id (wamid) of the message this event is about */
+  /**
+   * WhatsApp message id (wamid) of the message this event is about
+   */
   externalMessageId String?
-  /** meta, keyword, admin */
+  /**
+   * meta, keyword, admin
+   */
   provider          String
-  /** Text of a received message */
+  /**
+   * Text of a received message
+   */
   text              String?
-  /** JSON: error details, profile name, message type */
+  /**
+   * JSON: error details, profile name, message type
+   */
   metadata          String?
   occurredAt        DateTime
   createdAt         DateTime          @default(now())
@@ -424,6 +527,7 @@ model WhatsAppEvent {
   @@index([attemptId, occurredAt])
   @@index([leadId, occurredAt])
   @@index([type, occurredAt])
+  @@index([ownerId])
 }
 
 /**
@@ -433,19 +537,30 @@ model WhatsAppEvent {
  */
 model Suppression {
   id        String   @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId   String?
   channel   Channel
-  /** email: lowercase address · whatsapp: E.164 phone with "+" */
+  /**
+   * email: lowercase address · whatsapp: E.164 phone with "+"
+   */
   address   String
   reason    String
-  /** unsubscribe_link, spam_complaint, stop_reply, whatsapp_stop, whatsapp_error, do_not_contact, admin, import */
+  /**
+   * unsubscribe_link, spam_complaint, stop_reply, whatsapp_stop, whatsapp_error, do_not_contact, admin, import
+   */
   source    String
-  /** Lead it was recorded for (plain id: the entry must outlive the lead). */
+  /**
+   * Lead it was recorded for (plain id: the entry must outlive the lead).
+   */
   leadId    String?
   createdAt DateTime @default(now())
 
-  @@unique([channel, address])
+  @@unique([ownerId, channel, address])
   @@index([leadId])
   @@index([createdAt])
+  @@index([ownerId])
 }
 
 // ---- Integrations (Phase 17): outgoing webhooks, e.g. to n8n ----
@@ -454,11 +569,17 @@ model WebhookEndpoint {
   id         String            @id @default(cuid())
   name       String
   url        String
-  /** Signing secret, AES-256-GCM encrypted with a key derived from SESSION_SECRET */
+  /**
+   * Signing secret, AES-256-GCM encrypted with a key derived from SESSION_SECRET
+   */
   secretEnc  String
-  /** Last 4 characters, to recognise it in the UI */
+  /**
+   * Last 4 characters, to recognise it in the UI
+   */
   secretHint String
-  /** JSON array of event types */
+  /**
+   * JSON array of event types
+   */
   events     String
   enabled    Boolean           @default(true)
   createdAt  DateTime          @default(now())
@@ -466,15 +587,21 @@ model WebhookEndpoint {
   deliveries WebhookDelivery[]
 }
 
-/** One event for one endpoint: the send queue (with retries) and the delivery log. */
+/**
+ * One event for one endpoint: the send queue (with retries) and the delivery log.
+ */
 model WebhookDelivery {
   id             String          @id @default(cuid())
   endpointId     String
-  /** Stable id of the event, e.g. "lead.created:<leadId>": an event is queued once per endpoint */
+  /**
+   * Stable id of the event, e.g. "lead.created:<leadId>": an event is queued once per endpoint
+   */
   eventId        String
   event          String
   payload        String
-  /** pending | delivered | failed */
+  /**
+   * pending | delivered | failed
+   */
   status         String          @default("pending")
   attempts       Int             @default(0)
   nextAttemptAt  DateTime        @default(now())
@@ -494,41 +621,61 @@ model WebhookDelivery {
 
 model LinkedInLead {
   id             String   @id @default(cuid())
-  /** https://www.linkedin.com/in/<slug> (lowercase slug, no query) */
+  /**
+   * https://www.linkedin.com/in/<slug> (lowercase slug, no query)
+   */
   ownerId        String?
   profileUrl     String
   name           String
-  /** Headline / designation */
+  /**
+   * Headline / designation
+   */
   headline       String?
   company        String?
   location       String?
-  /** JSON array of lowercase email addresses */
+  /**
+   * JSON array of lowercase email addresses
+   */
   emails         String   @default("[]")
-  /** JSON array of phone numbers as shown */
+  /**
+   * JSON array of phone numbers as shown
+   */
   phones         String   @default("[]")
-  /** JSON array of { url, label } */
+  /**
+   * JSON array of { url, label }
+   */
   websites       String   @default("[]")
-  /** JSON array of instant-messenger entries, e.g. "name (Skype)" */
+  /**
+   * JSON array of instant-messenger entries, e.g. "name (Skype)"
+   */
   ims            String   @default("[]")
-  /** JSON array of { title, company, employmentType, dates, location } */
+  /**
+   * JSON array of { title, company, employmentType, dates, location }
+   */
   experience     String   @default("[]")
-  /** JSON array of { school, degree, dates } */
+  /**
+   * JSON array of { school, degree, dates }
+   */
   education      String   @default("[]")
   birthday       String?
   address        String?
   connectedSince String?
   notes          String?
-  /** Free label to group profiles, e.g. the search you did ("HR Lucknow") */
+  /**
+   * Free label to group profiles, e.g. the search you did ("HR Lucknow")
+   */
   tag            String?
-  /** extension | csv | admin */
+  /**
+   * extension | csv | admin
+   */
   source         String
   hasEmail       Boolean  @default(false)
   hasPhone       Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@index([createdAt])
   @@unique([ownerId, profileUrl])
+  @@index([createdAt])
   @@index([ownerId])
   @@index([company])
   @@index([tag])
@@ -538,41 +685,64 @@ model LinkedInLead {
 // and LinkedIn message campaigns sent through the LinkedIn Messenger extension. ----
 
 model OutreachContact {
-  id          String            @id @default(cuid())
-  name        String
-  /** Canonical https://www.linkedin.com/in/<slug>; the key used to merge re-uploads */
-  linkedinUrl String?           @unique
-  /** Canonical https://www.instagram.com/<username>/ */
-  instagramUrl String?          @unique
-  /** Lowercase */
-  email       String?
-  phone       String?
-  designation String?
-  company     String?
-  /** Name given to the uploaded sheet, to group contacts ("HR Lucknow Oct") */
-  listName    String?
-  /** sheet | admin */
-  source      String            @default("sheet")
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  messages    LinkedInMessage[]
+  id           String            @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId      String?
+  name         String
+  /**
+   * Canonical https://www.linkedin.com/in/<slug>; the key used to merge re-uploads
+   */
+  linkedinUrl  String?
+  /**
+   * Canonical https://www.instagram.com/<username>/
+   */
+  instagramUrl String?
+  /**
+   * Lowercase
+   */
+  email        String?
+  phone        String?
+  designation  String?
+  company      String?
+  /**
+   * Name given to the uploaded sheet, to group contacts ("HR Lucknow Oct")
+   */
+  listName     String?
+  /**
+   * sheet | admin
+   */
+  source       String            @default("sheet")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  messages     LinkedInMessage[]
 
+  @@unique([ownerId, linkedinUrl])
+  @@unique([ownerId, instagramUrl])
   @@index([listName])
   @@index([email])
   @@index([createdAt])
+  @@index([ownerId])
 }
 
 model LinkedInCampaign {
   id           String            @id @default(cuid())
-  /** linkedin | instagram: which extension sends it (LinkedIn Messenger or Meta Helper) */
+  /**
+   * linkedin | instagram: which extension sends it (LinkedIn Messenger or Meta Helper)
+   */
   platform     String            @default("linkedin")
   name         String
   templateId   String
   status       CampaignStatus    @default(draft)
   statusReason String?
-  /** assisted: the extension types the message and you click Send · auto: it also clicks Send */
+  /**
+   * assisted: the extension types the message and you click Send · auto: it also clicks Send
+   */
   mode         String            @default("assisted")
-  /** Fixed gap between two messages (seconds). */
+  /**
+   * Fixed gap between two messages (seconds).
+   */
   intervalSec  Int               @default(300)
   dailyLimit   Int               @default(20)
   windowStart  String            @default("10:00")
@@ -592,7 +762,9 @@ model LinkedInCampaign {
   @@index([platform, status])
 }
 
-/** One LinkedIn message to one contact: the extension's work queue and the send log. */
+/**
+ * One LinkedIn message to one contact: the extension's work queue and the send log.
+ */
 model LinkedInMessage {
   id           String           @id @default(cuid())
   campaignId   String
@@ -600,7 +772,9 @@ model LinkedInMessage {
   profileUrl   String
   contactName  String
   renderedBody String
-  /** queued → sending (handed to the extension) → sent | failed | skipped; cancelled on stop */
+  /**
+   * queued → sending (handed to the extension) → sent | failed | skipped; cancelled on stop
+   */
   status       AttemptStatus    @default(queued)
   error        String?
   claimedAt    DateTime?
@@ -621,23 +795,37 @@ model LinkedInMessage {
 
 model SocialAccount {
   id             String    @id @default(cuid())
-  /** facebook_page | instagram | linkedin */
+  /**
+   * facebook_page | instagram | linkedin
+   */
   platform       String
-  /** Page id, Instagram account id, or LinkedIn member id ("sub") */
+  /**
+   * Page id, Instagram account id, or LinkedIn member id ("sub")
+   */
   externalId     String
   name           String
   username       String?
   pictureUrl     String?
-  /** Access token, AES-256-GCM encrypted (SecretBox "social-tokens"); never sent to the admin panel */
+  /**
+   * Access token, AES-256-GCM encrypted (SecretBox "social-tokens"); never sent to the admin panel
+   */
   tokenEnc       String
-  /** null = does not expire (Facebook Page tokens from a long-lived login) */
+  /**
+   * null = does not expire (Facebook Page tokens from a long-lived login)
+   */
   tokenExpiresAt DateTime?
-  /** JSON array of granted permissions */
+  /**
+   * JSON array of granted permissions
+   */
   scopes         String    @default("[]")
-  /** connected | expired | error */
+  /**
+   * connected | expired | error
+   */
   status         String    @default("connected")
   lastError      String?
-  /** JSON: extras, e.g. the Facebook Page an Instagram account is linked to */
+  /**
+   * JSON: extras, e.g. the Facebook Page an Instagram account is linked to
+   */
   meta           String    @default("{}")
   connectedById  String?
   lastCheckedAt  DateTime?
@@ -651,25 +839,41 @@ model SocialAccount {
 // ---- AI Inbox: chats from Telegram (bot), Facebook Pages, Instagram and LinkedIn, with
 // AI-written replies (sent automatically when safe, otherwise kept as drafts). ----
 
-/** One chat with one person on one platform. */
+/**
+ * One chat with one person on one platform.
+ */
 model InboxConversation {
   id                  String         @id @default(cuid())
-  /** telegram | facebook | instagram | linkedin */
+  /**
+   * telegram | facebook | instagram | linkedin
+   */
   platform            String
-  /** SocialAccount id (Facebook/Instagram), "bot" (Telegram), "extension" (LinkedIn) */
+  /**
+   * SocialAccount id (Facebook/Instagram), "bot" (Telegram), "extension" (LinkedIn)
+   */
   accountKey          String
-  /** The platform's id for this chat (Telegram chat id, Messenger/Instagram conversation id, LinkedIn thread id) */
+  /**
+   * The platform's id for this chat (Telegram chat id, Messenger/Instagram conversation id, LinkedIn thread id)
+   */
   externalThreadId    String
-  /** The other person's id for sending (Telegram chat id, PSID, IGSID, LinkedIn profile URL) */
+  /**
+   * The other person's id for sending (Telegram chat id, PSID, IGSID, LinkedIn profile URL)
+   */
   participantId       String?
   participantName     String
   participantUsername String?
-  /** smart | auto | draft | off; null = the platform's default from the AI settings */
+  /**
+   * smart | auto | draft | off; null = the platform's default from the AI settings
+   */
   replyMode           String?
-  /** needs_reply | draft_ready | replied | handled | no_reply */
+  /**
+   * needs_reply | draft_ready | replied | handled | no_reply
+   */
   status              String         @default("needs_reply")
   lastIntent          String?
-  /** The AI's short summary of who this is and what they want */
+  /**
+   * The AI's short summary of who this is and what they want
+   */
   summary             String?
   lastInboundAt       DateTime?
   lastOutboundAt      DateTime?
@@ -687,12 +891,18 @@ model InboxConversation {
 model InboxMessage {
   id             String            @id @default(cuid())
   conversationId String
-  /** in = from the other person · out = from you (or the AI) */
+  /**
+   * in = from the other person · out = from you (or the AI)
+   */
   direction      String
-  /** The platform's message id (dedupe); LinkedIn: a hash of the message */
+  /**
+   * The platform's message id (dedupe); LinkedIn: a hash of the message
+   */
   externalId     String?
   text           String
-  /** customer | ai_auto | ai_approved | admin | elsewhere (sent outside this panel) */
+  /**
+   * customer | ai_auto | ai_approved | admin | elsewhere (sent outside this panel)
+   */
   author         String
   sentAt         DateTime
   createdAt      DateTime          @default(now())
@@ -702,11 +912,15 @@ model InboxMessage {
   @@index([conversationId, sentAt])
 }
 
-/** A reply the AI wrote. */
+/**
+ * A reply the AI wrote.
+ */
 model InboxDraft {
   id             String            @id @default(cuid())
   conversationId String
-  /** pending | sending | sent | dismissed | failed | superseded */
+  /**
+   * pending | sending | sent | dismissed | failed | superseded
+   */
   status         String            @default("pending")
   text           String
   intent         String?
@@ -714,9 +928,13 @@ model InboxDraft {
   language       String?
   confidence     Float?
   needsHuman     Boolean           @default(false)
-  /** Why it was held for approval or sent automatically */
+  /**
+   * Why it was held for approval or sent automatically
+   */
   decision       String?
-  /** The inbound message it answers */
+  /**
+   * The inbound message it answers
+   */
   forMessageId   String?
   model          String?
   error          String?
@@ -729,34 +947,62 @@ model InboxDraft {
   @@index([status, createdAt])
 }
 
-/** What the AI knows and may do (one row, id "default"). */
+/**
+ * What the AI knows and may do (one row, id "default").
+ */
 model AiAssistantSettings {
   id                   String   @id @default("default")
-  /** Master switch: off = nothing is drafted or sent */
+  /**
+   * Master switch: off = nothing is drafted or sent
+   */
   enabled              Boolean  @default(false)
-  /** Who you are, what you sell, prices, hours, location, links */
+  /**
+   * Who you are, what you sell, prices, hours, location, links
+   */
   businessProfile      String   @default("")
-  /** Questions and answers the AI can use as they are */
+  /**
+   * Questions and answers the AI can use as they are
+   */
   faqs                 String   @default("")
-  /** Tone, languages (e.g. reply in the customer's language: Hindi, English or Hinglish), length, signature */
+  /**
+   * Tone, languages (e.g. reply in the customer's language: Hindi, English or Hinglish), length, signature
+   */
   style                String   @default("")
-  /** Topics the AI must never answer itself (it leaves them for you) */
+  /**
+   * Topics the AI must never answer itself (it leaves them for you)
+   */
   neverSay             String   @default("")
-  /** JSON: platform → smart | auto | draft | off */
+  /**
+   * JSON: platform → smart | auto | draft | off
+   */
   modes                String   @default("{\"telegram\":\"smart\",\"facebook\":\"smart\",\"instagram\":\"smart\",\"linkedin\":\"draft\"}")
-  /** Smart mode sends on its own only at or above this confidence (0–1) */
+  /**
+   * Smart mode sends on its own only at or above this confidence (0–1)
+   */
   minConfidence        Float    @default(0.8)
-  /** Most automatic replies per chat per day */
+  /**
+   * Most automatic replies per chat per day
+   */
   maxAutoPerChatPerDay Int      @default(5)
-  /** Telegram getUpdates offset, so a restart does not re-read old messages */
+  /**
+   * Telegram getUpdates offset, so a restart does not re-read old messages
+   */
   telegramOffset       Int      @default(0)
-  /** anthropic | gemini */
+  /**
+   * anthropic | gemini
+   */
   aiProvider           String   @default("anthropic")
-  /** Model id; empty = the provider's default */
+  /**
+   * Model id; empty = the provider's default
+   */
   aiModel              String   @default("")
-  /** low | medium | high (thinking effort) */
+  /**
+   * low | medium | high (thinking effort)
+   */
   aiEffort             String   @default("medium")
-  /** Keys entered in the admin panel, AES-256-GCM encrypted (SecretBox "inbox-secrets"); .env is the fallback */
+  /**
+   * Keys entered in the admin panel, AES-256-GCM encrypted (SecretBox "inbox-secrets"); .env is the fallback
+   */
   anthropicKeyEnc      String?
   anthropicKeyHint     String?
   geminiKeyEnc         String?
@@ -770,33 +1016,49 @@ model AiAssistantSettings {
 // Helper extension from keyword searches the user runs (public details only; no member lists). ----
 
 model SocialLead {
-  id          String   @id @default(cuid())
-  /** instagram | facebook */
-  platform    String
-  /** profile | page | group */
-  kind        String
-  /** Canonical link (unique) */
-  url         String   @unique
-  /** Instagram username or Facebook vanity name, when known */
-  handle      String?
-  name        String
-  /** Bio, Page category line or group description, as shown */
-  bio         String?
-  category    String?
-  followers   Int?
-  /** Followers/members as shown, e.g. "21.7K followers" */
+  id           String   @id @default(cuid())
+  /**
+   * instagram | facebook
+   */
+  platform     String
+  /**
+   * profile | page | group
+   */
+  kind         String
+  /**
+   * Canonical link (unique)
+   */
+  url          String   @unique
+  /**
+   * Instagram username or Facebook vanity name, when known
+   */
+  handle       String?
+  name         String
+  /**
+   * Bio, Page category line or group description, as shown
+   */
+  bio          String?
+  category     String?
+  followers    Int?
+  /**
+   * Followers/members as shown, e.g. "21.7K followers"
+   */
   audienceText String?
-  /** Groups: public | private */
-  privacy     String?
-  email       String?
-  phone       String?
-  website     String?
-  location    String?
-  /** The search keyword it was found with */
-  keyword     String?
-  tag         String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  /**
+   * Groups: public | private
+   */
+  privacy      String?
+  email        String?
+  phone        String?
+  website      String?
+  location     String?
+  /**
+   * The search keyword it was found with
+   */
+  keyword      String?
+  tag          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([platform, kind])
   @@index([keyword])

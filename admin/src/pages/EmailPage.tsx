@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
 import { api, qs } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/format";
+import { SENDER_REQUIRED_NOTE, useIsSuperAdmin } from "../lib/me";
 import { Link, navigate, setSearchParams, useSearchParams } from "../lib/router";
 import type { Attempt, AttemptStatus, Campaign, CampaignDetail, CampaignStatus, EmailTemplate, Facets, Page, RecipientSummary } from "../lib/types";
 import { TemplatePreview } from "./TemplatesPage";
@@ -71,13 +72,23 @@ export function EmailCampaignsPage({ channel = "email" }: { channel?: CampaignCh
     queryFn: () => api<Page<Campaign>>(`${ch.api}${qs({ page, pageSize: 25 })}`),
     placeholderData: keepPreviousData,
   });
-  const provider = useQuery({ queryKey: [`${channel}-provider-summary`], queryFn: ch.provider });
+  const superAdmin = useIsSuperAdmin();
+  // The platform's sender is the super admin's: customers do not see it (they cannot send yet).
+  const provider = useQuery({ queryKey: [`${channel}-provider-summary`], queryFn: ch.provider, enabled: superAdmin });
 
   return (
     <>
       <PageHeader
         title={ch.title}
-        subtitle={provider.data ? (provider.data.real ? `Sending through ${provider.data.provider}` : `Development mode: ${ch.one}s are recorded, not delivered`) : " "}
+        subtitle={
+          !superAdmin
+            ? SENDER_REQUIRED_NOTE
+            : provider.data
+              ? provider.data.real
+                ? `Sending through ${provider.data.provider}`
+                : `Development mode: ${ch.one}s are recorded, not delivered`
+              : " "
+        }
         actions={
           <>
             <Link to={ch.templates} className="btn">
@@ -263,6 +274,7 @@ const ATTEMPT_FILTERS: (AttemptStatus | "")[] = ["", "queued", "sent", "failed",
 
 export function CampaignDetailPage({ id, channel = "email" }: { id: string; channel?: CampaignChannel }) {
   const ch = CHANNEL[channel];
+  const superAdmin = useIsSuperAdmin();
   const client = useQueryClient();
   const params = useSearchParams();
   const status = (ATTEMPT_FILTERS as string[]).includes(params.get("status") ?? "") ? params.get("status")! : "";
@@ -296,7 +308,12 @@ export function CampaignDetailPage({ id, channel = "email" }: { id: string; chan
         actions={
           <>
             {(c.status === "draft" || c.status === "paused") && (
-              <button className="btn btn-primary" disabled={action.isPending} onClick={() => action.mutate("start")}>
+              <button
+                className="btn btn-primary"
+                disabled={action.isPending || !superAdmin}
+                title={superAdmin ? undefined : SENDER_REQUIRED_NOTE}
+                onClick={() => action.mutate("start")}
+              >
                 {c.status === "draft" ? "Start sending" : "Resume"}
               </button>
             )}

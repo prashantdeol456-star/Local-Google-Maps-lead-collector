@@ -6,7 +6,7 @@ import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts"]);
 
 const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: "▦" },

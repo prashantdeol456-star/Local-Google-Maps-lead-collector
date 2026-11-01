@@ -95,7 +95,7 @@ describe("registration and approval", () => {
     const c = await customer("plain");
     expect((await req("GET", "/api/users", c.auth)).statusCode).toBe(403);
     expect((await req("POST", `/api/users/${c.id}/approve`, c.auth)).statusCode).toBe(403);
-    const blocked = await req("GET", "/api/opt-outs", c.auth);
+    const blocked = await req("GET", "/api/campaign-logs/campaigns", c.auth);
     expect(blocked.statusCode).toBe(403);
     expect(blocked.json().error.code).toBe("NOT_AVAILABLE_FOR_ACCOUNT");
     expect((await req("GET", "/api/stats", c.auth)).statusCode).toBe(200);

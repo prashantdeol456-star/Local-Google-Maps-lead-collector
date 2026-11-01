@@ -204,10 +204,17 @@ background collection.
   has their own collection. Customers' live events only carry their own data.
 - Super admins see all data, or one user's with the `X-View-Owner` header (`?viewOwner=` for
   download links): the "Data" selector in the admin panel.
-- Customers can use: dashboard, Google Maps leads, collections, LinkedIn leads, export and the
-  Extensions page (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`). Campaigns, templates,
-  contacts, opt-outs, inbox, social accounts, integrations and settings stay with super admins
-  until they are separated per user (phases B–D).
+- Phase B: templates, email/WhatsApp campaigns with their attempts and tracking events,
+  opt-outs (`Suppression`, unique per owner), lead preferences and sheet contacts are owned the
+  same way. Rows created without a customer acting (webhooks, unsubscribe and click links,
+  workers, a super admin working on a customer's lead) take the owner of their campaign,
+  attempt or lead. Campaign workers process each campaign inside its owner's scope.
+- Customers can use: dashboard, Google Maps leads, collections, LinkedIn leads, export,
+  Extensions, templates, contacts, opt-outs and email/WhatsApp campaigns (`CUSTOMER_ROUTES` in
+  `api/middleware/auth.ts`). Starting a campaign and test sends are refused with
+  `SENDER_REQUIRED` until they connect their own sender (phase C). Campaign logs, AI inbox,
+  social accounts, LinkedIn/Instagram outreach, integrations and settings stay with super
+  admins.
 
 ## 9. Security
 

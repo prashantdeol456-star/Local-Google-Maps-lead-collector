@@ -335,6 +335,8 @@ export interface TemplateRepository {
 
 export interface CampaignRecord {
   id: string;
+  /** User who owns the campaign (null only for data from before user accounts) */
+  ownerId?: string | null;
   channel: Channel;
   name: string;
   templateId: string;
