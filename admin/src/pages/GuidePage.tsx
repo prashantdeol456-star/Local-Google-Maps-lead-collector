@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { GUIDE, GUIDE_PDF, type GuideSection } from "../guide/content";
 import { useIsSuperAdmin } from "../lib/me";
 import { useSearchParams } from "../lib/router";
@@ -5,11 +6,11 @@ import { useSearchParams } from "../lib/router";
 // Step-by-step guide with screenshots. ?audience=customer shows the customers' version to a
 // super admin (used to print the customers' PDF).
 
-function Section({ s }: { s: GuideSection }) {
+function Section({ s, n }: { s: GuideSection; n: number }) {
   return (
-    <section id={s.id} className="card mb-6 break-inside-avoid-page p-6 print:mb-4 print:border-0 print:p-0 print:shadow-none">
+    <section id={s.id} className="card mb-6 scroll-mt-20 break-inside-avoid-page p-6 print:mb-4 print:border-0 print:p-0 print:shadow-none">
       <h2 className="mb-2 text-lg font-semibold">
-        {s.title}
+        {n}. {s.title}
         {s.audience === "admin" && <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 align-middle text-xs font-normal text-brand-700">administrators</span>}
       </h2>
       {s.intro && <p className="mb-3 text-slate-600 dark:text-slate-300">{s.intro}</p>}
@@ -68,6 +69,12 @@ export function GuidePage() {
   const sections = GUIDE.filter((s) => s.audience === "all" || showAdmin);
   const pdf = showAdmin ? GUIDE_PDF.admin : GUIDE_PDF.customer;
 
+  // Opened from a page's Guide button (/guide#section): jump to that section once it is rendered.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+  }, []);
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -83,18 +90,18 @@ export function GuidePage() {
       <nav className="card mb-6 p-5 print:hidden" aria-label="Contents">
         <h2 className="mb-2 font-medium">Contents</h2>
         <ol className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-          {sections.map((s) => (
+          {sections.map((s, i) => (
             <li key={s.id}>
               <a href={`#${s.id}`} className="text-brand-600 hover:underline">
-                {s.title}
+                {i + 1}. {s.title}
               </a>
             </li>
           ))}
         </ol>
       </nav>
 
-      {sections.map((s) => (
-        <Section key={s.id} s={s} />
+      {sections.map((s, i) => (
+        <Section key={s.id} s={s} n={i + 1} />
       ))}
     </div>
   );

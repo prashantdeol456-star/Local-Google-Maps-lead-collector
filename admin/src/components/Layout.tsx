@@ -4,6 +4,8 @@ import { api, getViewOwner, setViewOwner } from "../lib/api";
 import type { LiveState } from "../lib/live";
 import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
+import { guideSectionFor } from "../guide/content";
+import { NAV } from "./nav";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
 const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/quick-send", "/opt-outs", "/contacts", "/sender", "/inbox", "/social", "/guide"]);
@@ -11,32 +13,7 @@ const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/ex
 /** Customer-only pages (super admins send with the .env senders, set up in Settings). */
 const CUSTOMER_ONLY = new Set(["/sender"]);
 
-const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
-  { to: "/", label: "Dashboard", icon: "▦" },
-  { to: "/inbox", label: "AI Inbox", icon: "✦" },
-  { to: "/leads", label: "Google Maps Leads", icon: "☰" },
-  { to: "/linkedin", label: "LinkedIn Leads", icon: "in" },
-  { to: "/contacts", label: "Contacts (Sheets)", icon: "▤" },
-  { to: "/social-leads", label: "Social Leads", icon: "◎" },
-  { to: "/collections", label: "Collections", icon: "⌖" },
-  { to: "/email", label: "Email", icon: "✉" },
-  { to: "/whatsapp", label: "WhatsApp", icon: "✆" },
-  { to: "/linkedin-outreach", label: "LinkedIn Outreach", icon: "➤" },
-  { to: "/instagram-outreach", label: "Instagram Outreach", icon: "◉" },
-  { to: "/quick-send", label: "Quick Send", icon: "⚡" },
-  { to: "/templates", label: "Templates", icon: "❏" },
-  { to: "/campaign-logs", label: "Campaign Logs", icon: "≡" },
-  { to: "/opt-outs", label: "Opt-outs", icon: "⊘" },
-  { to: "/social", label: "Social Accounts", icon: "◎" },
-  { to: "/integrations", label: "Integrations", icon: "⇄" },
-  { to: "/extensions", label: "Extensions", icon: "⬇" },
-  { to: "/sender", label: "My sender", icon: "➚" },
-  { to: "/guide", label: "Guide", icon: "?" },
-  { to: "/users", label: "Users", icon: "☺" },
-  { to: "/contact-leads", label: "Contact Leads", icon: "☏" },
-  { to: "/website", label: "Website", icon: "⌂" },
-  { to: "/settings", label: "Settings", icon: "⚙" },
-];
+
 
 /** Pages that belong to a service the super admin can switch off per customer. */
 const PAGE_SERVICE: Record<string, string> = {
@@ -171,7 +148,16 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
           ☰
         </button>
         {admin.role === "super_admin" && <ViewOwnerSelect />}
-        <span className="ml-auto flex items-center gap-2 text-xs text-slate-500" title="Live updates from the backend">
+        {path !== "/guide" && (
+          <Link
+            to={`/guide${guideSectionFor(path) ? `#${guideSectionFor(path)!.id}` : ""}`}
+            className="btn ml-auto h-9 border-gold-400/70 bg-gold-100/60 text-[#5a4208] hover:border-gold-600 hover:text-[#3d2c04] dark:bg-gold-600/10 dark:text-gold-300"
+            title="How this page works, with screenshots"
+          >
+            📘 Guide
+          </Link>
+        )}
+        <span className={`${path === "/guide" ? "ml-auto " : ""}flex items-center gap-2 text-xs text-slate-500`} title="Live updates from the backend">
           <span className={`h-2 w-2 rounded-full ${LIVE_LABEL[live].dot}`} />
           {LIVE_LABEL[live].text}
         </span>

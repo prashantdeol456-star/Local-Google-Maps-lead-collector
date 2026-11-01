@@ -1,0 +1,28 @@
+// The admin menu (also used by the guide test: every page needs a guide section).
+
+export const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
+  { to: "/", label: "Dashboard", icon: "▦" },
+  { to: "/inbox", label: "AI Inbox", icon: "✦" },
+  { to: "/leads", label: "Google Maps Leads", icon: "☰" },
+  { to: "/linkedin", label: "LinkedIn Leads", icon: "in" },
+  { to: "/contacts", label: "Contacts (Sheets)", icon: "▤" },
+  { to: "/social-leads", label: "Social Leads", icon: "◎" },
+  { to: "/collections", label: "Collections", icon: "⌖" },
+  { to: "/email", label: "Email", icon: "✉" },
+  { to: "/whatsapp", label: "WhatsApp", icon: "✆" },
+  { to: "/linkedin-outreach", label: "LinkedIn Outreach", icon: "➤" },
+  { to: "/instagram-outreach", label: "Instagram Outreach", icon: "◉" },
+  { to: "/quick-send", label: "Quick Send", icon: "⚡" },
+  { to: "/templates", label: "Templates", icon: "❏" },
+  { to: "/campaign-logs", label: "Campaign Logs", icon: "≡" },
+  { to: "/opt-outs", label: "Opt-outs", icon: "⊘" },
+  { to: "/social", label: "Social Accounts", icon: "◎" },
+  { to: "/integrations", label: "Integrations", icon: "⇄" },
+  { to: "/extensions", label: "Extensions", icon: "⬇" },
+  { to: "/sender", label: "My sender", icon: "➚" },
+  { to: "/guide", label: "Guide", icon: "?" },
+  { to: "/users", label: "Users", icon: "☺" },
+  { to: "/contact-leads", label: "Contact Leads", icon: "☏" },
+  { to: "/website", label: "Website", icon: "⌂" },
+  { to: "/settings", label: "Settings", icon: "⚙" },
+];

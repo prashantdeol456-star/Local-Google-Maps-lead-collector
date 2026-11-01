@@ -157,11 +157,16 @@ npx prisma generate   # back to SQLite
 
 ## User guide (admin panel → Guide)
 
-The step-by-step guide with screenshots lives at `/admin/guide` (text in `admin/src/guide/content.ts`).
-Screenshots and the two PDFs are static files in `admin/public/guide/`:
+The step-by-step guide with screenshots lives at `/admin/guide` (text in `admin/src/guide/content.ts`);
+every admin page has a "📘 Guide" button that opens its section. Screenshots and the two PDFs are static
+files in `admin/public/guide/`:
 
 - `lead-platform-guide.pdf` – customers' version (`/admin/guide?audience=customer`)
 - `lead-platform-admin-guide.pdf` – full version with the administrator sections
 
-When the screens change, retake the screenshots from a demo database (never real customer data),
-print the Guide page again to PDF (Chrome → Print → Save as PDF works too) and replace the files.
+After changing screens or adding a feature, update the guide text and run
+
+    npm run guide:build
+
+It creates a throw-away demo database, takes all screenshots, prints both PDFs and cleans up
+(needs Google Chrome; set CHROME_PATH if it is not found). See CLAUDE.md for the full checklist.

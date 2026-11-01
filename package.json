@@ -24,6 +24,7 @@
     "test": "npm test --workspaces --if-present",
     "dev:admin": "npm run dev -w admin",
     "build:admin": "npm run build -w admin",
+    "guide:build": "node scripts/guide/build.mjs",
     "build:extensions": "npm run build -w extension && npm run build -w linkedin-extension && npm run pack:extensions -w backend"
   },
   "allowScripts": {
@@ -31,5 +32,8 @@
     "better-sqlite3@12.11.1": true,
     "esbuild@0.28.2": true,
     "prisma@7.10.0": true
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.43.1"
   }
 }
