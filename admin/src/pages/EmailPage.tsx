@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getQuickSend, preselectedLeadIds } from "../lib/quickSend";
 import { useEffect, useState, type FormEvent } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
 import { api, qs } from "../lib/api";
@@ -141,11 +142,11 @@ export function EmailCampaignsPage({ channel = "email" }: { channel?: CampaignCh
 
 export function NewCampaignPage() {
   const params = useSearchParams();
-  const preselected = (params.get("leadIds") ?? "").split(",").filter(Boolean);
+  const preselected = preselectedLeadIds(params);
   const client = useQueryClient();
   const templates = useQuery({ queryKey: ["templates"], queryFn: () => api<{ items: EmailTemplate[] }>("/templates").then((r) => r.items) });
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => (params.get("quickSend") === "1" ? `Quick Send – ${getQuickSend()?.list ?? ""}` : ""));
   const [templateId, setTemplateId] = useState("");
   const [filters, setFilters] = useState({ city: "", category: "", searchKeyword: "", q: "" });
   const [intervalMin, setIntervalMin] = useState(3);
@@ -229,7 +230,7 @@ export function NewCampaignPage() {
           <section className="card space-y-4 p-5">
             <h2 className="font-medium">Recipients</h2>
             {preselected.length ? (
-              <p className="text-sm">{preselected.length} leads selected on the Leads page.</p>
+              <p className="text-sm">{preselected.length} {params.get("quickSend") === "1" ? `contacts from Quick Send (${getQuickSend()?.list ?? ""})` : "leads selected on the Leads page"}.</p>
             ) : (
               <LeadFilterFields filters={filters} onChange={setFilters} />
             )}

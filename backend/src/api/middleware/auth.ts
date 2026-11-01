@@ -30,6 +30,7 @@ const CUSTOMER_ROUTES = new RegExp(
       "templates|templates/:id|templates/preview",
       "channel-templates|channel-templates/:id|channel-templates/preview",
       "opt-outs|opt-outs/:id",
+      "quick-send/contacts",
       "contacts|contacts/:id|contacts/facets|contacts/template\\.(csv|xlsx)|contacts/delete|contacts/import",
       "email/campaigns|email/campaigns/recipients|email/campaigns/:id|email/campaigns/:id/(attempts|start|pause|stop)|email/attempts/:id/reply",
       "whatsapp/templates|whatsapp/templates/:id|whatsapp/templates/preview",

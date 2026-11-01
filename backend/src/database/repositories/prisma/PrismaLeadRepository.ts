@@ -94,6 +94,10 @@ export class PrismaLeadRepository implements LeadRepository {
     return this.db.lead.findMany({ where: { normalizedPhone: phone }, orderBy: OLDEST_FIRST });
   }
 
+  findByEmail(email: string) {
+    return this.db.lead.findMany({ where: { email }, orderBy: OLDEST_FIRST });
+  }
+
   findByNormalizedWebsite(website: string) {
     return this.db.lead.findMany({ where: { normalizedWebsite: website }, orderBy: OLDEST_FIRST });
   }

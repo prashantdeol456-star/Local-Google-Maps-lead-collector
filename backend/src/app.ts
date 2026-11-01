@@ -10,6 +10,7 @@ import { adminRoutes, isAdminPageRequest, sendAdminIndex } from "./api/routes/ad
 import { extensionRoutes } from "./api/routes/extensions.js";
 import { userRoutes } from "./api/routes/users.js";
 import { senderRoutes, senderWebhookRoutes } from "./api/routes/senders.js";
+import { quickSendRoutes } from "./api/routes/quickSend.js";
 import { siteRoutes } from "./api/routes/site.js";
 import { SiteService } from "./services/site/siteService.js";
 import { UserService } from "./services/auth/userService.js";
@@ -69,6 +70,7 @@ import { statsRoutes } from "./api/routes/stats.js";
 import { EventBus } from "./services/events.js";
 import { JobService } from "./services/collection/jobService.js";
 import { DedupeService } from "./services/lead/dedupeService.js";
+import { QuickSendService } from "./services/outreach/quickSendService.js";
 import { LeadService } from "./services/lead/leadService.js";
 import { StatsService } from "./services/statsService.js";
 import { AppError } from "./utils/errors.js";
@@ -124,6 +126,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const jobs = new JobService(repos, bus);
   const leads = new LeadService(repos, bus);
   const dedupe = new DedupeService(repos, bus);
+  const quickSend = new QuickSendService(repos, dedupe);
   const stats = new StatsService(repos, config.timeZone);
   const exporter = new ExportService(repos, config.timeZone);
   const mailer = emailProvider ?? createEmailProvider(config.email);
@@ -223,6 +226,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   });
   await app.register(jobRoutes, { jobs });
   await app.register(leadRoutes, { leads, dedupe, timeZone: config.timeZone });
+  await app.register(quickSendRoutes, { quickSend });
   await app.register(statsRoutes, { stats });
   await app.register(eventRoutes, { bus });
   await app.register(exportRoutes, { exporter, timeZone: config.timeZone });

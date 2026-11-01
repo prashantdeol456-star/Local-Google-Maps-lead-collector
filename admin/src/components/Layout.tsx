@@ -6,7 +6,7 @@ import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts", "/sender", "/inbox", "/social", "/guide"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/quick-send", "/opt-outs", "/contacts", "/sender", "/inbox", "/social", "/guide"]);
 
 /** Customer-only pages (super admins send with the .env senders, set up in Settings). */
 const CUSTOMER_ONLY = new Set(["/sender"]);
@@ -23,6 +23,7 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/whatsapp", label: "WhatsApp", icon: "✆" },
   { to: "/linkedin-outreach", label: "LinkedIn Outreach", icon: "➤" },
   { to: "/instagram-outreach", label: "Instagram Outreach", icon: "◉" },
+  { to: "/quick-send", label: "Quick Send", icon: "⚡" },
   { to: "/templates", label: "Templates", icon: "❏" },
   { to: "/campaign-logs", label: "Campaign Logs", icon: "≡" },
   { to: "/opt-outs", label: "Opt-outs", icon: "⊘" },

@@ -27,6 +27,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ExtensionsPage } from "./pages/ExtensionsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { SenderPage } from "./pages/SenderPage";
+import { QuickSendPage } from "./pages/QuickSendPage";
 import { ContactLeadsPage, WebsitePage } from "./pages/WebsitePage";
 import { GuidePage } from "./pages/GuidePage";
 
@@ -62,6 +63,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/whatsapp/templates") return <WhatsAppTemplatesPage />;
   if ((params = matchPath("/whatsapp/:id", path))) return <WhatsAppCampaignDetailPage key={params.id} id={params.id!} />;
   if (path === "/templates") return <TemplatesPage />;
+  if (path === "/quick-send") return <QuickSendPage />;
   if (path === "/opt-outs") return <OptOutsPage />;
   if (path === "/integrations") return <IntegrationsPage />;
   if (path === "/extensions") return <ExtensionsPage />;

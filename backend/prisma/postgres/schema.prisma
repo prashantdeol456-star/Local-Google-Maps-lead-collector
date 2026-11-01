@@ -175,6 +175,7 @@ model Lead {
   @@unique([ownerId, dedupeKey])
   @@index([normalizedPhone])
   @@index([normalizedWebsite])
+  @@index([email])
   @@index([normalizedName])
   @@index([city])
   @@index([category])

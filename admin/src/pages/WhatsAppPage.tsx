@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getQuickSend, preselectedLeadIds } from "../lib/quickSend";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
 import { api } from "../lib/api";
@@ -85,12 +86,12 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 export function NewWhatsAppCampaignPage() {
   const params = useSearchParams();
-  const preselected = (params.get("leadIds") ?? "").split(",").filter(Boolean);
+  const preselected = preselectedLeadIds(params);
   const client = useQueryClient();
   const templates = useQuery({ queryKey: ["wa-templates"], queryFn: () => api<{ items: WhatsAppTemplate[] }>("/whatsapp/templates").then((r) => r.items) });
   const approved = templates.data?.filter((t) => t.approvalStatus === "approved");
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => (params.get("quickSend") === "1" ? `Quick Send – ${getQuickSend()?.list ?? ""}` : ""));
   const [templateId, setTemplateId] = useState("");
   const [filters, setFilters] = useState({ city: "", category: "", searchKeyword: "", q: "" });
   const [intervalMin, setIntervalMin] = useState(2);
@@ -160,7 +161,7 @@ export function NewWhatsAppCampaignPage() {
               <select className="input" required value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
                 {approved?.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} ({t.language})
+                    {t.name} ({t.language}){t.category ? ` · ${t.category[0]!.toUpperCase()}${t.category.slice(1)}` : ""}
                   </option>
                 ))}
               </select>
@@ -170,7 +171,7 @@ export function NewWhatsAppCampaignPage() {
           <section className="card space-y-4 p-5">
             <h2 className="font-medium">Recipients</h2>
             {preselected.length ? (
-              <p className="text-sm">{preselected.length} leads selected on the Leads page.</p>
+              <p className="text-sm">{preselected.length} {params.get("quickSend") === "1" ? `contacts from Quick Send (${getQuickSend()?.list ?? ""})` : "leads selected on the Leads page"}.</p>
             ) : (
               <LeadFilterFields filters={filters} onChange={setFilters} />
             )}

@@ -165,6 +165,8 @@ export interface LeadRepository {
   // Duplicate lookups (all on indexed columns)
   findByPlaceId(placeId: string): Promise<LeadRecord | null>;
   findByNormalizedPhone(phone: string): Promise<LeadRecord[]>;
+  /** Leads with this (lowercase) email, oldest first. */
+  findByEmail(email: string): Promise<LeadRecord[]>;
   findByNormalizedWebsite(website: string): Promise<LeadRecord[]>;
   findByNameAddress(normalizedName: string, normalizedAddress: string): Promise<LeadRecord[]>;
 
