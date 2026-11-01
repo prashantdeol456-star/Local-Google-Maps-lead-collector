@@ -289,13 +289,11 @@ export class PrismaSocialAccountRepository implements SocialAccountRepository {
   findById(id: string) {
     return this.db.socialAccount.findUnique({ where: { id } });
   }
-  upsert(data: SocialAccountData): Promise<SocialAccountRecord> {
+  async upsert(data: SocialAccountData): Promise<SocialAccountRecord> {
     const fresh = { ...data, status: data.status ?? "connected", lastError: data.lastError ?? null, lastCheckedAt: data.lastCheckedAt ?? new Date() };
-    return this.db.socialAccount.upsert({
-      where: { platform_externalId: { platform: data.platform, externalId: data.externalId } },
-      create: fresh,
-      update: fresh,
-    });
+    // Unique per owner: the owner scope adds the owner to the lookup and to a new row.
+    const existing = await this.db.socialAccount.findFirst({ where: { platform: data.platform, externalId: data.externalId } });
+    return existing ? this.db.socialAccount.update({ where: { id: existing.id }, data: fresh }) : this.db.socialAccount.create({ data: fresh });
   }
   async update(id: string, data: Partial<Pick<SocialAccountRecord, "status" | "lastError" | "lastCheckedAt" | "name" | "username" | "pictureUrl">>) {
     await this.db.socialAccount.updateMany({ where: { id }, data });

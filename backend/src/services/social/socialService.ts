@@ -7,6 +7,7 @@
 // expire (until the password changes or the app is removed).
 // LinkedIn: the member's own profile ("Sign In with LinkedIn using OpenID Connect").
 
+import { ownerScope } from "../../database/ownerScope.js";
 import { randomBytes } from "node:crypto";
 import type { Repositories, SocialAccountRecord, SocialPlatform } from "../../database/repositories/index.js";
 import type { SocialConfig } from "../../providers/social/config.js";
@@ -149,7 +150,11 @@ export class SocialService {
     }
     if (!query.code) throw new OAuthError("No authorization code came back.");
 
-    const accounts = provider === "meta" ? await this.connectMeta(query.code, pending.adminId) : await this.connectLinkedIn(query.code, pending.adminId);
+    // The redirect carries no login: the accounts belong to whoever started the connection.
+    const code = query.code;
+    const accounts = await ownerScope.run({ userId: pending.adminId, ownerId: pending.adminId, customer: true }, () =>
+      provider === "meta" ? this.connectMeta(code, pending.adminId) : this.connectLinkedIn(code, pending.adminId),
+    );
     await this.repos.agentLogs.create({
       jobId: null,
       action: "social_connected",

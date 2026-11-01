@@ -794,6 +794,10 @@ model LinkedInMessage {
 model SocialAccount {
   id             String    @id @default(cuid())
   /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId        String?
+  /**
    * facebook_page | instagram | linkedin
    */
   platform       String
@@ -830,8 +834,9 @@ model SocialAccount {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  @@unique([platform, externalId])
+  @@unique([ownerId, platform, externalId])
   @@index([platform])
+  @@index([ownerId])
 }
 
 // ---- AI Inbox: chats from Telegram (bot), Facebook Pages, Instagram and LinkedIn, with
@@ -842,6 +847,10 @@ model SocialAccount {
  */
 model InboxConversation {
   id                  String         @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId             String?
   /**
    * telegram | facebook | instagram | linkedin
    */
@@ -881,13 +890,18 @@ model InboxConversation {
   messages            InboxMessage[]
   drafts              InboxDraft[]
 
-  @@unique([platform, accountKey, externalThreadId])
+  @@unique([ownerId, platform, accountKey, externalThreadId])
   @@index([status, lastMessageAt])
   @@index([platform, lastMessageAt])
+  @@index([ownerId])
 }
 
 model InboxMessage {
   id             String            @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId        String?
   conversationId String
   /**
    * in = from the other person · out = from you (or the AI)
@@ -908,6 +922,7 @@ model InboxMessage {
 
   @@unique([conversationId, externalId])
   @@index([conversationId, sentAt])
+  @@index([ownerId])
 }
 
 /**
@@ -915,6 +930,10 @@ model InboxMessage {
  */
 model InboxDraft {
   id             String            @id @default(cuid())
+  /**
+   * User this belongs to (see database/ownerScope.ts)
+   */
+  ownerId        String?
   conversationId String
   /**
    * pending | sending | sent | dismissed | failed | superseded
@@ -943,12 +962,16 @@ model InboxDraft {
 
   @@index([conversationId, createdAt])
   @@index([status, createdAt])
+  @@index([ownerId])
 }
 
 /**
  * What the AI knows and may do (one row, id "default").
  */
 model AiAssistantSettings {
+  /**
+   * The owner's user id (one row per user; "default" only before user accounts)
+   */
   id                   String   @id @default("default")
   /**
    * Master switch: off = nothing is drafted or sent
@@ -1063,19 +1086,33 @@ model SocialLead {
   @@index([createdAt])
 }
 
-/** A customer's own email and WhatsApp sender (phase C). Super admins use the .env senders. */
+/**
+ * A customer's own email and WhatsApp sender (phase C). Super admins use the .env senders.
+ */
 model SenderSettings {
-  /** The user (AdminUser id) */
+  /**
+   * The user (AdminUser id)
+   */
   ownerId         String   @id
-  /** EmailConfig as JSON, encrypted with SecretBox("sender-secrets") */
+  /**
+   * EmailConfig as JSON, encrypted with SecretBox("sender-secrets")
+   */
   emailConfig     String?
-  /** Non-secret part for display: JSON { provider, from } */
+  /**
+   * Non-secret part for display: JSON { provider, from }
+   */
   emailSummary    String?
-  /** WhatsAppConfig as JSON, encrypted */
+  /**
+   * WhatsAppConfig as JSON, encrypted
+   */
   whatsappConfig  String?
-  /** JSON { provider, phoneNumberId } */
+  /**
+   * JSON { provider, phoneNumberId }
+   */
   whatsappSummary String?
-  /** Random part of this user's webhook URLs (/api/webhooks/u/<token>/…) */
+  /**
+   * Random part of this user's webhook URLs (/api/webhooks/u/<token>/…)
+   */
   webhookToken    String   @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -779,6 +779,8 @@ export type SocialPlatform = "facebook_page" | "instagram" | "linkedin";
 
 export interface SocialAccountRecord {
   id: string;
+  /** User the account belongs to (null only for data from before user accounts) */
+  ownerId?: string | null;
   platform: string;
   externalId: string;
   name: string;
@@ -893,6 +895,8 @@ export type InboxConversationListItem = InboxConversationRecord & {
 export interface InboxRepository {
   getSettings(): Promise<AiAssistantSettingsRecord>;
   updateSettings(data: Partial<Omit<AiAssistantSettingsRecord, "id" | "updatedAt">>): Promise<AiAssistantSettingsRecord>;
+  /** Users that have AI inbox settings. */
+  listSettingsOwners(): Promise<string[]>;
   upsertConversation(data: Pick<InboxConversationRecord, "platform" | "accountKey" | "externalThreadId" | "participantName"> & Partial<Pick<InboxConversationRecord, "participantId" | "participantUsername">>): Promise<InboxConversationRecord>;
   findConversation(id: string): Promise<InboxConversationRecord | null>;
   findConversationByThread(platform: string, accountKey: string, externalThreadId: string): Promise<InboxConversationRecord | null>;

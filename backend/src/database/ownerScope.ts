@@ -35,6 +35,11 @@ export const OWNED_MODELS = new Set([
   "Suppression",
   "LeadCommunicationPreference",
   "OutreachContact",
+  // AI Inbox and social accounts (phase C2)
+  "SocialAccount",
+  "InboxConversation",
+  "InboxMessage",
+  "InboxDraft",
 ]);
 
 /** Models owned through their collection (CollectionJob): model → relation field. */
@@ -65,6 +70,11 @@ function ownerResolver(db: PrismaClient) {
     if (typeof data.attemptId === "string") {
       const id = data.attemptId;
       const owner = await lookup(`a:${id}`, () => db.contactAttempt.findUnique({ where: { id }, select: { ownerId: true } }));
+      if (owner) return owner;
+    }
+    if (typeof data.conversationId === "string") {
+      const id = data.conversationId;
+      const owner = await lookup(`i:${id}`, () => db.inboxConversation.findUnique({ where: { id }, select: { ownerId: true } }));
       if (owner) return owner;
     }
     if (typeof data.leadId === "string") {

@@ -234,7 +234,8 @@ describe("AI inbox", () => {
 
   it("Facebook: reads Page chats, replies through the Page, and respects the 24-hour window", async () => {
     const box = new SecretBox("test-secret-test-secret-test-secret-123", "social-tokens");
-    const page = await t.db.socialAccount.create({ data: { platform: "facebook_page", externalId: "PAGE1", name: "Acme Bakery", tokenEnc: box.seal("PAGE_TOKEN") } });
+    const owner = await t.db.adminUser.findFirstOrThrow();
+    const page = await t.db.socialAccount.create({ data: { ownerId: owner.id, platform: "facebook_page", externalId: "PAGE1", name: "Acme Bakery", tokenEnc: box.seal("PAGE_TOKEN") } });
     await enable();
     const now = Date.now();
     fbConversations = [

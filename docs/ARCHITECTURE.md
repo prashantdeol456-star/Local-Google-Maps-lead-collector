@@ -217,9 +217,16 @@ background collection.
   Webhooks for a customer's sender: `/api/webhooks/u/<token>/email/resend` and
   `/api/webhooks/u/<token>/whatsapp/meta`, verified with their secrets and handled in their
   data scope. Tests go through `/api/senders/test`.
+- Phase C2, AI inbox and social accounts: `SocialAccount`, `InboxConversation`,
+  `InboxMessage` and `InboxDraft` are owned; `AiAssistantSettings` has one row per user (id = user
+  id). Each user enters their own Claude/Gemini key and Telegram bot token; the `.env` keys are a
+  fallback for super admins only. The inbox worker serves every user in their own scope: one
+  Telegram polling loop per bot, AI replies per user, Facebook/Instagram polling per account
+  owner. OAuth connections belong to whoever started them. The LinkedIn inbox (extension) and
+  Social Leads stay with super admins.
 - Customers can use: dashboard, Google Maps leads, collections, LinkedIn leads, export,
-  Extensions, templates, contacts, opt-outs, email/WhatsApp campaigns and My sender
-  (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`). Campaign logs, AI inbox,
+  Extensions, templates, contacts, opt-outs, email/WhatsApp campaigns, My sender, AI inbox and
+  social accounts (`CUSTOMER_ROUTES` in `api/middleware/auth.ts`). Campaign logs, AI inbox,
   social accounts, LinkedIn/Instagram outreach, integrations and settings stay with super
   admins.
 

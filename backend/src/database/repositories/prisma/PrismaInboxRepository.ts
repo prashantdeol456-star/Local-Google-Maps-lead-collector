@@ -1,41 +1,50 @@
 import { containsInsensitive, isUniqueViolation, type DbClient } from "../../client.js";
+import { ownerScope } from "../../ownerScope.js";
 import type { InboxConversationRecord, InboxDraftRecord, InboxMessageRecord, InboxRepository } from "../types.js";
 
-const SETTINGS_ID = "default";
+/** One settings row per user: the acting user's id ("default" outside any user's scope). */
+const settingsId = () => ownerScope.getStore()?.userId ?? "default";
 
 export class PrismaInboxRepository implements InboxRepository {
   constructor(private readonly db: DbClient) {}
 
   async getSettings() {
-    return (
-      (await this.db.aiAssistantSettings.findUnique({ where: { id: SETTINGS_ID } })) ??
-      this.db.aiAssistantSettings.upsert({ where: { id: SETTINGS_ID }, create: { id: SETTINGS_ID }, update: {} })
-    );
+    const id = settingsId();
+    return (await this.db.aiAssistantSettings.findUnique({ where: { id } })) ?? this.db.aiAssistantSettings.upsert({ where: { id }, create: { id }, update: {} });
   }
   async updateSettings(data: Parameters<InboxRepository["updateSettings"]>[0]) {
-    return this.db.aiAssistantSettings.upsert({ where: { id: SETTINGS_ID }, create: { id: SETTINGS_ID, ...data }, update: data });
+    const id = settingsId();
+    return this.db.aiAssistantSettings.upsert({ where: { id }, create: { id, ...data }, update: data });
+  }
+  /** Users with AI inbox settings (the worker serves each of them in their own scope). */
+  async listSettingsOwners() {
+    return (await this.db.aiAssistantSettings.findMany({ select: { id: true } })).map((s) => s.id).filter((id) => id !== "default");
   }
 
   async upsertConversation(data: Parameters<InboxRepository["upsertConversation"]>[0]) {
-    const where = { platform_accountKey_externalThreadId: { platform: data.platform, accountKey: data.accountKey, externalThreadId: data.externalThreadId } };
+    // Unique per owner: the owner scope adds the owner to the lookup and to a new row.
+    const where = { platform: data.platform, accountKey: data.accountKey, externalThreadId: data.externalThreadId };
     const details = {
       participantName: data.participantName,
       ...(data.participantId !== undefined ? { participantId: data.participantId } : {}),
       ...(data.participantUsername !== undefined ? { participantUsername: data.participantUsername } : {}),
     };
+    const existing = await this.db.inboxConversation.findFirst({ where });
+    if (existing) return this.db.inboxConversation.update({ where: { id: existing.id }, data: details });
     try {
-      return await this.db.inboxConversation.upsert({ where, create: { ...data, ...details, lastMessageAt: new Date(0) }, update: details });
+      return await this.db.inboxConversation.create({ data: { ...data, ...details, lastMessageAt: new Date(0) } });
     } catch (err) {
       // Two pollers creating the same chat at once: the second one reads it.
       if (!isUniqueViolation(err)) throw err;
-      return this.db.inboxConversation.update({ where, data: details });
+      const raced = await this.db.inboxConversation.findFirstOrThrow({ where });
+      return this.db.inboxConversation.update({ where: { id: raced.id }, data: details });
     }
   }
   findConversation(id: string) {
     return this.db.inboxConversation.findUnique({ where: { id } });
   }
   findConversationByThread(platform: string, accountKey: string, externalThreadId: string) {
-    return this.db.inboxConversation.findUnique({ where: { platform_accountKey_externalThreadId: { platform, accountKey, externalThreadId } } });
+    return this.db.inboxConversation.findFirst({ where: { platform, accountKey, externalThreadId } }); // per owner (owner scope)
   }
   updateConversation(id: string, data: Partial<Omit<InboxConversationRecord, "id" | "createdAt" | "updatedAt">>) {
     return this.db.inboxConversation.update({ where: { id }, data });

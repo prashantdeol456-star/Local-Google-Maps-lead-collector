@@ -3,6 +3,7 @@
 // - Facebook Pages and Instagram: the Conversations API, checked every INBOX_POLL_SECONDS;
 // - every few seconds: answer chats that are waiting (InboxService.processDue).
 
+import { ownerScope, type OwnerScope } from "../database/ownerScope.js";
 import type { Repositories } from "../database/repositories/index.js";
 import { ChannelError, type MetaMessaging } from "../services/inbox/channels.js";
 import type { InboxRuntime } from "../services/inbox/runtime.js";
@@ -13,6 +14,8 @@ export class InboxWorker {
   private stopped = true;
   private timers: ReturnType<typeof setInterval>[] = [];
   private telegramLoop: Promise<void> | null = null;
+  /** user id → their bot's polling loop (each user can connect their own bot) */
+  private readonly telegramLoops = new Map<string, Promise<void>>();
   private telegramAbort = new AbortController();
   private processing: Promise<unknown> | null = null;
   private polling: Promise<unknown> | null = null;
@@ -50,24 +53,61 @@ export class InboxWorker {
     await Promise.allSettled([this.telegramLoop, this.processing, this.polling]);
   }
 
+  /** Each user with inbox settings, as the data scope to work in (their chats, keys and bot). */
+  private async owners(): Promise<OwnerScope[]> {
+    // Users who saved inbox settings, and every super admin (they can run on the .env keys).
+    const superAdmins = (await this.repos.adminUsers.list({ status: "active" })).filter((u) => u.role === "super_admin").map((u) => u.id);
+    const ids = new Set([...superAdmins, ...(await this.repos.inbox.listSettingsOwners())]);
+    const scopes: OwnerScope[] = [];
+    for (const id of ids) {
+      const scope = await this.scopeOf(id);
+      if (scope) scopes.push(scope);
+    }
+    return scopes;
+  }
+
+  private async scopeOf(userId: string | null | undefined): Promise<OwnerScope | null> {
+    if (!userId) return null;
+    const user = await this.repos.adminUsers.findById(userId);
+    return user?.status === "active" ? { userId, ownerId: userId, customer: user.role !== "super_admin" } : null;
+  }
+
   processOnce() {
-    this.processing ??= this.inbox
-      .processDue()
+    this.processing ??= (async () => {
+      for (const scope of await this.owners()) {
+        await ownerScope.run(scope, () => this.inbox.processDue()).catch((err) => this.opts.log(`AI inbox: ${String(err)}`));
+      }
+    })()
       .catch((err) => this.opts.log(`AI inbox: ${String(err)}`))
       .finally(() => (this.processing = null));
     return this.processing;
   }
 
-  /** Keeps reading the bot; follows a token added or changed in the admin panel. */
+  /** Starts a polling loop for every user whose bot token is set; loops end when it is removed. */
   private async runTelegram() {
+    while (!this.stopped) {
+      try {
+        for (const scope of await this.owners()) {
+          if (this.telegramLoops.has(scope.userId)) continue;
+          const bot = await ownerScope.run(scope, () => this.opts.runtime.telegram()).catch(() => null);
+          if (!bot) continue;
+          const loop = this.runTelegramFor(scope).finally(() => this.telegramLoops.delete(scope.userId));
+          this.telegramLoops.set(scope.userId, loop);
+        }
+      } catch (err) {
+        this.opts.log(`AI inbox: Telegram: ${String(err)}`);
+      }
+      await this.sleep(15_000);
+    }
+    await Promise.allSettled(this.telegramLoops.values());
+  }
+
+  /** Keeps reading one user's bot; follows a token changed in the admin panel, ends when removed. */
+  private async runTelegramFor(scope: OwnerScope) {
     let announced: string | null = null;
     while (!this.stopped) {
-      const telegram = await this.opts.runtime.telegram().catch(() => null);
-      if (!telegram) {
-        announced = null;
-        await this.sleep(15_000);
-        continue;
-      }
+      const telegram = await ownerScope.run(scope, () => this.opts.runtime.telegram()).catch(() => null);
+      if (!telegram) return;
       if (announced !== telegram.token) {
         announced = telegram.token;
         try {
@@ -81,7 +121,7 @@ export class InboxWorker {
         }
       }
       try {
-        await this.telegramOnce(25);
+        await ownerScope.run(scope, () => this.telegramRound(25));
       } catch (err) {
         const retryable = !(err instanceof ChannelError) || err.retryable;
         this.opts.log(`AI inbox: Telegram: ${err instanceof Error ? err.message : String(err)}`);
@@ -91,8 +131,8 @@ export class InboxWorker {
     }
   }
 
-  /** One long-poll round (also used by tests with waitSec 0). */
-  async telegramOnce(waitSec: number) {
+  /** One long-poll round of the current user's bot (inside their scope). */
+  private async telegramRound(waitSec: number) {
     const bot = (await this.opts.runtime.telegram())?.bot;
     if (!bot) return 0;
     const settings = await this.repos.inbox.getSettings();
@@ -100,6 +140,13 @@ export class InboxWorker {
     for (const t of threads) await this.inbox.ingest("telegram", "bot", t);
     if (nextOffset !== settings.telegramOffset) await this.repos.inbox.updateSettings({ telegramOffset: nextOffset });
     return threads.length;
+  }
+
+  /** One round of every user's bot (tests use waitSec 0). */
+  async telegramOnce(waitSec: number) {
+    let total = 0;
+    for (const scope of await this.owners()) total += await ownerScope.run(scope, () => this.telegramRound(waitSec));
+    return total;
   }
 
   pollMetaOnce() {
@@ -114,11 +161,19 @@ export class InboxWorker {
     if (!meta) return;
     const accounts = (await this.repos.socialAccounts.list()).filter((a) => (a.platform === "facebook_page" || a.platform === "instagram") && a.status !== "expired");
     for (const account of accounts) {
+      const scope = await this.scopeOf(account.ownerId);
+      if (!scope) continue; // owner disabled or deleted
+      await ownerScope.run(scope, () => this.pollAccount(meta, account));
+    }
+  }
+
+  private async pollAccount(meta: MetaMessaging, account: Awaited<ReturnType<Repositories["socialAccounts"]["list"]>>[number]) {
+    {
       let token: string;
       try {
         token = (await this.opts.social.tokenFor(account.id)).token;
       } catch {
-        continue; // unreadable token: Social Accounts shows it
+        return; // unreadable token: Social Accounts shows it
       }
       const isInstagram = account.platform === "instagram";
       let pageId = account.externalId;
@@ -128,7 +183,7 @@ export class InboxWorker {
         } catch {
           pageId = "";
         }
-        if (!pageId) continue;
+        if (!pageId) return;
       }
       try {
         const since = this.seen.get(account.id) ?? null;

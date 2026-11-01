@@ -6,7 +6,7 @@ import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts", "/sender"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts", "/sender", "/inbox", "/social"]);
 
 /** Customer-only pages (super admins send with the .env senders, set up in Settings). */
 const CUSTOMER_ONLY = new Set(["/sender"]);

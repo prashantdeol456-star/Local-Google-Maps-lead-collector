@@ -35,6 +35,10 @@ const CUSTOMER_ROUTES = new RegExp(
       "whatsapp/campaigns|whatsapp/campaigns/recipients|whatsapp/campaigns/:id|whatsapp/campaigns/:id/(attempts|start|pause|stop)",
       // Their own sender (phase C)
       "senders|senders/email|senders/whatsapp|senders/:channel|senders/test",
+      // AI Inbox and social accounts (phase C2); the LinkedIn inbox (extension) stays with super admins
+      "inbox/(ai-config|secrets/:name|test/:what|settings|status|conversations|refresh)",
+      "inbox/conversations/:id|inbox/conversations/:id/(ai-reply|send|handled|mode)|inbox/drafts/:id/(approve|dismiss)",
+      "social/(providers|accounts|connect/:provider)|social/accounts/:id|social/accounts/:id/check",
     ].join("|") +
     ")$",
 );

@@ -7,6 +7,7 @@ import { ApiError, GoogleGenAI } from "@google/genai";
 import type { AiAssistantSettingsRecord, Repositories } from "../../database/repositories/index.js";
 import type { InboxConfig } from "../../providers/inbox/config.js";
 import type { SecretBox } from "../../utils/secretBox.js";
+import { ownerScope } from "../../database/ownerScope.js";
 import { ChannelError, TelegramBot } from "./channels.js";
 import { GeminiReplyWriter } from "./geminiWriter.js";
 import { AnthropicReplyWriter, type ReplyWriter } from "./replyWriter.js";
@@ -50,8 +51,14 @@ export const TELEGRAM_TOKEN = /^\d+:[A-Za-z0-9_-]{30,}$/;
 
 const hint = (value: string) => `…${value.slice(-4)}`;
 
+type Resolved = { stamp: string; writer: ReplyWriter | null; telegram: TelegramBot | null; telegramToken: string | null };
+
+/** Whose settings: the acting user's (each user has their own AI keys and Telegram bot). */
+const ownerKey = () => ownerScope.getStore()?.userId ?? "default";
+
 export class InboxRuntime {
-  private cache: { stamp: string; writer: ReplyWriter | null; telegram: TelegramBot | null; telegramToken: string | null } | null = null;
+  /** per user (ownerKey) */
+  private readonly cache = new Map<string, Resolved>();
 
   constructor(
     private readonly repos: Repositories,
@@ -69,9 +76,14 @@ export class InboxRuntime {
     }
   }
 
-  /** The key in use for each secret, and where it comes from. */
+  /**
+   * The key in use for each secret, and where it comes from. The .env keys are the platform's:
+   * only super admins fall back to them; customers use the keys they entered.
+   */
   private secrets(s: AiAssistantSettingsRecord) {
-    const pick = (name: SecretName, fromEnv: string | null) => {
+    const customer = ownerScope.getStore()?.customer === true;
+    const pick = (name: SecretName, envValue: string | null) => {
+      const fromEnv = customer ? null : envValue;
       const stored = this.open(s[COLUMNS[name].enc]);
       return stored ? { value: stored, source: "admin" as const, hint: s[COLUMNS[name].hint] } : fromEnv ? { value: fromEnv, source: "env" as const, hint: hint(fromEnv) } : null;
     };
@@ -93,7 +105,8 @@ export class InboxRuntime {
   private async resolve() {
     const s = await this.repos.inbox.getSettings();
     const stamp = [s.updatedAt.getTime(), s.aiProvider, s.aiModel, s.aiEffort, s.anthropicKeyEnc, s.geminiKeyEnc, s.telegramTokenEnc].join("|");
-    if (this.cache?.stamp === stamp) return this.cache;
+    const cached = this.cache.get(ownerKey());
+    if (cached?.stamp === stamp) return cached;
     const keys = this.secrets(s);
     const { provider, model, effort } = this.choice(s);
     let writer: ReplyWriter | null = null;
@@ -102,8 +115,9 @@ export class InboxRuntime {
     else if (provider === "gemini" && keys.geminiKey) writer = new GeminiReplyWriter({ apiKey: keys.geminiKey.value, model, effort });
     const telegramToken = keys.telegramToken?.value ?? null;
     const telegram = telegramToken ? new TelegramBot(telegramToken, this.opts.fetch) : null;
-    this.cache = { stamp, writer, telegram, telegramToken };
-    return this.cache;
+    const resolved = { stamp, writer, telegram, telegramToken };
+    this.cache.set(ownerKey(), resolved);
+    return resolved;
   }
 
   async writer(): Promise<ReplyWriter | null> {
@@ -139,11 +153,11 @@ export class InboxRuntime {
     if (clean && name === "anthropicKey" && !clean.startsWith("sk-ant-")) throw new Error('A Claude API key starts with "sk-ant-"');
     if (clean && clean.length > 500) throw new Error("That key is too long");
     await this.repos.inbox.updateSettings({ [cols.enc]: clean ? this.box.seal(clean) : null, [cols.hint]: clean ? hint(clean) : null });
-    this.cache = null;
+    this.cache.delete(ownerKey());
   }
 
   invalidate() {
-    this.cache = null;
+    this.cache.delete(ownerKey());
   }
 
   /** Checks a key with a free call (no message is generated or sent). */
