@@ -67,4 +67,20 @@ describe.skipIf(ON_POSTGRES)("migrations", () => {
     ]);
     db.close();
   });
+
+  it("multi_user_inbox moves the AI settings to the first admin, even if newer code already made a row for them", () => {
+    const db = new Database(":memory:");
+    const target = migrations.findIndex((n) => n.endsWith("_multi_user_inbox"));
+    expect(target).toBeGreaterThan(0);
+    for (const name of migrations.slice(0, target)) db.exec(sql(name));
+
+    db.prepare(`INSERT INTO "AdminUser" (id, email, passwordHash, role, status) VALUES ('admin1', 'a@x.in', 'h', 'super_admin', 'active')`).run();
+    const settings = db.prepare(`INSERT INTO "AiAssistantSettings" (id, businessProfile, updatedAt) VALUES (?, ?, CURRENT_TIMESTAMP)`);
+    settings.run("default", "Acme Bakery");
+    settings.run("admin1", ""); // created early by newer code
+
+    for (const name of migrations.slice(target)) db.exec(sql(name));
+    expect(db.prepare(`SELECT id, businessProfile FROM "AiAssistantSettings"`).all()).toEqual([{ id: "admin1", businessProfile: "Acme Bakery" }]);
+    db.close();
+  });
 });

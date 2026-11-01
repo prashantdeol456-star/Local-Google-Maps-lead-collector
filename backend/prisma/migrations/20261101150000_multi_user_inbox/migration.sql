@@ -41,5 +41,9 @@ UPDATE "SocialAccount" SET "ownerId" = (SELECT "id" FROM "AdminUser" ORDER BY "c
 UPDATE "InboxConversation" SET "ownerId" = (SELECT "id" FROM "AdminUser" ORDER BY "createdAt" LIMIT 1) WHERE "ownerId" IS NULL;
 UPDATE "InboxMessage" SET "ownerId" = (SELECT "id" FROM "AdminUser" ORDER BY "createdAt" LIMIT 1) WHERE "ownerId" IS NULL;
 UPDATE "InboxDraft" SET "ownerId" = (SELECT "id" FROM "AdminUser" ORDER BY "createdAt" LIMIT 1) WHERE "ownerId" IS NULL;
+-- A row for that admin may exist already (created by newer code before this migration ran):
+-- the "default" row holds the real settings, so it wins.
+DELETE FROM "AiAssistantSettings" WHERE "id" = (SELECT "id" FROM "AdminUser" ORDER BY "createdAt" LIMIT 1)
+  AND EXISTS (SELECT 1 FROM "AiAssistantSettings" WHERE "id" = 'default');
 UPDATE "AiAssistantSettings" SET "id" = (SELECT "id" FROM "AdminUser" ORDER BY "createdAt" LIMIT 1)
   WHERE "id" = 'default' AND EXISTS (SELECT 1 FROM "AdminUser");
