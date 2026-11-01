@@ -32,6 +32,7 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/sender", label: "My sender", icon: "➚" },
   { to: "/guide", label: "Guide", icon: "?" },
   { to: "/users", label: "Users", icon: "☺" },
+  { to: "/contact-leads", label: "Contact Leads", icon: "☏" },
   { to: "/website", label: "Website", icon: "⌂" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];
@@ -102,14 +103,22 @@ const LIVE_LABEL: Record<LiveState, { text: string; dot: string }> = {
 export function Layout({ admin, live, onLogout, children }: { admin: Admin; live: LiveState; onLogout: () => void; children: ReactNode }) {
   const path = usePath();
   const [open, setOpen] = useState(false);
+  const contactUnread = useQuery({
+    queryKey: ["site-messages", "unread"],
+    queryFn: () => api<{ unread: number }>("/site/messages?status=new&pageSize=1"),
+    enabled: admin.role === "super_admin",
+    refetchInterval: 60_000,
+  }).data?.unread;
 
   const sidebar = (
     <nav className="flex h-full flex-col bg-sidebar text-slate-300">
-      <div className="flex h-16 items-center gap-2 px-5 text-white">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold">LP</span>
-        <span className="font-semibold">Lead Platform</span>
+      <div className="flex h-16 shrink-0 items-center gap-2 px-5 text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-[#1fb57b] to-[#0d8a5c] text-sm font-bold">LP</span>
+        <span className="font-bold tracking-tight">
+          Lead Platform<sup className="text-[9px]">™</sup>
+        </span>
       </div>
-      <ul className="flex-1 space-y-1 px-3 py-2">
+      <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
         {NAV.filter((item) => canOpen(admin, item.to) && !(admin.role === "super_admin" && CUSTOMER_ONLY.has(item.to))).map((item) => {
           const active = isActive(path, item.to);
           return (
@@ -125,17 +134,22 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
                   to={item.to}
                   onClick={() => setOpen(false)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${active ? "bg-brand-600 text-white" : "hover:bg-sidebar-hover hover:text-white"}`}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm ${active ? "nav-active" : "hover:bg-sidebar-hover hover:text-white"}`}
                 >
                   <span className="w-4 text-center" aria-hidden>{item.icon}</span>
                   {item.label}
+                  {item.to === "/contact-leads" && !!contactUnread && (
+                    <span className="ml-auto rounded-full bg-gold-400 px-1.5 text-[11px] font-semibold text-[#1d1606]" title="New contact leads">
+                      {contactUnread}
+                    </span>
+                  )}
                 </Link>
               )}
             </li>
           );
         })}
       </ul>
-      <p className="px-5 py-4 text-xs text-slate-500">Local · SQLite</p>
+      <p className="px-5 py-4 text-xs text-slate-500">© Lead Platform</p>
     </nav>
   );
 

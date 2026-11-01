@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 function Brand({ subtitle }: { subtitle: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">LP</span>
+      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-[#1fb57b] to-[#0d8a5c] text-sm font-bold text-white">LP</span>
       <div>
         <h1 className="font-semibold text-slate-900 dark:text-white">Lead Platform</h1>
         <p className="text-xs text-slate-500">{subtitle}</p>
@@ -14,7 +14,7 @@ function Brand({ subtitle }: { subtitle: string }) {
   );
 }
 
-const shell = "flex min-h-screen items-center justify-center bg-slate-100 px-4 py-8 dark:bg-slate-950";
+const shell = "auth-shell flex min-h-screen items-center justify-center px-4 py-8";
 
 function RegisterForm({ onBack }: { onBack: () => void }) {
   const [form, setForm] = useState({ email: "", phone: "", username: "", password: "", confirm: "" });
@@ -40,13 +40,13 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
 
   if (done) {
     return (
-      <div className="card w-full max-w-sm space-y-4 p-6">
+      <div className="card w-full max-w-sm space-y-4 p-6 shadow-2xl">
         <Brand subtitle="Account request sent" />
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Thank you. Your account is waiting for approval by the administrator. You can sign in with your user id <strong>{form.username.toLowerCase()}</strong> or
           email once it is approved.
         </p>
-        <button type="button" className="btn btn-primary w-full" onClick={onBack}>
+        <button type="button" className="btn btn-gold w-full" onClick={onBack}>
           Back to sign in
         </button>
       </div>
@@ -54,7 +54,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
+    <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6 shadow-2xl">
       <Brand subtitle="Create an account" />
       <label className="block space-y-1">
         <span className="label">Email</span>
@@ -88,7 +88,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
         <input className="input" type="password" autoComplete="new-password" required minLength={10} maxLength={200} value={form.confirm} onChange={set("confirm")} />
       </label>
       {error !== null && <ErrorBox error={error} />}
-      <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+      <button type="submit" className="btn btn-gold w-full" disabled={busy}>
         {busy ? "Sending…" : "Create account"}
       </button>
       <p className="text-center text-sm text-slate-500">
@@ -126,7 +126,7 @@ export function LoginPage({ onLogin }: { onLogin: (email: string, password: stri
 
   return (
     <div className={shell}>
-      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
+      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6 shadow-2xl">
         <a href="/" className="text-sm text-slate-500 hover:text-brand-600">
           ← Back to the website
         </a>
@@ -140,7 +140,7 @@ export function LoginPage({ onLogin }: { onLogin: (email: string, password: stri
           <input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         {error !== null && <ErrorBox error={error} />}
-        <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+        <button type="submit" className="btn btn-gold w-full" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
         <p className="text-center text-sm text-slate-500">

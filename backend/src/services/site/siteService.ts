@@ -12,6 +12,9 @@ export interface SiteSettingsInput {
   contactPhone?: string;
   whatsapp?: string;
   address?: string;
+  linkedinUrl?: string;
+  youtubeUrl?: string;
+  xUrl?: string;
 }
 
 export interface ContactInput {

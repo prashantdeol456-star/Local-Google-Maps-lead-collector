@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import type { SiteService } from "../../services/site/siteService.js";
 import {
+  aboutPage,
   contactPage,
   FAVICON,
   featuresPage,
@@ -36,6 +37,8 @@ const ContactBody = z.object({
 });
 
 const text = (max: number) => z.string().trim().max(max);
+/** Footer "Follow us" links: https only (or empty to hide the icon). */
+const SocialUrl = z.url({ protocol: /^https$/ }).max(300).or(z.literal(""));
 const SettingsBody = z
   .object({
     brandName: text(80).min(1),
@@ -44,6 +47,9 @@ const SettingsBody = z
     contactPhone: text(30),
     whatsapp: text(30),
     address: text(300),
+    linkedinUrl: SocialUrl,
+    youtubeUrl: SocialUrl,
+    xUrl: SocialUrl,
   })
   .partial();
 
@@ -60,6 +66,9 @@ export async function siteRoutes(app: FastifyInstance, opts: { site: SiteService
       contactPhone: s.contactPhone,
       whatsapp: s.whatsapp,
       address: s.address,
+      linkedinUrl: s.linkedinUrl,
+      youtubeUrl: s.youtubeUrl,
+      xUrl: s.xUrl,
       baseUrl: opts.publicBaseUrl,
     };
   };
@@ -73,6 +82,7 @@ export async function siteRoutes(app: FastifyInstance, opts: { site: SiteService
   app.get("/pricing", async (_req, reply) => html(reply, pricingPage(await info())));
   app.get("/privacy", async (_req, reply) => html(reply, privacyPage(await info())));
   app.get("/terms", async (_req, reply) => html(reply, termsPage(await info())));
+  app.get("/about", async (_req, reply) => html(reply, aboutPage(await info())));
   app.get<{ Querystring: { sent?: string } }>("/contact", async (request, reply) =>
     html(reply, contactPage(await info(), { sent: request.query.sent === "1" }), { "Cache-Control": "no-store" }),
   );

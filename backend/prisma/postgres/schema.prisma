@@ -1135,6 +1135,9 @@ model SiteSettings {
   contactPhone String   @default("")
   whatsapp     String   @default("")
   address      String   @default("")
+  linkedinUrl  String   @default("")
+  youtubeUrl   String   @default("")
+  xUrl         String   @default("")
   updatedAt    DateTime @updatedAt
 }
 

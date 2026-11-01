@@ -3,9 +3,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
 import { api, qs } from "../lib/api";
 import { formatDate } from "../lib/format";
-import { setSearchParams, useSearchParams } from "../lib/router";
+import { Link, setSearchParams, useSearchParams } from "../lib/router";
 
-// Super admin: the public website's brand and contact details, and contact-form messages.
+// Super admin: the public website's brand, contact details and social links, and the
+// contact-form messages (Contact Leads page).
 
 interface SiteSettings {
   brandName: string;
@@ -14,6 +15,9 @@ interface SiteSettings {
   contactPhone: string;
   whatsapp: string;
   address: string;
+  linkedinUrl: string;
+  youtubeUrl: string;
+  xUrl: string;
 }
 
 interface ContactMessage {
@@ -67,6 +71,11 @@ function SettingsCard() {
       </div>
       {field("tagline", "Tagline (shown on the home page and in the footer)", { maxLength: 300 })}
       {field("address", "Address", { maxLength: 300 })}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {field("linkedinUrl", "LinkedIn page (Follow us)", { type: "url", maxLength: 300, placeholder: "https://www.linkedin.com/company/…" })}
+        {field("youtubeUrl", "YouTube channel", { type: "url", maxLength: 300, placeholder: "https://www.youtube.com/@…" })}
+        {field("xUrl", "X (Twitter)", { type: "url", maxLength: 300, placeholder: "https://x.com/…" })}
+      </div>
       {save.error && <ErrorBox error={save.error} />}
       <div className="flex items-center gap-3">
         <button className="btn btn-primary" disabled={save.isPending}>
@@ -75,6 +84,15 @@ function SettingsCard() {
         {save.isSuccess && <span className="text-sm text-emerald-600">Saved. The website shows it now.</span>}
       </div>
     </form>
+  );
+}
+
+export function ContactLeadsPage() {
+  return (
+    <>
+      <PageHeader title="Contact Leads" subtitle="People who wrote to you through the website's Contact us form." />
+      <Messages />
+    </>
   );
 }
 
@@ -97,7 +115,7 @@ function Messages() {
     <div className="card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
         <h2 className="font-medium">
-          Contact messages
+          Messages
           {!!list.data?.unread && <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">{list.data.unread} new</span>}
         </h2>
         <div className="flex gap-1">
@@ -154,9 +172,15 @@ function Messages() {
 export function WebsitePage() {
   return (
     <>
-      <PageHeader title="Website" subtitle="The public pages before login (home, features, pricing, contact) and messages sent from the contact form." />
+      <PageHeader title="Website" subtitle="Brand, contact details and social links shown on the public pages (home, features, pricing, contact)." />
       <SettingsCard />
-      <Messages />
+      <p className="text-sm text-slate-500">
+        Messages from the Contact us form are under{" "}
+        <Link to="/contact-leads" className="text-brand-600 hover:underline">
+          Contact Leads
+        </Link>
+        .
+      </p>
     </>
   );
 }

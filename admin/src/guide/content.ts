@@ -216,13 +216,14 @@ export const GUIDE: GuideSection[] = [
     id: "admin-website",
     title: "17. Administrators: website, contact messages and server settings",
     audience: "admin",
-    image: img("17-website-settings", "Website: brand, contact details and contact-form messages"),
+    image: img("17-website-settings", "Website: brand, contact details and social links"),
     steps: [
-      "Website page: edit the brand name, tagline, contact email, phone, WhatsApp and address shown on the public pages. Messages from the contact form appear below; mark them read or delete them.",
+      "Website page: edit the brand name, tagline, contact email, phone, WhatsApp, address and the “Follow us” links (LinkedIn, YouTube, X) shown on the public pages.",
+      "Contact Leads page: every message sent with the website’s Contact us form. The menu shows how many are new; mark them read or delete them.",
       "Server settings (Render → service → Environment): DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL/ADMIN_PASSWORD (first start only), PUBLIC_BASE_URL = your domain (e.g. https://lead.the360tech.com).",
       "Social Connect: META_APP_ID and META_APP_SECRET (Meta app with Facebook Login), LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET. Add the redirect URLs <your domain>/api/oauth/callback/meta and …/linkedin in those apps.",
       "Optional platform defaults used by super admins: EMAIL_PROVIDER with RESEND_API_KEY or SMTP_*, WHATSAPP_PROVIDER=meta with META_WA_*, ANTHROPIC_API_KEY. Customers always use their own keys.",
-      "The public website (/, /features, /pricing, /contact, /privacy, /terms) and sitemap.xml are ready for Google; submit https://<your domain>/sitemap.xml in Google Search Console.",
+      "The public website (/, /features, /pricing, /about, /contact, /privacy, /terms) and sitemap.xml are ready for Google; submit https://<your domain>/sitemap.xml in Google Search Console.",
     ],
   },
   {

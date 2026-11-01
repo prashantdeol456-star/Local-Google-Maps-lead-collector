@@ -17,7 +17,7 @@ afterAll(async () => {
 
 describe("public website", () => {
   it("serves indexable pages with titles, descriptions, canonical URLs and structured data", async () => {
-    for (const path of ["/", "/features", "/pricing", "/contact", "/privacy", "/terms"]) {
+    for (const path of ["/", "/features", "/pricing", "/about", "/contact", "/privacy", "/terms"]) {
       const res = await t.app.inject({ method: "GET", url: path });
       expect(res.statusCode, path).toBe(200);
       expect(res.headers["content-type"]).toContain("text/html");
@@ -52,6 +52,15 @@ describe("public website", () => {
     expect(page).not.toContain("Acme <Leads>");
     expect(page).toContain('href="mailto:hello@acme.in"');
     expect(page).toContain("Hazratganj, Lucknow");
+    expect(page).toContain('href="tel:+919876543210"');
+    expect(page).not.toContain("Follow us"); // no social links yet
+
+    const bad = await t.app.inject({ method: "PUT", url: "/api/site/settings", headers: superAuth, payload: { linkedinUrl: "javascript:alert(1)" } });
+    expect(bad.statusCode).toBe(400);
+    await t.app.inject({ method: "PUT", url: "/api/site/settings", headers: superAuth, payload: { linkedinUrl: "https://www.linkedin.com/company/acme" } });
+    const home = (await t.app.inject({ method: "GET", url: "/" })).body;
+    expect(home).toContain("Follow us");
+    expect(home).toContain('href="https://www.linkedin.com/company/acme"');
   });
 
   it("stores contact form messages for super admins, ignores bots, and validates", async () => {

@@ -27,7 +27,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ExtensionsPage } from "./pages/ExtensionsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { SenderPage } from "./pages/SenderPage";
-import { WebsitePage } from "./pages/WebsitePage";
+import { ContactLeadsPage, WebsitePage } from "./pages/WebsitePage";
 import { GuidePage } from "./pages/GuidePage";
 
 function Routes({ admin }: { admin: Admin }) {
@@ -68,6 +68,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/users") return <UsersPage admin={admin} />;
   if (path === "/sender") return <SenderPage />;
   if (path === "/website") return <WebsitePage />;
+  if (path === "/contact-leads") return <ContactLeadsPage />;
   if (path === "/guide") return <GuidePage />;
   if (path === "/settings") return <SettingsPage admin={admin} />;
   return (
