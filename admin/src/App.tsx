@@ -28,6 +28,7 @@ import { ExtensionsPage } from "./pages/ExtensionsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { SenderPage } from "./pages/SenderPage";
 import { WebsitePage } from "./pages/WebsitePage";
+import { GuidePage } from "./pages/GuidePage";
 
 function Routes({ admin }: { admin: Admin }) {
   const path = usePath();
@@ -67,6 +68,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/users") return <UsersPage admin={admin} />;
   if (path === "/sender") return <SenderPage />;
   if (path === "/website") return <WebsitePage />;
+  if (path === "/guide") return <GuidePage />;
   if (path === "/settings") return <SettingsPage admin={admin} />;
   return (
     <EmptyState title="Page not found">

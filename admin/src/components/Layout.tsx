@@ -6,7 +6,7 @@ import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts", "/sender", "/inbox", "/social"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/opt-outs", "/contacts", "/sender", "/inbox", "/social", "/guide"]);
 
 /** Customer-only pages (super admins send with the .env senders, set up in Settings). */
 const CUSTOMER_ONLY = new Set(["/sender"]);
@@ -30,6 +30,7 @@ const NAV: { to: string; label: string; icon: string; soon?: boolean }[] = [
   { to: "/integrations", label: "Integrations", icon: "⇄" },
   { to: "/extensions", label: "Extensions", icon: "⬇" },
   { to: "/sender", label: "My sender", icon: "➚" },
+  { to: "/guide", label: "Guide", icon: "?" },
   { to: "/users", label: "Users", icon: "☺" },
   { to: "/website", label: "Website", icon: "⌂" },
   { to: "/settings", label: "Settings", icon: "⚙" },
@@ -139,9 +140,9 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
   );
 
   return (
-    <div className="min-h-screen lg:pl-60">
+    <div className="min-h-screen lg:pl-60 print:pl-0">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block">{sidebar}</aside>
+      <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block print:hidden">{sidebar}</aside>
       {/* Mobile sidebar */}
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -150,7 +151,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
         </div>
       )}
 
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
+      <header className="sticky top-0 z-30 flex h-16 print:hidden items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
         <button className="btn lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
           ☰
         </button>

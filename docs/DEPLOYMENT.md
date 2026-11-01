@@ -154,3 +154,14 @@ DATABASE_PROVIDER=postgresql npx prisma generate
 DATABASE_PROVIDER=postgresql TEST_DATABASE_URL="postgresql://user:pass@localhost:5432/leads_test" npx vitest run
 npx prisma generate   # back to SQLite
 ```
+
+## User guide (admin panel → Guide)
+
+The step-by-step guide with screenshots lives at `/admin/guide` (text in `admin/src/guide/content.ts`).
+Screenshots and the two PDFs are static files in `admin/public/guide/`:
+
+- `lead-platform-guide.pdf` – customers' version (`/admin/guide?audience=customer`)
+- `lead-platform-admin-guide.pdf` – full version with the administrator sections
+
+When the screens change, retake the screenshots from a demo database (never real customer data),
+print the Guide page again to PDF (Chrome → Print → Save as PDF works too) and replace the files.
