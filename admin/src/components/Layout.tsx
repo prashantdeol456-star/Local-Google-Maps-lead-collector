@@ -96,8 +96,8 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
   }).data?.unread;
 
   const sidebar = (
-    <nav className="flex h-full flex-col bg-sidebar bg-linear-to-b from-[#0a2e23] to-[#041a13] text-slate-300">
-      <div className="flex h-16 shrink-0 items-center gap-2 px-5 text-white">
+    <nav className="flex h-full flex-col border-r border-[#dfe8e3] bg-[#f4f8f6] text-[#2b4a3f] dark:border-[#1c3a2e] dark:bg-[#0b1f17] dark:text-slate-300">
+      <div className="flex h-16 shrink-0 items-center gap-2 px-5 text-[#0f2a20] dark:text-white">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-[#1fb57b] to-[#0d8a5c] text-sm font-bold">LP</span>
         <span className="font-bold tracking-tight">
           Lead Platform<sup className="text-[9px]">™</sup>
@@ -109,7 +109,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
           if (!items.length) return null;
           return (
             <div key={group.title} className="mt-3 first:mt-1">
-              <p className="px-3 pb-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7fa294]">{group.title}</p>
+              <p className="px-3 pb-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#557366] dark:text-[#7fa294]">{group.title}</p>
               <ul className="space-y-0.5">
                 {items.map((item) => {
                   const active = isActive(path, item.to);
@@ -126,7 +126,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
                           to={item.to}
                           onClick={() => setOpen(false)}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm ${active ? "nav-active" : "hover:bg-sidebar-hover hover:text-white"}`}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm ${active ? "nav-active shadow-[inset_3px_0_0_#c4953a]" : "hover:bg-[#e4efe9] hover:text-[#0d4a36] dark:hover:bg-sidebar-hover dark:hover:text-white"}`}
                         >
                           <span className="w-4 text-center" aria-hidden>{item.icon}</span>
                           {item.label}
@@ -145,7 +145,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
           );
         })}
       </div>
-      <p className="px-5 py-4 text-xs text-slate-500">© Lead Platform</p>
+      <p className="px-5 py-4 text-xs text-[#6b8379] dark:text-slate-500">© Lead Platform</p>
     </nav>
   );
 

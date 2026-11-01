@@ -46,13 +46,14 @@
   .btn-gold {
     @apply border-gold-400 bg-linear-to-b from-gold-300 to-gold-400 font-semibold text-[#1d1606] hover:brightness-105;
   }
+  /* Selected menu item / tab: soft green with a thin gold marker (easy on the eyes, AA contrast) */
   .nav-active {
-    @apply bg-linear-to-b from-gold-300 to-gold-400 font-semibold text-[#1d1606];
+    @apply bg-[#dcefe5] font-semibold text-[#0b5a40] dark:bg-[#14503c] dark:text-white;
   }
   .auth-shell {
     background:
-      radial-gradient(900px 450px at 85% 10%, #14503c 0%, transparent 60%),
-      linear-gradient(160deg, #0a2e23, #041a13);
+      radial-gradient(900px 450px at 85% 10%, #cfe9dc 0%, transparent 60%),
+      linear-gradient(160deg, #f4f8f6, #e3f0e9);
   }
   .btn-danger {
     @apply border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950;
@@ -71,13 +72,13 @@
 /* Thin scrollbar for the sidebar menu (scrolls up and down when it is longer than the screen) */
 .sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #2c5a48 transparent;
+  scrollbar-color: #bcd0c6 transparent;
 }
 .sidebar-scroll::-webkit-scrollbar {
   width: 6px;
 }
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background: #2c5a48;
+  background: #bcd0c6;
   border-radius: 6px;
 }
 
@@ -85,4 +86,12 @@
 textarea.input,
 select.input[multiple] {
   height: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .auth-shell {
+    background:
+      radial-gradient(900px 450px at 85% 10%, #14503c 0%, transparent 60%),
+      linear-gradient(160deg, #0a2e23, #041a13);
+  }
 }

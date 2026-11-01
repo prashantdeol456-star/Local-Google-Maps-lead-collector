@@ -74,7 +74,7 @@ export function BillingPage() {
           <>
             <div className="flex flex-wrap items-end gap-2">
               {PRESETS.map((p) => (
-                <button key={p} type="button" className={`btn ${amount === String(p) ? "nav-active border-gold-400" : ""}`} onClick={() => setAmount(String(p))}>
+                <button key={p} type="button" className={`btn ${amount === String(p) ? "nav-active border-brand-500" : ""}`} onClick={() => setAmount(String(p))}>
                   ₹{p.toLocaleString("en-IN")}
                 </button>
               ))}

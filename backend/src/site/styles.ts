@@ -1,11 +1,11 @@
-// Stylesheet of the public website (served at /site.css). Deep green with gold accents: dark
-// hero, header, plans and footer; light content sections. System fonts (no downloads).
+// Stylesheet of the public website (served at /site.css). Green with gold accents (softened for
+// comfortable reading): green hero, header, plans and footer; light content sections. System fonts.
 
 /** Thin gold curves drawn in the corners of the dark sections. */
 const CURVES = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400' fill='none' stroke='%23d9ad55' stroke-opacity='.45'%3E%3Cpath d='M600 40C470 90 380 210 330 400'/%3E%3Cpath d='M600 90C490 140 410 250 380 400' stroke-opacity='.3'/%3E%3Cpath d='M600 150C520 190 460 280 440 400' stroke-opacity='.2'/%3E%3C/svg%3E")`;
 
 export const SITE_CSS = `
-:root{--g950:#041a13;--g900:#06231a;--g800:#0a2e23;--g700:#0f3d2e;--g600:#155c44;--g100:#e7f2ec;--gold:#e2b558;--gold-l:#f3d58c;--gold-d:#c4953a;--text:#0f1f19;--muted:#5a6b63;--line:#e2e8e4;--bg:#fff;--alt:#f3f6f3;--ok:#1d8a52;--err:#c9362b;--r:14px}
+:root{--g950:#123a2d;--g900:#164535;--g800:#1b5441;--g700:#22654d;--g600:#155c44;--g100:#e7f2ec;--gold:#e2b558;--gold-l:#f3d58c;--gold-d:#c4953a;--text:#0f1f19;--muted:#5a6b63;--line:#e2e8e4;--bg:#fff;--alt:#f3f6f3;--ok:#1d8a52;--err:#c9362b;--r:14px}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "Plus Jakarta Sans","Segoe UI",Inter,system-ui,-apple-system,Roboto,Arial,sans-serif}
@@ -45,7 +45,7 @@ p{margin:0 0 1em}
 .menu__panel a{color:#fff;padding:9px 0;font-weight:600}.menu__panel .btn{margin-top:8px;color:#1d1606}
 
 /* Hero */
-.hero{position:relative;overflow:hidden;color:#fff;background:${CURVES} right bottom/60% auto no-repeat,radial-gradient(1000px 500px at 85% 20%,#14503c 0%,transparent 60%),linear-gradient(160deg,var(--g800),var(--g950))}
+.hero{position:relative;overflow:hidden;color:#fff;background:${CURVES} right bottom/60% auto no-repeat,radial-gradient(1000px 500px at 85% 20%,#2c7a5d 0%,transparent 60%),linear-gradient(160deg,var(--g800),var(--g950))}
 .hero__in{display:grid;grid-template-columns:1fr 1.15fr;gap:48px;align-items:center;padding:56px 20px 64px}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:rgba(226,181,88,.12);border:1px solid rgba(226,181,88,.35);color:var(--gold-l);font-size:.74rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 18px}
 .hero h1{max-width:12ch;margin-bottom:.45em}
@@ -55,13 +55,13 @@ p{margin:0 0 1em}
 .trust li{display:flex;align-items:center;gap:7px}.trust .i{color:var(--gold)}.trust li:first-child .i{color:#3ccf8e}
 
 /* Product preview */
-.mock{background:#0f3628;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:10px;box-shadow:0 30px 70px rgba(0,0,0,.45);font-size:12px;color:var(--text)}
+.mock{background:#1d5a45;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:10px;box-shadow:0 30px 70px rgba(0,0,0,.45);font-size:12px;color:var(--text)}
 .mock__bar{display:flex;gap:6px;padding:4px 6px 10px}.mock__bar span{width:9px;height:9px;border-radius:50%;background:#f0605a}.mock__bar span:nth-child(2){background:#f4bf4f}.mock__bar span:nth-child(3){background:#3cc35b}
 .mock__body{display:grid;grid-template-columns:150px 1fr;border-radius:12px;overflow:hidden;background:#fff}
-.mock__side{background:var(--g900);color:#cfdcd5;padding:14px 10px}
-.mock__brand{display:flex;align-items:center;gap:7px;color:#fff;font-weight:800;font-size:12.5px;margin:0 0 16px}.mock__brand .brand__logo{width:24px;height:24px;font-size:10px;border-radius:6px}
+.mock__side{background:#f4f8f6;color:#2b4a3f;padding:14px 10px}
+.mock__brand{display:flex;align-items:center;gap:7px;color:#0f2a20;font-weight:800;font-size:12.5px;margin:0 0 16px}.mock__brand .brand__logo{width:24px;height:24px;font-size:10px;border-radius:6px}
 .mock__nav{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;margin:0 0 3px;font-weight:600}
-.mock__nav.is-on{background:linear-gradient(180deg,var(--gold-l),var(--gold));color:#1d1606}
+.mock__nav.is-on{background:#dcefe5;color:#0b5a40;box-shadow:inset 3px 0 0 var(--gold-d)}
 .mock__main{padding:14px 16px 12px;min-width:0}
 .mock__head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.mock__head b{font-size:15px}
 .mock__pill{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:7px;padding:3px 8px;font-size:11px}
@@ -125,7 +125,7 @@ p{margin:0 0 1em}
 .cta__text{flex:1}.cta__text h2{color:var(--gold);margin:0 0 4px;font-size:clamp(1.3rem,2.4vw,1.75rem)}.cta__text p{margin:0;color:#d6e2dc}
 
 /* Page head (inner pages) */
-.page-head{color:#fff;padding:60px 0 54px;background:${CURVES} right bottom/50% auto no-repeat,radial-gradient(800px 400px at 85% 10%,#14503c 0%,transparent 60%),linear-gradient(160deg,var(--g800),var(--g950))}
+.page-head{color:#fff;padding:60px 0 54px;background:${CURVES} right bottom/50% auto no-repeat,radial-gradient(800px 400px at 85% 10%,#2c7a5d 0%,transparent 60%),linear-gradient(160deg,var(--g800),var(--g950))}
 .page-head h1{margin-bottom:.3em}.page-head .hero__lead{margin:0}
 
 /* Contact */
