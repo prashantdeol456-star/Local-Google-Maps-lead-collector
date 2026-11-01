@@ -248,7 +248,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(senderWebhookRoutes, { senders, tracking, whatsappTracking: waTracking });
   await app.register(userRoutes, { users: new UserService(repos), registerRateLimitPerMinute: config.loginRateLimitPerMinute });
   await app.register(extensionRoutes, { extensionsDir: config.extensionsDir });
-  await app.register(siteRoutes, { site: new SiteService(db), publicBaseUrl: config.publicBaseUrl, contactRateLimitPerMinute: config.loginRateLimitPerMinute });
+  await app.register(siteRoutes, { site: new SiteService(db), publicBaseUrl: config.publicBaseUrl, contactRateLimitPerMinute: config.loginRateLimitPerMinute, timeZone: config.timeZone });
   await app.register(adminRoutes, { adminDir: config.adminDir });
 
   app.decorate("authService", auth);

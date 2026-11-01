@@ -27,6 +27,7 @@ function where(f: LinkedInLeadFilters) {
     ...(f.hasPhone !== undefined ? { hasPhone: f.hasPhone } : {}),
     // websites is a JSON array; "[]" means none
     ...(f.hasWebsite !== undefined ? { websites: f.hasWebsite ? { not: "[]" } : "[]" } : {}),
+    ...(f.createdFrom || f.createdUntil ? { createdAt: { ...(f.createdFrom ? { gte: f.createdFrom } : {}), ...(f.createdUntil ? { lt: f.createdUntil } : {}) } } : {}),
   };
 }
 

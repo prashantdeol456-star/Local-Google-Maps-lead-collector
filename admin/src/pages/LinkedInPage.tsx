@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner, StatCard } from "../components/ui";
+import { ConfirmButton, DateRangeFilter, EmptyState, ErrorBox, PageHeader, Pagination, Spinner, StatCard } from "../components/ui";
 import { api, qs, withViewOwner } from "../lib/api";
 import { formatDate, formatNumber, safeHref } from "../lib/format";
 import { Link, navigate, setSearchParams, useSearchParams } from "../lib/router";
@@ -91,12 +91,14 @@ export function LinkedInLeadsPage() {
   const hasEmail = params.get("hasEmail") ?? "";
   const hasPhone = params.get("hasPhone") ?? "";
   const hasWebsite = params.get("hasWebsite") ?? "";
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const [search, setSearch] = useState(q);
   const [companyInput, setCompanyInput] = useState(company);
   const [importing, setImporting] = useState(false);
 
-  const filters = { q, company, tag, source, hasEmail, hasPhone, hasWebsite };
+  const filters = { q, company, tag, source, hasEmail, hasPhone, hasWebsite, from, to };
   const list = useQuery({
     queryKey: ["linkedin", "list", filters, page],
     queryFn: () => api<LinkedInLeadPage>(`/linkedin/leads${qs({ ...filters, page, pageSize: PAGE_SIZE })}`),
@@ -180,6 +182,10 @@ export function LinkedInLeadsPage() {
           {select("hasPhone", hasPhone, [["", "Any"], ["true", "Has phone"], ["false", "No phone"]], "Phone")}
           {select("hasWebsite", hasWebsite, [["", "Any"], ["true", "Has website"], ["false", "No website"]], "Website")}
           {select("source", source, [["", "All sources"], ["extension", "Extension"], ["csv", "CSV import"], ["admin", "Admin"]], "Source")}
+          <div className="space-y-1 sm:col-span-2">
+            <span className="label block">Date added</span>
+            <DateRangeFilter from={from} to={to} onChange={(f, t) => setSearchParams({ from: f, to: t, page: null })} />
+          </div>
           {filtered && (
             <div className="flex items-end">
               <button
@@ -187,7 +193,7 @@ export function LinkedInLeadsPage() {
                 onClick={() => {
                   setSearch("");
                   setCompanyInput("");
-                  setSearchParams({ q: null, company: null, tag: null, source: null, hasEmail: null, hasPhone: null, hasWebsite: null, page: null });
+                  setSearchParams({ q: null, company: null, tag: null, source: null, hasEmail: null, hasPhone: null, hasWebsite: null, from: null, to: null, page: null });
                 }}
               >
                 Clear filters

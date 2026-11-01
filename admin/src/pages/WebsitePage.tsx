@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
+import { ConfirmButton, DateRangeFilter, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
 import { api, qs } from "../lib/api";
 import { formatDate } from "../lib/format";
 import { Link, setSearchParams, useSearchParams } from "../lib/router";
@@ -100,10 +100,12 @@ function Messages() {
   const client = useQueryClient();
   const params = useSearchParams();
   const status = params.get("status") === "new" ? "new" : "";
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const list = useQuery({
-    queryKey: ["site-messages", status, page],
-    queryFn: () => api<{ items: ContactMessage[]; total: number; unread: number }>(`/site/messages${qs({ status, page, pageSize: 25 })}`),
+    queryKey: ["site-messages", status, from, to, page],
+    queryFn: () => api<{ items: ContactMessage[]; total: number; unread: number }>(`/site/messages${qs({ status, from, to, page, pageSize: 25 })}`),
     placeholderData: keepPreviousData,
   });
   const act = useMutation({
@@ -118,7 +120,8 @@ function Messages() {
           Messages
           {!!list.data?.unread && <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">{list.data.unread} new</span>}
         </h2>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <DateRangeFilter from={from} to={to} onChange={(f, t) => setSearchParams({ from: f, to: t, page: null })} />
           {(["", "new"] as const).map((v) => (
             <button
               key={v}

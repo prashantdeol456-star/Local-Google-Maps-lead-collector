@@ -16,6 +16,7 @@ import {
   type SiteInfo,
 } from "../../site/pages.js";
 import { SITE_CSS } from "../../site/styles.js";
+import { day, dayRange } from "../leadFilters.js";
 import { requireSuperAdmin } from "../middleware/auth.js";
 import { IdParams, Pagination, parse, toSkipTake } from "../validation.js";
 
@@ -53,7 +54,7 @@ const SettingsBody = z
   })
   .partial();
 
-export async function siteRoutes(app: FastifyInstance, opts: { site: SiteService; publicBaseUrl: string | null; contactRateLimitPerMinute: number }) {
+export async function siteRoutes(app: FastifyInstance, opts: { site: SiteService; publicBaseUrl: string | null; contactRateLimitPerMinute: number; timeZone: string }) {
   // The contact form posts as a normal HTML form (works without JavaScript).
   app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string", bodyLimit: 16 * 1024 }, (_req, body, done) => done(null, body));
 
@@ -116,8 +117,9 @@ export async function siteRoutes(app: FastifyInstance, opts: { site: SiteService
   });
   app.get("/api/site/messages", async (request) => {
     requireSuperAdmin(request);
-    const query = parse(Pagination.extend({ status: z.enum(["new", "read"]).optional() }), request.query);
-    return { ...(await opts.site.messages({ status: query.status, ...toSkipTake(query) })), page: query.page, pageSize: query.pageSize };
+    const query = parse(Pagination.extend({ status: z.enum(["new", "read"]).optional(), from: day, to: day }), request.query);
+    const range = dayRange(query.from, query.to, opts.timeZone);
+    return { ...(await opts.site.messages({ status: query.status, ...range, ...toSkipTake(query) })), page: query.page, pageSize: query.pageSize };
   });
   app.post("/api/site/messages/:id/:status", async (request) => {
     requireSuperAdmin(request);

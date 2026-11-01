@@ -111,14 +111,14 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
   }).data?.unread;
 
   const sidebar = (
-    <nav className="flex h-full flex-col bg-sidebar text-slate-300">
+    <nav className="flex h-full flex-col bg-sidebar bg-linear-to-b from-[#0a2e23] to-[#041a13] text-slate-300">
       <div className="flex h-16 shrink-0 items-center gap-2 px-5 text-white">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-[#1fb57b] to-[#0d8a5c] text-sm font-bold">LP</span>
         <span className="font-bold tracking-tight">
           Lead Platform<sup className="text-[9px]">™</sup>
         </span>
       </div>
-      <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+      <ul className="sidebar-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-2">
         {NAV.filter((item) => canOpen(admin, item.to) && !(admin.role === "super_admin" && CUSTOMER_ONLY.has(item.to))).map((item) => {
           const active = isActive(path, item.to);
           return (
@@ -165,7 +165,7 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
         </div>
       )}
 
-      <header className="sticky top-0 z-30 flex h-16 print:hidden items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
+      <header className="sticky top-0 z-30 flex h-16 print:hidden items-center gap-3 border-b border-[#e2e8e4] bg-white/90 px-4 backdrop-blur sm:px-6 dark:border-[#1c3a2e] dark:bg-[#0b1f17]/90">
         <button className="btn lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
           ☰
         </button>

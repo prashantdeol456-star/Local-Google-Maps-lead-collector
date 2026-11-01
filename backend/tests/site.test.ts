@@ -78,6 +78,10 @@ describe("public website", () => {
     const list = (await t.app.inject({ method: "GET", url: "/api/site/messages", headers: superAuth })).json();
     expect(list.items.map((m: { email: string }) => m.email)).toEqual(["ravi@shop.in"]);
     expect(list.unread).toBe(1);
+    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    const count = async (q: string) => (await t.app.inject({ method: "GET", url: `/api/site/messages?${q}`, headers: superAuth })).json().total;
+    expect(await count(`from=${day(-1)}&to=${day(1)}`)).toBe(1);
+    expect(await count(`from=${day(3)}`)).toBe(0);
     await t.app.inject({ method: "POST", url: `/api/site/messages/${list.items[0].id}/read`, headers: superAuth });
     expect((await t.app.inject({ method: "GET", url: "/api/site/messages", headers: superAuth })).json().unread).toBe(0);
   });

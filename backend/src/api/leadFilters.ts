@@ -11,7 +11,7 @@ const yesNo = z
   .optional()
   .transform((v) => (v === undefined ? undefined : v === "yes"));
 
-const day = z
+export const day = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD")
   .optional();
@@ -64,4 +64,12 @@ function nextDay(value: string): string {
   const d = new Date(`${value}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+/** A "date added" range (inclusive calendar days in the app time zone) as createdAt bounds. */
+export function dayRange(from: string | undefined, to: string | undefined, timeZone: string): { createdFrom?: Date; createdUntil?: Date } {
+  return {
+    createdFrom: from ? dayStart(from, timeZone) : undefined,
+    createdUntil: to ? dayStart(nextDay(to), timeZone) : undefined,
+  };
 }

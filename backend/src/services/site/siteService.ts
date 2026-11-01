@@ -42,8 +42,13 @@ export class SiteService {
     });
   }
 
-  async messages(query: { status?: "new" | "read"; skip: number; take: number }) {
-    const where = query.status ? { status: query.status } : {};
+  async messages(query: { status?: "new" | "read"; createdFrom?: Date; createdUntil?: Date; skip: number; take: number }) {
+    const where = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.createdFrom || query.createdUntil
+        ? { createdAt: { ...(query.createdFrom ? { gte: query.createdFrom } : {}), ...(query.createdUntil ? { lt: query.createdUntil } : {}) } }
+        : {}),
+    };
     const [items, total, unread] = await Promise.all([
       this.db.contactMessage.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: query.skip, take: query.take }),
       this.db.contactMessage.count({ where }),

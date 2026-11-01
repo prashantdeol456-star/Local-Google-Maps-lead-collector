@@ -126,6 +126,12 @@ describe("LinkedIn leads API", () => {
     expect(await names("hasWebsite=false")).toEqual(["Asha", "Bala"]);
     expect(await names("source=csv")).toEqual([]);
     expect((await call("GET", "/api/linkedin/leads?hasEmail=maybe")).statusCode).toBe(400);
+    // Date added (calendar days); today in any zone is within yesterday..tomorrow UTC
+    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    expect(await names(`from=${day(-1)}&to=${day(1)}`)).toEqual(["Asha", "Bala", "Chetan"]);
+    expect(await names(`from=${day(3)}`)).toEqual([]);
+    expect(await names(`to=${day(-3)}`)).toEqual([]);
+    expect((await call("GET", "/api/linkedin/leads?from=01-11-2026")).statusCode).toBe(400);
 
     const facets = (await call("GET", "/api/linkedin/facets")).json();
     expect(facets).toMatchObject({ total: 3, withEmail: 1, withPhone: 1, withWebsite: 1, tags: [{ value: "HR", count: 2 }], sources: [{ value: "extension", count: 3 }] });

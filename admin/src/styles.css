@@ -19,7 +19,7 @@
 
 @layer base {
   html {
-    @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200;
+    @apply bg-[#f4f7f5] text-slate-800 antialiased dark:bg-[#07140f] dark:text-slate-200;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-500;
@@ -28,20 +28,20 @@
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+    @apply rounded-2xl border border-[#e2e8e4] bg-white shadow-[0_4px_18px_rgba(16,40,30,0.05)] dark:border-[#1c3a2e] dark:bg-[#0b1f17];
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400
-      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100
-      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-700;
+    @apply h-10 w-full rounded-lg border border-[#cfd8d3] bg-white px-3 py-2 text-sm text-slate-800 shadow-[inset_0_1px_1px_rgba(0,0,0,0.03)] transition placeholder:text-slate-400
+      hover:border-[#a9b8b0] focus:border-gold-600 focus:outline-none focus:ring-3 focus:ring-gold-100
+      dark:border-[#24463a] dark:bg-[#0d241b] dark:text-slate-100 dark:focus:ring-gold-600/30;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium
-      text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50
-      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cfd8d3] bg-white px-3.5 py-2 text-sm font-semibold
+      text-slate-700 transition hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50
+      dark:border-[#24463a] dark:bg-[#0d241b] dark:text-slate-200 dark:hover:bg-[#12382c];
   }
   .btn-primary {
-    @apply border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700;
+    @apply border-brand-600 bg-brand-600 text-white shadow-sm hover:border-brand-700 hover:bg-brand-700 hover:text-white dark:border-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700;
   }
   .btn-gold {
     @apply border-gold-400 bg-linear-to-b from-gold-300 to-gold-400 font-semibold text-[#1d1606] hover:brightness-105;
@@ -58,12 +58,31 @@
     @apply border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950;
   }
   .th {
-    @apply whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply whitespace-nowrap bg-[#f6f9f7] px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#4d6158] dark:bg-[#0d241b] dark:text-slate-400;
   }
   .td {
     @apply px-3 py-2.5 align-top text-sm;
   }
   .label {
-    @apply text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400;
+    @apply text-[13px] font-semibold text-[#33443d] dark:text-slate-300;
   }
+}
+
+/* Thin scrollbar for the sidebar menu (scrolls up and down when it is longer than the screen) */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2c5a48 transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #2c5a48;
+  border-radius: 6px;
+}
+
+/* Fixed height only for one-line fields; text areas grow with their rows. */
+textarea.input,
+select.input[multiple] {
+  height: auto;
 }

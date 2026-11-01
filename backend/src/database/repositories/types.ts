@@ -611,6 +611,10 @@ export interface LinkedInLeadFilters {
   hasEmail?: boolean;
   hasPhone?: boolean;
   hasWebsite?: boolean;
+  /** Added on or after */
+  createdFrom?: Date;
+  /** Added before */
+  createdUntil?: Date;
   sort?: (typeof LINKEDIN_SORT_FIELDS)[number];
   order?: "asc" | "desc";
 }

@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ConfirmButton, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
+import { ConfirmButton, DateRangeFilter, EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
 import { api, qs, withViewOwner } from "../lib/api";
 import { formatDate, formatNumber, hostOf, safeHref } from "../lib/format";
 import { Link, setSearchParams, useSearchParams } from "../lib/router";
@@ -63,7 +63,7 @@ export function LeadsPage() {
   const keyword = params.get("keyword") ?? "";
   const state = params.get("state") ?? "";
   const extra = Object.fromEntries(EXTRA_FILTERS.map((k) => [k, params.get(k) ?? ""])) as Record<(typeof EXTRA_FILTERS)[number], string>;
-  const extraCount = EXTRA_FILTERS.filter((k) => extra[k]).length;
+  const extraCount = EXTRA_FILTERS.filter((k) => extra[k] && k !== "from" && k !== "to").length;
   const [showMore, setShowMore] = useState(extraCount > 0);
   const sort = (SORTABLE as readonly string[]).includes(params.get("sort") ?? "") ? params.get("sort")! : "createdAt";
   const order = params.get("order") === "asc" ? "asc" : "desc";
@@ -162,6 +162,7 @@ export function LeadsPage() {
           <FacetSelect label="States" param="state" value={state} options={facets.data?.states} />
           <FacetSelect label="Categories" param="category" value={category} options={facets.data?.categories} />
           <FacetSelect label="Keywords" param="keyword" value={keyword} options={facets.data?.keywords} />
+          <DateRangeFilter from={extra.from} to={extra.to} onChange={(from, to) => setSearchParams({ from, to, page: null })} />
           <button className={`btn ${extraCount ? "btn-primary" : ""}`} aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
             ⚙ More filters{extraCount ? ` (${extraCount})` : ""}
           </button>
@@ -212,14 +213,6 @@ export function LeadsPage() {
                 onBlur={(e) => setSearchParams({ minReviews: e.target.value.trim(), page: null })}
                 onKeyDown={(e) => e.key === "Enter" && setSearchParams({ minReviews: e.currentTarget.value.trim(), page: null })}
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="label">Added from</span>
-              <input className="input w-auto" type="date" value={extra.from} max={extra.to || undefined} onChange={(e) => setSearchParams({ from: e.target.value, page: null })} />
-            </label>
-            <label className="block space-y-1">
-              <span className="label">Added to</span>
-              <input className="input w-auto" type="date" value={extra.to} min={extra.from || undefined} onChange={(e) => setSearchParams({ to: e.target.value, page: null })} />
             </label>
             <p className="basis-full text-xs text-slate-500">Exports use the same filters.</p>
           </div>

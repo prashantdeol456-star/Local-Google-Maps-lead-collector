@@ -7,7 +7,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[#0f1f19] dark:text-white">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -30,8 +30,8 @@ export function StatCard({ label, value, hint, tone = "blue", icon }: { label: s
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="label">{label}</p>
-        <p className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="mt-0.5 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
           {value === undefined ? <span className="inline-block h-7 w-12 animate-pulse rounded bg-slate-200 dark:bg-slate-800" /> : formatNumber(value)}
         </p>
         {hint && <p className="text-xs text-slate-500">{hint}</p>}
@@ -134,5 +134,61 @@ export function ConfirmButton({ label, confirmLabel = "Confirm?", onConfirm, dis
         Cancel
       </button>
     </span>
+  );
+}
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const daysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return ymd(d);
+};
+
+const DATE_PRESETS: { id: string; label: string; range: () => [string, string] }[] = [
+  { id: "today", label: "Today", range: () => [daysAgo(0), daysAgo(0)] },
+  { id: "yesterday", label: "Yesterday", range: () => [daysAgo(1), daysAgo(1)] },
+  { id: "7d", label: "Last 7 days", range: () => [daysAgo(6), daysAgo(0)] },
+  { id: "30d", label: "Last 30 days", range: () => [daysAgo(29), daysAgo(0)] },
+  { id: "month", label: "This month", range: () => [`${daysAgo(0).slice(0, 8)}01`, daysAgo(0)] },
+];
+
+/** "Date added" filter: quick ranges or a custom from–to, kept in the URL as ?from=&to= (YYYY-MM-DD). */
+export function DateRangeFilter({ from, to, onChange }: { from: string; to: string; onChange: (from: string | null, to: string | null) => void }) {
+  const preset = DATE_PRESETS.find((p) => {
+    const [f, t] = p.range();
+    return f === from && t === to;
+  })?.id;
+  const [custom, setCustom] = useState(!preset && !!(from || to));
+  const mode = custom ? "custom" : (preset ?? (from || to ? "custom" : ""));
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        className="input w-auto"
+        aria-label="Date added"
+        value={mode}
+        onChange={(e) => {
+          const id = e.target.value;
+          if (id === "custom") return setCustom(true);
+          setCustom(false);
+          const range = DATE_PRESETS.find((p) => p.id === id)?.range();
+          onChange(range?.[0] ?? null, range?.[1] ?? null);
+        }}
+      >
+        <option value="">📅 Any date</option>
+        {DATE_PRESETS.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}
+          </option>
+        ))}
+        <option value="custom">Custom range…</option>
+      </select>
+      {mode === "custom" && (
+        <>
+          <input className="input w-auto" type="date" aria-label="From" value={from} max={to || undefined} onChange={(e) => onChange(e.target.value || null, to || null)} />
+          <span className="text-slate-400">–</span>
+          <input className="input w-auto" type="date" aria-label="To" value={to} min={from || undefined} onChange={(e) => onChange(from || null, e.target.value || null)} />
+        </>
+      )}
+    </div>
   );
 }

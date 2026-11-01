@@ -3,6 +3,7 @@ import { z } from "zod";
 import { LINKEDIN_SORT_FIELDS, type LinkedInLeadFilters } from "../../database/repositories/index.js";
 import type { LinkedInService } from "../../services/linkedin/linkedinService.js";
 import { formatWallClock } from "../../utils/time.js";
+import { day, dayRange } from "../leadFilters.js";
 import { IdParams, optionalText, Pagination, parse, toSkipTake } from "../validation.js";
 
 const text = (max: number) => z.string().max(max).nullish();
@@ -65,6 +66,8 @@ const Filters = z.object({
   hasEmail: bool,
   hasPhone: bool,
   hasWebsite: bool,
+  from: day,
+  to: day,
   sort: z.enum(LINKEDIN_SORT_FIELDS).default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -76,8 +79,19 @@ const CheckBody = z.object({ profileUrls: z.array(z.string().max(2000)).max(500)
 const MAX_CSV_BYTES = 10 * 1024 * 1024;
 const ImportBody = z.object({ csv: z.string().min(1).max(MAX_CSV_BYTES), tag: z.string().trim().max(100).nullish() });
 
-function filtersOf(q: z.infer<typeof Filters>): LinkedInLeadFilters {
-  return { q: q.q, company: q.company, tag: q.tag, source: q.source, hasEmail: q.hasEmail, hasPhone: q.hasPhone, hasWebsite: q.hasWebsite, sort: q.sort, order: q.order };
+function filtersOf(q: z.infer<typeof Filters>, timeZone: string): LinkedInLeadFilters {
+  return {
+    q: q.q,
+    company: q.company,
+    tag: q.tag,
+    source: q.source,
+    hasEmail: q.hasEmail,
+    hasPhone: q.hasPhone,
+    hasWebsite: q.hasWebsite,
+    ...dayRange(q.from, q.to, timeZone),
+    sort: q.sort,
+    order: q.order,
+  };
 }
 
 export async function linkedinRoutes(app: FastifyInstance, opts: { linkedin: LinkedInService; timeZone: string }) {
@@ -99,7 +113,7 @@ export async function linkedinRoutes(app: FastifyInstance, opts: { linkedin: Lin
 
   app.get("/api/linkedin/leads", async (request) => {
     const query = parse(ListQuery, request.query);
-    const result = await linkedin.list({ ...filtersOf(query), ...toSkipTake(query) });
+    const result = await linkedin.list({ ...filtersOf(query, opts.timeZone), ...toSkipTake(query) });
     return { ...result, page: query.page, pageSize: query.pageSize };
   });
 
@@ -117,7 +131,7 @@ export async function linkedinRoutes(app: FastifyInstance, opts: { linkedin: Lin
   });
 
   app.get("/api/linkedin/export.csv", async (request, reply) => {
-    const filters = filtersOf(parse(Filters, request.query));
+    const filters = filtersOf(parse(Filters, request.query), opts.timeZone);
     const stamp = formatWallClock(new Date(), opts.timeZone).replace(" ", "_").replace(":", "");
     reply.hijack();
     const res = reply.raw;
