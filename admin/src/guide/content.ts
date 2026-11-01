@@ -114,7 +114,7 @@ export const GUIDE: GuideSection[] = [
     pages: ["/"],
     image: img("05-dashboard", "Dashboard after sign-in"),
     intro:
-      "After signing in you see your totals: leads, new leads today, duplicates skipped, collections, and the latest leads and collections. The menu on the left shows only the services enabled for your account; it scrolls when it is longer than the screen. The “Guide” button at the top of every page opens the part of this guide for that page.",
+      "After signing in you see your totals: leads, new leads today, duplicates skipped, collections, and the latest leads and collections. The menu on the left is grouped by what you want to do — Start, Find leads, Send messages, Chats and My account (super admins also see Administration). It shows only the services enabled for your account and scrolls when it is longer than the screen. The “Guide” button at the top of every page opens the part of this guide for that page.",
   },
   {
     id: "extensions",

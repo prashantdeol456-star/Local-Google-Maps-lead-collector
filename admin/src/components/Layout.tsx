@@ -5,7 +5,7 @@ import type { LiveState } from "../lib/live";
 import { Link, usePath } from "../lib/router";
 import type { Admin, UserAccount } from "../lib/types";
 import { guideSectionFor } from "../guide/content";
-import { NAV } from "./nav";
+import { NAV_GROUPS } from "./nav";
 import { rupees, type MyBilling } from "../lib/billing";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
@@ -103,37 +103,48 @@ export function Layout({ admin, live, onLogout, children }: { admin: Admin; live
           Lead Platform<sup className="text-[9px]">™</sup>
         </span>
       </div>
-      <ul className="sidebar-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-2">
-        {NAV.filter((item) => canOpen(admin, item.to) && !(admin.role === "super_admin" && CUSTOMER_ONLY.has(item.to))).map((item) => {
-          const active = isActive(path, item.to);
+      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+        {NAV_GROUPS.map((group) => {
+          const items = group.items.filter((item) => canOpen(admin, item.to) && !(admin.role === "super_admin" && CUSTOMER_ONLY.has(item.to)));
+          if (!items.length) return null;
           return (
-            <li key={item.to}>
-              {item.soon ? (
-                <span className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500" title="Available in a later phase">
-                  <span className="w-4 text-center" aria-hidden>{item.icon}</span>
-                  {item.label}
-                  <span className="ml-auto rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">Soon</span>
-                </span>
-              ) : (
-                <Link
-                  to={item.to}
-                  onClick={() => setOpen(false)}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm ${active ? "nav-active" : "hover:bg-sidebar-hover hover:text-white"}`}
-                >
-                  <span className="w-4 text-center" aria-hidden>{item.icon}</span>
-                  {item.label}
-                  {item.to === "/contact-leads" && !!contactUnread && (
-                    <span className="ml-auto rounded-full bg-gold-400 px-1.5 text-[11px] font-semibold text-[#1d1606]" title="New contact leads">
-                      {contactUnread}
-                    </span>
-                  )}
-                </Link>
-              )}
-            </li>
+            <div key={group.title} className="mt-3 first:mt-1">
+              <p className="px-3 pb-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7fa294]">{group.title}</p>
+              <ul className="space-y-0.5">
+                {items.map((item) => {
+                  const active = isActive(path, item.to);
+                  return (
+                    <li key={item.to}>
+                      {item.soon ? (
+                        <span className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500" title="Available in a later phase">
+                          <span className="w-4 text-center" aria-hidden>{item.icon}</span>
+                          {item.label}
+                          <span className="ml-auto rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">Soon</span>
+                        </span>
+                      ) : (
+                        <Link
+                          to={item.to}
+                          onClick={() => setOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm ${active ? "nav-active" : "hover:bg-sidebar-hover hover:text-white"}`}
+                        >
+                          <span className="w-4 text-center" aria-hidden>{item.icon}</span>
+                          {item.label}
+                          {item.to === "/contact-leads" && !!contactUnread && (
+                            <span className="ml-auto rounded-full bg-gold-400 px-1.5 text-[11px] font-semibold text-[#1d1606]" title="New contact leads">
+                              {contactUnread}
+                            </span>
+                          )}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           );
         })}
-      </ul>
+      </div>
       <p className="px-5 py-4 text-xs text-slate-500">© Lead Platform</p>
     </nav>
   );
