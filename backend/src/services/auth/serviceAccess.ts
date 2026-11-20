@@ -51,4 +51,6 @@ export function serviceForRoute(url: string): ServiceId | null {
 export const EXTENSION_SERVICES: Record<string, ServiceId> = {
   "maps-data-collector": "google_maps",
   "linkedin-helper": "linkedin",
+  "linkedin-messenger": "linkedin",
+  "meta-helper": "social",
 };

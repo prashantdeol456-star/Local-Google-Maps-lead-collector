@@ -1,7 +1,7 @@
 // Packs the built Chrome extensions into zip files that the admin panel offers for download
 // (Extensions page). Run after building them:
 //
-//   npm run build:extensions        (root: builds both extensions, then runs this)
+//   npm run build:extensions        (root: builds all four extensions, then runs this)
 
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -12,8 +12,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 
 /** Extensions offered for download: id → workspace folder. */
 export const DOWNLOADABLE_EXTENSIONS = [
-  { id: "maps-data-collector", folder: "extension", description: "Collects publicly visible Google Maps listings into Google Maps Leads." },
+  {
+    id: "maps-data-collector",
+    folder: "extension",
+    description: "Collects Google Maps and Justdial listings into Google Maps Leads and Justdial Leads, in a tab behind yours.",
+  },
   { id: "linkedin-helper", folder: "linkedin-extension", description: "Saves LinkedIn profiles you open (with the Contact info you can see) into LinkedIn Leads." },
+  {
+    id: "linkedin-messenger",
+    folder: "linkedin-messenger",
+    description: "Sends your LinkedIn Outreach campaigns from your own LinkedIn account, one message at a time, at the pace you set.",
+  },
+  {
+    id: "meta-helper",
+    folder: "meta-helper",
+    description: "Finds Instagram profiles and Facebook Pages, groups and people by keyword (Social Leads) and sends your Instagram Outreach campaigns.",
+  },
 ] as const;
 
 export interface ExtensionDownload {

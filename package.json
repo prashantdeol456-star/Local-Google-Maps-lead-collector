@@ -25,7 +25,7 @@
     "dev:admin": "npm run dev -w admin",
     "build:admin": "npm run build -w admin",
     "guide:build": "node scripts/guide/build.mjs",
-    "build:extensions": "npm run build -w extension && npm run build -w linkedin-extension && npm run pack:extensions -w backend"
+    "build:extensions": "npm run build -w extension && npm run build -w linkedin-extension && npm run build -w linkedin-messenger && npm run build -w meta-helper && npm run pack:extensions -w backend"
   },
   "allowScripts": {
     "@prisma/engines@7.10.0": true,

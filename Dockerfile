@@ -1,5 +1,6 @@
-# Production image: backend + built admin panel, PostgreSQL client, and zips of the Maps and
-# LinkedIn Helper extensions for the admin panel's Extensions page.
+# Production image: backend + built admin panel, PostgreSQL client, and zips of the four Chrome
+# extensions (Maps Data Collector, LinkedIn Helper, LinkedIn Messenger, Meta Helper) for the
+# admin panel's Extensions page.
 #   docker compose -f deploy/docker-compose.yml up -d --build
 
 FROM node:24-bookworm-slim AS build
@@ -17,12 +18,14 @@ COPY backend/prisma backend/prisma
 COPY backend/prisma.config.ts backend/
 ENV DATABASE_PROVIDER=postgresql \
     DATABASE_URL=postgresql://build:build@localhost:5432/build
-RUN npm ci --workspace shared --workspace backend --workspace admin --workspace extension --workspace linkedin-extension --include-workspace-root
+RUN npm ci --workspace shared --workspace backend --workspace admin --workspace extension --workspace linkedin-extension --workspace linkedin-messenger --workspace meta-helper --include-workspace-root
 COPY shared shared
 COPY backend backend
 COPY admin admin
 COPY extension extension
 COPY linkedin-extension linkedin-extension
+COPY linkedin-messenger linkedin-messenger
+COPY meta-helper meta-helper
 # Admin panel → backend/public/admin; extension zips → backend/public/extensions (admin
 # Extensions page); Prisma client generated for PostgreSQL.
 # (prisma.config.ts needs a DATABASE_URL; nothing connects during the build.)

@@ -58,7 +58,7 @@ export const GUIDE: GuideSection[] = [
       rows: [
         ["An approved account", "Signing in to the panel and the extensions", "Always"],
         ["Lead credit (after your 1,000 free leads)", "Saving new Google Maps / LinkedIn leads — ₹0.50 each, recharge on Billing", "After 1,000 leads"],
-        ["Google Chrome on a computer", "The Maps Data Collector and LinkedIn Helper extensions", "To collect leads"],
+        ["Google Chrome on a computer", "The Chrome extensions (Maps Data Collector, LinkedIn Helper, LinkedIn Messenger, Meta Helper)", "To collect leads and send LinkedIn / Instagram messages"],
         ["Your own Resend account (or SMTP mailbox)", "Sending email campaigns", "For email"],
         ["Your own Meta WhatsApp Business (Cloud API) number + approved templates", "Sending WhatsApp campaigns", "For WhatsApp"],
         ["Claude or Gemini API key, Telegram bot", "AI replies in the AI Inbox", "Optional"],
@@ -123,7 +123,7 @@ export const GUIDE: GuideSection[] = [
     pages: ["/extensions"],
     image: img("06-extensions", "Extensions page with download buttons and the backend URL"),
     steps: [
-      "Open Extensions in the menu and click “Download zip” for Maps Data Collector (Google Maps) and/or LinkedIn Helper.",
+      "Open Extensions in the menu and click “Download zip” for the ones you need: Maps Data Collector (Google Maps and Justdial leads), LinkedIn Helper (save LinkedIn profiles), LinkedIn Messenger (send LinkedIn Outreach campaigns) and Meta Helper (Instagram and Facebook search, Instagram Outreach). You only see the ones for the services your account has.",
       "Extract the zip into a folder (right click → Extract All).",
       "In Chrome open chrome://extensions and switch on Developer mode (top right).",
       "Click “Load unpacked” and choose the extracted folder (the one with manifest.json).",
@@ -392,7 +392,7 @@ export const GUIDE: GuideSection[] = [
         ["Domain", "lead.the360tech.com → Render", "PUBLIC_BASE_URL must match it (links in emails, webhooks, sitemap)."],
         ["Backend", "Node.js 24, Fastify, Prisma (SQLite locally, PostgreSQL on Render)", "Secrets entered by users are stored encrypted (SESSION_SECRET must stay the same)."],
         ["Admin panel", "React + Vite, served at /admin", "Built inside the Docker image."],
-        ["Chrome extensions", "Maps Data Collector, LinkedIn Helper (zips on the Extensions page)", "Users load them unpacked in Chrome."],
+        ["Chrome extensions", "Maps Data Collector, LinkedIn Helper, LinkedIn Messenger, Meta Helper (zips on the Extensions page, built on every deploy)", "Users load them unpacked in Chrome."],
         ["Email / WhatsApp / AI", "Each customer's own Resend/SMTP, Meta WhatsApp, Claude/Gemini keys", "The platform's own .env keys are only a fallback for super admins."],
         ["Payments", "Razorpay (orders, Checkout, webhook) + credit ledger", "Keys on the Integrations page; webhook /api/webhooks/razorpay; ₹0.50 per new lead after 1,000 free."],
         ["This guide", "admin/src/guide/content.ts + screenshots and PDFs in admin/public/guide", "After adding a feature: add its section (with `pages`), then run `npm run guide:build` to retake screenshots and PDFs."],
