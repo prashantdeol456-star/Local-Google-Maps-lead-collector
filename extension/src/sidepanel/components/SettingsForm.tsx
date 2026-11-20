@@ -1,6 +1,7 @@
 import {
   buildSearchQuery,
   COLLECTOR_FIELDS,
+  isOn,
   MAX_RECORDS_LIMIT,
   parseKeywords,
   type CollectorSettings,
@@ -34,7 +35,8 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
           <small className="error">{errors.keyword}</small>
         ) : keywords.length > 1 ? (
           <small className="hint">
-            {keywords.length} searches will be queued; you start each one: {keywords.join(" → ")}
+            {keywords.length} searches will be queued
+            {isOn(settings.autoNext) ? ", one after another by themselves" : "; you start each one"}: {keywords.join(" → ")}
           </small>
         ) : (
           <small className="hint">Tip: separate keywords with commas to queue several searches.</small>
@@ -74,6 +76,27 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
       >
         Open search in Maps
       </button>
+
+      <div className="fields">
+        <span className="fields__title">Hands-off</span>
+        <label className="check" title="Name, phone, website, address and rating are read from the results list. Much faster than opening every listing.">
+          <input type="checkbox" checked={isOn(settings.fastMode)} onChange={(e) => onChange({ ...settings, fastMode: e.target.checked })} />
+          Fast: read the list without opening each listing
+        </label>
+        <label className="check" title="The search opens in a new tab behind your current one. Keep that tab open; you can use Chrome as usual.">
+          <input
+            type="checkbox"
+            checked={isOn(settings.runInBackground)}
+            onChange={(e) => onChange({ ...settings, runInBackground: e.target.checked })}
+          />
+          Run in a background tab
+        </label>
+        <label className="check" title="When one search finishes, the next keyword starts by itself.">
+          <input type="checkbox" checked={isOn(settings.autoNext)} onChange={(e) => onChange({ ...settings, autoNext: e.target.checked })} />
+          Start the next search by itself
+        </label>
+        <small className="hint">You get a Chrome notification when everything is done, or if Google asks for a security check (only you can do that).</small>
+      </div>
 
       <label className="check" title="The backend needs AI_PROVIDER set. Every AI step is logged on the job.">
         <input type="checkbox" checked={!!settings.aiAssist} onChange={(e) => onChange({ ...settings, aiAssist: e.target.checked })} />

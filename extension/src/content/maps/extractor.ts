@@ -12,6 +12,7 @@ import {
   parseReviewCount,
   parseWebsite,
 } from "./parser";
+import { placeMapsUrl, type SearchPlace } from "./searchData";
 import { SELECTORS } from "./selectors";
 import type { DetailFields, ExtractedListing, ResultCard } from "./types";
 
@@ -86,5 +87,37 @@ export function buildListing(
     searchKeyword,
     source: "google_maps",
     clientKey: card.key,
+  };
+}
+
+/** Builds a listing straight from Maps' own search data (fast mode: the listing is never opened). */
+export function buildFastListing(
+  place: SearchPlace,
+  searchKeyword: string,
+  fields: CollectorFieldSelection,
+  location?: string | null,
+): ExtractedListing {
+  const parts = parseAddress(place.address, location);
+  const pick = <T>(field: keyof CollectorFieldSelection, value: T): T | null => (fields[field] ? value : null);
+  return {
+    name: place.name,
+    category: pick("category", place.category),
+    phone: pick("phone", place.phone),
+    email: null,
+    website: pick("website", place.website),
+    address: pick("address", place.address),
+    city: pick("city", parts.city),
+    state: pick("state", parts.state),
+    country: pick("country", parts.country),
+    postalCode: pick("address", parts.postalCode),
+    latitude: place.latitude,
+    longitude: place.longitude,
+    rating: pick("rating", place.rating),
+    reviewCount: pick("reviewCount", place.reviewCount),
+    mapsUrl: pick("mapsUrl", placeMapsUrl(place)),
+    placeId: place.placeId,
+    searchKeyword,
+    source: "google_maps",
+    clientKey: place.featureId,
   };
 }

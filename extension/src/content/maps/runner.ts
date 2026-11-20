@@ -2,8 +2,9 @@
 // Deterministic: fixed delay between listings, stops on any security challenge.
 
 import { AI_LIMITS, checkAiAction, type AiAction, type AiStep, type AiStopReason, type CollectorFieldSelection, type PageSnapshot } from "@platform/shared";
-import { buildListing } from "./extractor";
+import { buildFastListing, buildListing } from "./extractor";
 import { sleep, type MapsPage } from "./page";
+import type { SearchSource } from "./searchStore";
 import type { ChallengeKind, ExtractedListing } from "./types";
 
 export type RunOutcome =
@@ -29,6 +30,10 @@ export interface RunOptions {
   maxEmptyScrolls?: number;
   /** How long to wait for the results list when the run starts. */
   initialWaitMs?: number;
+  /** Fast mode: the search as typed in Maps (e.g. "dentist in Lucknow"); results are read from Maps' own data. */
+  searchQuery?: string;
+  /** Fast mode: how long to wait for the next page of results after a scroll. */
+  pageWaitMs?: number;
 }
 
 export interface RunHooks {
@@ -38,6 +43,11 @@ export interface RunHooks {
   onError(clientKey: string, name: string, message: string): void | Promise<void>;
   /** Called for every key as soon as it is attempted, so a crash never repeats it. */
   onProcessed(clientKey: string): void | Promise<void>;
+  /**
+   * Pause between steps. The background keeps the time, because Chrome slows down timers in
+   * tabs you are not looking at; without it a background tab would crawl.
+   */
+  wait?(ms: number): Promise<void>;
   /** Optional AI assist (only when the user turned it on): asks for one next step. */
   assist?(snapshot: PageSnapshot, history: AiStep[]): Promise<{ ok: true; action: AiAction } | { ok: false; error: string }>;
 }
@@ -136,5 +146,77 @@ export async function runCollection(page: MapsPage, opts: RunOptions, hooks: Run
 
     await page.backToResults();
     await sleep(opts.delayMs);
+  }
+}
+
+/**
+ * Fast mode: reads every result from the data Maps loads for the search (name, phone, website,
+ * address, rating…), so no listing is opened. Scrolls the list to make Maps load the next page,
+ * until the end of the list, the maximum, or no new results. Falls back to opening listings
+ * (runCollection) if the data cannot be read on this page.
+ */
+export async function runFastCollection(page: MapsPage, source: SearchSource, opts: RunOptions, hooks: RunHooks): Promise<RunOutcome> {
+  const processed = new Set(opts.processedKeys);
+  const maxEmptyScrolls = opts.maxEmptyScrolls ?? 3;
+  const pageWaitMs = opts.pageWaitMs ?? 8_000;
+  const wait = (ms: number) => (hooks.wait ? hooks.wait(ms) : sleep(ms));
+  const query = opts.searchQuery ?? opts.searchKeyword;
+  /** Data for the job's search, else for whatever search is open in Maps. */
+  const places = () => {
+    const exact = source.placesFor(query);
+    if (exact.length > 0) return exact;
+    const latest = source.latestQuery();
+    return latest && page.hasResultsList() ? source.placesFor(latest) : [];
+  };
+
+  // The first page is usually there already; give Maps a moment if the search is still loading.
+  if (places().length === 0) {
+    const listShown = page.hasResultsList() || (await page.waitForResults(opts.initialWaitMs ?? 15_000));
+    if (places().length === 0) await source.waitForChange(source.version(), listShown ? 3_000 : 1_000);
+    if (places().length === 0) {
+      const challenge = page.challenge();
+      if (challenge) return { reason: "challenge", kind: challenge };
+      // No readable data (layout changed, or a single place opened): use the classic way.
+      return runCollection(page, opts, hooks);
+    }
+  }
+
+  let emptyScrolls = 0;
+  for (;;) {
+    const challenge = page.challenge();
+    if (challenge) return { reason: "challenge", kind: challenge };
+    const control = hooks.control();
+    if (control === "pause") return { reason: "paused" };
+    if (control === "stop") return { reason: "stopped" };
+
+    let added = 0;
+    for (const place of places()) {
+      if (processed.size >= opts.maxRecords) return { reason: "max_reached" };
+      if (processed.has(place.featureId)) continue;
+      processed.add(place.featureId);
+      await hooks.onProcessed(place.featureId);
+      await hooks.onListing(buildFastListing(place, opts.searchKeyword, opts.fields, opts.location));
+      added++;
+    }
+    if (processed.size >= opts.maxRecords) return { reason: "max_reached" };
+    if (added > 0) emptyScrolls = 0;
+
+    const end = page.listEnd();
+    if (end) return { reason: end };
+    if (!page.hasResultsList()) return { reason: "no_results_list" };
+    if (emptyScrolls >= maxEmptyScrolls) return { reason: "no_more_results" };
+
+    // Next page: scroll the list. Maps loads 20 results at a time but shows them a few per
+    // scroll, so new cards on screen count as progress too; only when nothing new shows does it
+    // wait for Maps to load the next 20 (event-driven, not a timer).
+    const version = source.version();
+    const before = places().length;
+    const cardsBefore = page.cards().length;
+    await page.scrollResults();
+    const grew = page.cards().length > cardsBefore;
+    if (!grew && places().length === before) await source.waitForChange(version, pageWaitMs);
+    if (grew || places().length > before) emptyScrolls = 0;
+    else emptyScrolls++;
+    await wait(opts.delayMs);
   }
 }

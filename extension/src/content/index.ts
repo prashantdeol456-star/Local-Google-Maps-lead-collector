@@ -2,7 +2,8 @@ import type { AiAction } from "@platform/shared";
 import { parseMapsPage } from "../utils/maps";
 import type { ContentCommand, ContentEvent, MessageResponse } from "../utils/messages";
 import { DomMapsPage } from "./maps/page";
-import { runCollection } from "./maps/runner";
+import { runCollection, runFastCollection, type RunHooks, type RunOptions } from "./maps/runner";
+import { SearchStore } from "./maps/searchStore";
 
 // 1) Reports which Maps page is open (Maps is a single-page app, so the URL is re-checked).
 // 2) Runs the collector when the background asks for it.
@@ -38,6 +39,9 @@ reportPage();
 
 // ---- Collector ----
 
+// Maps' own search data, passed on by mapsTap.iife.ts (fast mode reads results from it).
+const searchData = new SearchStore().listen(window);
+
 const HEARTBEAT_MS = 10_000;
 let current: { runId: string; control: "run" | "pause" | "stop" } | null = null;
 
@@ -48,30 +52,35 @@ async function startRun(cmd: Extract<ContentCommand, { type: "RUN_JOB" }>) {
 
   const heartbeat = setInterval(() => send({ type: "JOB_HEARTBEAT", runId: run.runId }), HEARTBEAT_MS);
   try {
-    const outcome = await runCollection(
-      new DomMapsPage(document),
-      {
-        searchKeyword: cmd.searchKeyword,
-        location: cmd.location,
-        fields: cmd.fields,
-        maxRecords: cmd.maxRecords,
-        processedKeys: cmd.processedKeys,
-        delayMs: cmd.delayMs,
+    const page = new DomMapsPage(document);
+    const options: RunOptions = {
+      searchKeyword: cmd.searchKeyword,
+      searchQuery: cmd.searchQuery,
+      location: cmd.location,
+      fields: cmd.fields,
+      maxRecords: cmd.maxRecords,
+      processedKeys: cmd.processedKeys,
+      delayMs: cmd.delayMs,
+    };
+    const hooks: RunHooks = {
+      control: () => (alive ? run.control : "stop"),
+      onProcessed: (clientKey) => send({ type: "JOB_PROCESSED", runId: run.runId, clientKey }),
+      onListing: (listing) => send({ type: "JOB_LISTING", runId: run.runId, listing }),
+      onError: (clientKey, name, message) => send({ type: "JOB_ITEM_ERROR", runId: run.runId, clientKey, name, message }),
+      // Only when the user turned AI assist on for this job.
+      assist: cmd.aiAssist
+        ? async (snapshot, history) => {
+            const res = await request<AiAction>({ type: "JOB_AI_ASSIST", runId: run.runId, snapshot, history });
+            return res.ok ? { ok: true, action: res.data } : { ok: false, error: res.error };
+          }
+        : undefined,
+      // The background keeps time, so a background tab is not slowed down by Chrome.
+      wait: async (ms: number) => {
+        const res = await request({ type: "JOB_WAIT", runId: run.runId, ms });
+        if (!res.ok) await new Promise((r) => setTimeout(r, ms));
       },
-      {
-        control: () => (alive ? run.control : "stop"),
-        onProcessed: (clientKey) => send({ type: "JOB_PROCESSED", runId: run.runId, clientKey }),
-        onListing: (listing) => send({ type: "JOB_LISTING", runId: run.runId, listing }),
-        onError: (clientKey, name, message) => send({ type: "JOB_ITEM_ERROR", runId: run.runId, clientKey, name, message }),
-        // Only when the user turned AI assist on for this job.
-        assist: cmd.aiAssist
-          ? async (snapshot, history) => {
-              const res = await request<AiAction>({ type: "JOB_AI_ASSIST", runId: run.runId, snapshot, history });
-              return res.ok ? { ok: true, action: res.data } : { ok: false, error: res.error };
-            }
-          : undefined,
-      },
-    );
+    };
+    const outcome = cmd.fast ? await runFastCollection(page, searchData, options, hooks) : await runCollection(page, options, hooks);
     await send({ type: "JOB_FINISHED", runId: run.runId, outcome });
   } catch (err) {
     console.error("[maps-collector] run crashed", err);

@@ -1,4 +1,4 @@
-import { isActive, validateCollectorSettings, type CollectorCommand } from "@platform/shared";
+import { isActive, isOn, validateCollectorSettings, type CollectorCommand } from "@platform/shared";
 import { useState } from "react";
 import type { BackendStatus } from "../../storage/auth";
 import { ActivityLog } from "../components/ActivityLog";
@@ -40,7 +40,8 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
   const errors = validateCollectorSettings(settings);
   const formValid = Object.keys(errors).length === 0;
   const active = isActive(state.status);
-  const canStart = state.status === "paused" || (formValid && !!page?.isMaps);
+  // In a background tab the job opens its own Maps search, so no Maps tab is needed first.
+  const canStart = state.status === "paused" || (formValid && (isOn(settings.runInBackground) || !!page?.isMaps));
 
   async function run(command: CollectorCommand) {
     setBusy(true);

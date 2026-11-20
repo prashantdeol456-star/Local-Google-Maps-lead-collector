@@ -85,6 +85,9 @@ export class DomMapsPage implements MapsPage {
     const feed = this.feed();
     if (!feed) return;
     feed.scrollTop = feed.scrollHeight;
+    // Chrome only fires "scroll" while the tab is drawn; firing it ourselves lets Maps load the
+    // next page in a background tab too.
+    feed.dispatchEvent(new Event("scroll"));
     await sleep(PAGE_TIMEOUTS.afterScrollMs);
   }
 

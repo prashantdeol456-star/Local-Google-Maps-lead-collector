@@ -26,13 +26,25 @@ export interface CollectorSettings {
   fields: CollectorFieldSelection;
   /** Optional AI help when the results list cannot be found (off unless the user turns it on). */
   aiAssist?: boolean;
+  /** Read results from the list without opening each one (on unless turned off). */
+  fastMode?: boolean;
+  /** Run the job in its own background tab, so you can keep using Chrome (on unless turned off). */
+  runInBackground?: boolean;
+  /** Start the next queued search by itself when one finishes (on unless turned off). */
+  autoNext?: boolean;
 }
+
+/** The three "hands-off" options are on unless the user turned them off. */
+export const isOn = (value: boolean | undefined) => value !== false;
 
 export function defaultCollectorSettings(): CollectorSettings {
   return {
     keyword: "",
     location: "",
     maxRecords: 500,
+    fastMode: true,
+    runInBackground: true,
+    autoNext: true,
     fields: Object.fromEntries(COLLECTOR_FIELDS.map((f) => [f.key, true])) as CollectorFieldSelection,
   };
 }

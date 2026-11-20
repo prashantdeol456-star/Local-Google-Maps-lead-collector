@@ -1,7 +1,10 @@
 import {
   buildSearchQuery,
   checkAiAction,
+  isOn,
+  nextStatus,
   parseKeywords,
+  validateCollectorSettings,
   startsNewJob,
   type AiAction,
   type CollectorCommand,
@@ -45,6 +48,11 @@ import { SyncEngine, type SyncEvent } from "./sync";
 
 /** Fixed pause between listings (polite pacing; not randomized). */
 const COLLECT_DELAY_MS = 1500;
+/** Fast mode: fixed pause between pages of results. */
+const FAST_PAGE_DELAY_MS = 1500;
+/** Fast mode: pause before the next queued search starts by itself. */
+const NEXT_SEARCH_DELAY_MS = 5000;
+const MAX_WAIT_MS = 15_000;
 const WATCHDOG_ALARM = "collector-watchdog";
 const FLUSH_ALARM = "outbox-flush";
 const SEARCH_LOAD_TIMEOUT_MS = 20_000;
@@ -68,6 +76,39 @@ async function getActiveTabId(): Promise<number | null> {
 async function loadPage(tabId: number | null): Promise<MapsPageState | null> {
   return tabId === null ? null : loadPageState(tabId);
 }
+
+async function tabExists(tabId: number | null): Promise<boolean> {
+  if (tabId === null) return false;
+  return chrome.tabs.get(tabId).then(() => true, () => false);
+}
+
+/** The job's own Maps tab while it is still open, else the active tab. */
+async function jobOrActiveTab(state: CollectorState): Promise<number | null> {
+  return (await tabExists(state.tabId)) && (await loadPage(state.tabId))?.isMaps ? state.tabId : getActiveTabId();
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ---- Notifications: the job tells you when it is done or needs you ----
+
+async function notify(title: string, message: string) {
+  await chrome.action.setBadgeText({ text: title.startsWith("Done") ? "" : "!" }).catch(() => undefined);
+  await chrome.action.setBadgeBackgroundColor({ color: "#b91c1c" }).catch(() => undefined);
+  await chrome.notifications
+    .create(`collector-${Date.now()}`, { type: "basic", iconUrl: chrome.runtime.getURL("icon-128.png"), title, message, priority: 1 })
+    .catch(console.error);
+}
+
+chrome.notifications.onClicked.addListener(async (id) => {
+  if (!id.startsWith("collector-")) return;
+  const state = await loadCollectorState();
+  if (state.tabId !== null && (await tabExists(state.tabId))) {
+    const tab = await chrome.tabs.update(state.tabId, { active: true });
+    if (tab?.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
+  }
+  await chrome.action.setBadgeText({ text: "" }).catch(() => undefined);
+  chrome.notifications.clear(id);
+});
 
 // ---- State updates (one at a time, so rapid clicks / events cannot interleave writes) ----
 // Never await a backend call or outbox flush inside updateState.
@@ -147,11 +188,13 @@ async function startRunner(): Promise<void> {
     type: "RUN_JOB",
     runId: state.runId,
     searchKeyword: state.jobSettings.keyword.trim(),
+    searchQuery: buildSearchQuery(state.jobSettings.keyword, state.jobSettings.location),
+    fast: isOn(state.jobSettings.fastMode),
     location: state.jobSettings.location.trim() || null,
     fields: state.jobSettings.fields,
     maxRecords: state.jobSettings.maxRecords,
     processedKeys: await loadProcessedKeys(state.runId),
-    delayMs: COLLECT_DELAY_MS,
+    delayMs: isOn(state.jobSettings.fastMode) ? FAST_PAGE_DELAY_MS : COLLECT_DELAY_MS,
     aiAssist: !!state.jobSettings.aiAssist,
   });
   if (ok) {
@@ -214,6 +257,14 @@ async function handleContentEvent(event: ContentEvent, tabId: number): Promise<M
     return { ok: true, data: undefined };
   }
   if (event.type === "JOB_AI_ASSIST") return aiAssist(event, tabId);
+  if (event.type === "JOB_WAIT") {
+    // Fast mode keeps time here: Chrome slows timers in background tabs, not in the extension.
+    const current = await loadCollectorState();
+    if (!isCurrentRun(current, event.runId) || current.tabId !== tabId) return { ok: false, error: "Not the current run" };
+    await updateState((s) => (isCurrentRun(s, event.runId) ? { ...s, lastHeartbeatAt: Date.now() } : null));
+    await sleep(Math.min(Math.max(0, event.ms), MAX_WAIT_MS));
+    return { ok: true, data: undefined };
+  }
 
   let toSend: OutboxPayload | null = null;
   let backendStatus: { status: "completed" | "paused"; reason: string } | null = null;
@@ -254,7 +305,35 @@ async function handleContentEvent(event: ContentEvent, tabId: number): Promise<M
     if (state.status === "running") reopenSearch().catch(console.error);
     else await statusUpdate(state.backendJobId, "paused", "ai_search_limit");
   }
+  if (event.type === "JOB_FINISHED" && state.runId === event.runId) afterRun(state).catch(console.error);
   return { ok: true, data: undefined };
+}
+
+/** After a search ends: start the next queued one by itself, or tell the user. */
+async function afterRun(state: CollectorState): Promise<void> {
+  const total = (s: CollectorState) => `${s.counters.found} listings read`;
+  if (state.status === "paused") {
+    const why = [...state.log].reverse().find((l) => l.level === "error")?.message ?? "The job is paused";
+    await notify("Maps collector needs you", why);
+    return;
+  }
+  if (state.status !== "completed") return;
+  const next = nextQueued(state);
+  if (next && state.jobSettings && isOn(state.jobSettings.autoNext)) {
+    await updateState((s) => withLog(s, "info", `Next search starts in ${NEXT_SEARCH_DELAY_MS / 1000} s: "${next.keyword}"`));
+    await sleep(NEXT_SEARCH_DELAY_MS);
+    // The user may have started something else meanwhile.
+    const now = await loadCollectorState();
+    if (now.runId !== state.runId || now.status !== "completed") return;
+    const res = await startNextInQueue(true);
+    if (!res.ok) {
+      await updateState((s) => withLog(s, "error", `Could not start the next search: ${res.error}. Press START NEXT`));
+      await notify("Maps collector needs you", `Could not start the next search: ${res.error}`);
+    }
+    return;
+  }
+  const searches = state.queue ? `${state.queue.jobs.length} searches, ` : "";
+  await notify("Done: Maps collector", `${searches}${total(state)} (last search: ${state.jobLabel ?? ""})`);
 }
 
 // ---- Commands ----
@@ -296,11 +375,30 @@ async function markRunning(jobId: string): Promise<{ ok: true } | { ok: false; e
   return res.ok ? { ok: true } : { ok: false, error: res.error.message };
 }
 
+/** Opens the search in a new tab behind the current one and waits until Maps shows it. */
+async function openBackgroundSearch(query: string): Promise<{ tabId: number; page: MapsPageState } | { error: string }> {
+  const since = Date.now();
+  const tab = await chrome.tabs.create({ url: buildMapsSearchUrl(query), active: false });
+  if (tab.id === undefined) return { error: "Could not open a Google Maps tab" };
+  const page = await waitForSearchPage(tab.id, query, since);
+  return page ? { tabId: tab.id, page } : { error: `The search "${query}" did not load in Maps. Try again` };
+}
+
 async function startNewJob(settings: CollectorSettings): Promise<MessageResponse<unknown>> {
   const keywords = parseKeywords(settings.keyword);
-  const tabId = await getActiveTabId();
   const current = await loadCollectorState();
-  const dry = applyCommand(current, "start", settings, await loadPage(tabId), Date.now(), tabId, keywords[0]);
+  let tabId = await getActiveTabId();
+  let page = await loadPage(tabId);
+  if (isOn(settings.runInBackground) && keywords[0]) {
+    // Check the settings before opening anything.
+    if (!nextStatus(current.status, "start")) return { ok: false, error: `Cannot start while ${current.status}` };
+    const firstError = Object.values(validateCollectorSettings(settings))[0];
+    if (firstError) return { ok: false, error: firstError };
+    const opened = await openBackgroundSearch(buildSearchQuery(keywords[0], settings.location));
+    if ("error" in opened) return { ok: false, error: opened.error };
+    ({ tabId, page } = opened);
+  }
+  const dry = applyCommand(current, "start", settings, page, Date.now(), tabId, keywords[0]);
   if (!dry.ok) return dry;
 
   // Searches left over from a previous queue are cancelled, then pending updates are sent first
@@ -337,11 +435,11 @@ async function waitForSearchPage(tabId: number, query: string, since: number): P
   return null;
 }
 
-async function startNextInQueue(): Promise<MessageResponse<unknown>> {
+async function startNextInQueue(inJobTab = false): Promise<MessageResponse<unknown>> {
   const current = await loadCollectorState();
   const next = nextQueued(current);
   if (!next || !current.jobSettings) return { ok: false, error: "No more searches in the queue" };
-  const tabId = await getActiveTabId();
+  const tabId = inJobTab ? (current.tabId !== null && (await tabExists(current.tabId)) ? current.tabId : null) : await jobOrActiveTab(current);
   if (tabId === null || !(await loadPage(tabId))?.isMaps) return { ok: false, error: "Open Google Maps in the active tab first" };
 
   const query = buildSearchQuery(next.keyword, current.jobSettings.location);
@@ -368,7 +466,7 @@ async function handleCommand(command: CollectorCommand, settings: CollectorSetti
 
   let error: string | null = null;
   const state = await updateState(async (s) => {
-    const tabId = await getActiveTabId();
+    const tabId = await jobOrActiveTab(s);
     const result = applyCommand(s, command, settings, await loadPage(tabId), Date.now(), tabId);
     if (!result.ok) {
       error = result.error;
@@ -435,6 +533,7 @@ async function handle(message: ExtensionMessage, sender: chrome.runtime.MessageS
       return handleCommand(message.command, message.settings);
 
     case "START_NEXT":
+      await chrome.action.setBadgeText({ text: "" }).catch(() => undefined);
       return startNextInQueue();
 
     case "RETRY_SYNC":
@@ -471,7 +570,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     if (next) pausedJobId = state.backendJobId;
     return next;
   })
-    .then(() => (pausedJobId ? statusUpdate(pausedJobId, "paused", "lost_contact_with_maps_tab") : undefined))
+    .then(async () => {
+      if (!pausedJobId) return;
+      await statusUpdate(pausedJobId, "paused", "lost_contact_with_maps_tab");
+      await notify("Maps collector needs you", "Lost contact with the Maps tab (closed, changed, or a security check). Check it, then press RESUME");
+    })
     .catch(console.error);
 });
 

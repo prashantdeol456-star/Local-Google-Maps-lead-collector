@@ -22,6 +22,8 @@ export type ContentEvent =
   | { type: "JOB_LISTING"; runId: string; listing: ExtractedListing }
   | { type: "JOB_ITEM_ERROR"; runId: string; clientKey: string; name: string; message: string }
   | { type: "JOB_HEARTBEAT"; runId: string }
+  /** Fast mode: "wake me in ms" (the background keeps time; Chrome slows timers in background tabs). */
+  | { type: "JOB_WAIT"; runId: string; ms: number }
   | { type: "JOB_FINISHED"; runId: string; outcome: RunOutcome }
   /** Optional AI assist: asks the background (→ backend) for one next step; answered with an AiAction. */
   | { type: "JOB_AI_ASSIST"; runId: string; snapshot: PageSnapshot; history: AiStep[] };
@@ -34,6 +36,10 @@ export type ContentCommand =
       type: "RUN_JOB";
       runId: string;
       searchKeyword: string;
+      /** The search as opened in Maps ("dentist in Lucknow"). */
+      searchQuery: string;
+      /** Read results from Maps' own data instead of opening each listing. */
+      fast: boolean;
       location: string | null;
       fields: CollectorFieldSelection;
       maxRecords: number;
