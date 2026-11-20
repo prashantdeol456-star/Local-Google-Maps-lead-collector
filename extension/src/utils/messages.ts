@@ -13,7 +13,8 @@ export type PanelRequest =
   | { type: "LOGOUT" }
   | { type: "GET_BACKEND_STATUS" }
   | { type: "START_NEXT" }
-  | { type: "RETRY_SYNC" };
+  | { type: "RETRY_SYNC" }
+  | { type: "GET_EMAIL_TEMPLATES" };
 
 /** Content script → background. `runId` lets the background ignore events from an old run. */
 export type ContentEvent =
@@ -47,7 +48,9 @@ export type ContentCommand =
       delayMs: number;
       aiAssist: boolean;
     }
-  | { type: "CONTROL"; runId: string; control: "pause" | "stop" };
+  | { type: "CONTROL"; runId: string; control: "pause" | "stop" }
+  /** Justdial jobs: places on the open Maps page */
+  | { type: "MAPS_PLACES" };
 
 export type ExtensionMessage = PanelRequest | ContentEvent;
 

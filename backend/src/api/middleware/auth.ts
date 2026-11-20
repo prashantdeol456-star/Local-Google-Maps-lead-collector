@@ -26,6 +26,8 @@ const CUSTOMER_ROUTES = new RegExp(
       "export/(csv|xlsx)",
       "linkedin/(leads|leads/check|leads/:id|facets|import|export\\.csv)",
       "extensions(/.*)?",
+      // Justdial leads (Maps Data Collector in Justdial mode)
+      "justdial/(leads|facets|export\\.csv|jobs/:id/auto-campaign)",
       // Outreach (phase B): templates, opt-outs, contacts and campaigns, each user's own
       "templates|templates/:id|templates/preview",
       "channel-templates|channel-templates/:id|channel-templates/preview",

@@ -99,6 +99,13 @@ chrome.runtime.onMessage.addListener((message: ContentCommand, sender, sendRespo
   if (message.type === "RUN_JOB") {
     startRun(message);
     sendResponse({ ok: true });
+  } else if (message.type === "MAPS_PLACES") {
+    // Justdial jobs: the places Maps shows for one business search (read from Maps' own data).
+    (async () => {
+      if (searchData.allPlaces().length === 0) await searchData.waitForChange(searchData.version(), 8_000);
+      return { places: searchData.allPlaces(), url: location.href };
+    })().then((data) => sendResponse({ ok: true, data }), (err: unknown) => sendResponse({ ok: false, error: String(err) }));
+    return true;
   } else if (message.type === "CONTROL") {
     if (current?.runId === message.runId) current.control = message.control;
     sendResponse({ ok: true });

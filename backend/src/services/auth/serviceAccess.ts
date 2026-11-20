@@ -34,7 +34,7 @@ export function parseServices(json: string | null | undefined): ServiceId[] {
 
 /** API route template → the service it belongs to (null: not tied to one service). */
 const ROUTE_SERVICES: [RegExp, ServiceId][] = [
-  [/^\/api\/(leads|jobs|export)(\/|$)/, "google_maps"],
+  [/^\/api\/(leads|jobs|export|justdial)(\/|$)/, "google_maps"],
   [/^\/api\/linkedin\//, "linkedin"],
   [/^\/api\/contacts(\/|$)/, "contacts"],
   [/^\/api\/email\//, "email"],

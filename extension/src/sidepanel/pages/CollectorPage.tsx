@@ -41,7 +41,8 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
   const formValid = Object.keys(errors).length === 0;
   const active = isActive(state.status);
   // In a background tab the job opens its own Maps search, so no Maps tab is needed first.
-  const canStart = state.status === "paused" || (formValid && (isOn(settings.runInBackground) || !!page?.isMaps));
+  const canStart =
+    state.status === "paused" || (formValid && (settings.source === "justdial" || isOn(settings.runInBackground) || !!page?.isMaps));
 
   async function run(command: CollectorCommand) {
     setBusy(true);

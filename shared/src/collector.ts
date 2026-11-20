@@ -32,7 +32,22 @@ export interface CollectorSettings {
   runInBackground?: boolean;
   /** Start the next queued search by itself when one finishes (on unless turned off). */
   autoNext?: boolean;
+  /** Where to collect: Google Maps (default) or Justdial. */
+  source?: CollectorSource;
+  /** Justdial: open every profile for address, website, photos… (on unless turned off). */
+  jdOpenProfiles?: boolean;
+  /** Justdial: look each business up on Google Maps for phone and website (on unless turned off). */
+  jdMatchMaps?: boolean;
+  /** Justdial: press "Show Number" when no phone was found (off unless turned on; daily limit). */
+  jdShowNumber?: boolean;
+  /** Justdial: email template for an automatic campaign with the new leads (null = no campaign). */
+  jdTemplateId?: string | null;
 }
+
+export type CollectorSource = "google_maps" | "justdial";
+
+/** "Show Number" presses per day at most (Justdial may ask to log in or block the account). */
+export const JD_SHOW_NUMBER_DAILY_LIMIT = 30;
 
 /** The three "hands-off" options are on unless the user turned them off. */
 export const isOn = (value: boolean | undefined) => value !== false;
@@ -82,6 +97,7 @@ export function validateCollectorSettings(s: CollectorSettings): SettingsErrors 
     errors.maxRecords = `Maximum records must be a whole number from 1 to ${MAX_RECORDS_LIMIT}`;
   }
   if (!s.fields.name) errors.fields = "Name is always collected";
+  if (s.source === "justdial" && !s.location.trim()) errors.location = "Justdial needs a city (e.g. Delhi)";
   return errors;
 }
 

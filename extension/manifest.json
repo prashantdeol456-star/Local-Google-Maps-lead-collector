@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Maps Data Collector",
-  "version": "0.2.0",
-  "description": "Collects publicly visible Google Maps listing information into your local lead database.",
+  "version": "0.3.0",
+  "description": "Collects publicly visible Google Maps and Justdial listing information into your lead database.",
   "minimum_chrome_version": "116",
   "action": {
     "default_title": "Open Maps Data Collector"
@@ -47,6 +47,25 @@
       ],
       "js": [
         "src/content/index.ts"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.justdial.com/*"
+      ],
+      "js": [
+        "src/content/justdialTap.iife.ts"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.justdial.com/*"
+      ],
+      "js": [
+        "src/content/justdial/index.ts"
       ],
       "run_at": "document_idle"
     }

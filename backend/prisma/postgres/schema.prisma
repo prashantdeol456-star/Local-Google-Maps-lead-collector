@@ -178,6 +178,7 @@ model Lead {
   emailEvents    EmailEvent[]
   whatsappEvents WhatsAppEvent[]
   preference     LeadCommunicationPreference?
+  justdial       JustdialDetail?
 
   @@unique([ownerId, placeId])
   @@unique([ownerId, dedupeKey])
@@ -1235,4 +1236,58 @@ model IntegrationSetting {
   provider  String   @id
   config    String
   updatedAt DateTime @updatedAt
+}
+
+/// Extra details of a lead collected from Justdial (the lead itself is a normal Lead with source "justdial").
+model JustdialDetail {
+  id              String    @id @default(cuid())
+  ownerId         String?
+  leadId          String    @unique
+  /// Justdial's id of the listing
+  docid           String
+  jdUrl           String?
+  /// Number shown by Justdial (often a Justdial virtual number)
+  jdPhone         String?
+  jdRating        Float?
+  jdReviewCount   Int?
+  /// "Visa Assistance, Immigration Consultants"
+  categories      String?
+  area            String?
+  established     String?
+  hours           String?
+  /// JSON array of photo links (links only, photos are not copied)
+  photos          String?
+  /// Google Maps match for the same business
+  mapsMatched     Boolean   @default(false)
+  mapsName        String?
+  mapsPhone       String?
+  mapsWebsite     String?
+  mapsRating      Float?
+  mapsReviewCount Int?
+  mapsUrl         String?
+  /// When the business website was checked for a public email (null = not yet)
+  emailCheckedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([emailCheckedAt])
+}
+
+/// A Justdial collection: whether its leads go into an email campaign by themselves.
+model JustdialJob {
+  id          String    @id @default(cuid())
+  ownerId     String?
+  /// CollectionJob id
+  jobId       String    @unique
+  /// Email template for the automatic campaign (null = no campaign)
+  templateId  String?
+  campaignId  String?
+  /// Why no campaign was made, if so
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId])
 }

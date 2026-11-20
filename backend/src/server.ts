@@ -27,5 +27,6 @@ app.whatsappWorker.start();
 app.inboxWorker.start();
 app.webhookWorker.start();
 app.maintenance.start();
+app.justdialWorker.start();
 
 await app.listen({ port: config.port, host: config.host });

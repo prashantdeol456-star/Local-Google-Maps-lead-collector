@@ -51,6 +51,8 @@ import { CampaignLogService } from "./services/outreach/campaignLogService.js";
 import { LinkedInOutreachService } from "./services/linkedin/outreachService.js";
 import { socialRoutes } from "./api/routes/social.js";
 import { socialLeadRoutes } from "./api/routes/socialLeads.js";
+import { justdialRoutes } from "./api/routes/justdial.js";
+import { JustdialService, JustdialWorker } from "./services/justdial/justdialService.js";
 import { SocialLeadService } from "./services/social/socialLeadService.js";
 import { SocialService } from "./services/social/socialService.js";
 import { inboxRoutes } from "./api/routes/inbox.js";
@@ -243,7 +245,10 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     loginRateLimitPerMinute: config.loginRateLimitPerMinute,
   });
   await app.register(jobRoutes, { jobs });
-  await app.register(leadRoutes, { leads, dedupe, timeZone: config.timeZone });
+  const justdial = new JustdialService(db, { campaigns, log: (msg) => app.log.info(msg) });
+  const justdialWorker = new JustdialWorker(justdial, { log: (msg) => app.log.error(msg) });
+  await app.register(leadRoutes, { leads, dedupe, timeZone: config.timeZone, justdial });
+  await app.register(justdialRoutes, { justdial, timeZone: config.timeZone });
   await app.register(quickSendRoutes, { quickSend });
   await app.register(billingRoutes, { payments, integrations: platform, timeZone: config.timeZone });
   await app.register(razorpayWebhookRoutes, { payments });
@@ -282,9 +287,11 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   app.decorate("inboxWorker", inboxWorker);
   app.decorate("webhookWorker", webhookWorker);
   app.decorate("maintenance", maintenance);
+  app.decorate("justdialWorker", justdialWorker);
   app.addHook("onClose", async () => {
     integrations.stop();
     maintenance.stop();
+    justdialWorker.stop();
     await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop()]);
   });
   return app;
@@ -297,6 +304,7 @@ declare module "fastify" {
     emailWorker: EmailWorker;
     whatsappWorker: WhatsAppWorker;
     inboxWorker: InboxWorker;
+    justdialWorker: JustdialWorker;
     webhookWorker: WebhookWorker;
     maintenance: MaintenanceWorker;
   }

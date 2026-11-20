@@ -21,6 +21,7 @@ import { ContactsPage } from "./pages/ContactsPage";
 import { SocialAccountsPage } from "./pages/SocialAccountsPage";
 import { InboxPage } from "./pages/InboxPage";
 import { SocialLeadsPage } from "./pages/SocialLeadsPage";
+import { JustdialLeadsPage } from "./pages/JustdialLeadsPage";
 import { CampaignLogsPage } from "./pages/CampaignLogsPage";
 import { LinkedInCampaignDetailPage, LinkedInCampaignsPage, NewLinkedInCampaignPage } from "./pages/LinkedInOutreachPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -53,6 +54,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/instagram-outreach/new") return <NewLinkedInCampaignPage key="ig-new" platform="instagram" />;
   if ((params = matchPath("/instagram-outreach/:id", path))) return <LinkedInCampaignDetailPage key={params.id} id={params.id!} platform="instagram" />;
   if (path === "/social-leads") return <SocialLeadsPage />;
+  if (path === "/justdial") return <JustdialLeadsPage />;
   if (path === "/campaign-logs") return <CampaignLogsPage />;
   if (path === "/social") return <SocialAccountsPage />;
   if (path === "/inbox") return <InboxPage />;

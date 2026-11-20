@@ -6,8 +6,29 @@ import type { ExtractedListing } from "../content/maps/types";
 
 export type LeadPayload = Omit<ExtractedListing, "clientKey">;
 
+/** What only Justdial has, plus the Google Maps match (stored with the lead on the backend). */
+export interface JustdialPayload {
+  docid: string;
+  jdUrl: string | null;
+  jdPhone: string | null;
+  jdRating: number | null;
+  jdReviewCount: number | null;
+  categories: string | null;
+  area: string | null;
+  established: string | null;
+  hours: string | null;
+  photos: string[];
+  mapsMatched: boolean;
+  mapsName: string | null;
+  mapsPhone: string | null;
+  mapsWebsite: string | null;
+  mapsRating: number | null;
+  mapsReviewCount: number | null;
+  mapsUrl: string | null;
+}
+
 export type OutboxPayload =
-  | { kind: "lead"; jobId: string; clientKey: string; lead: LeadPayload }
+  | { kind: "lead"; jobId: string; clientKey: string; lead: LeadPayload; justdial?: JustdialPayload }
   | { kind: "error"; jobId: string; clientKey: string; name: string; message: string }
   | { kind: "status"; jobId: string; status: "running" | "paused" | "completed" | "stopped" | "failed"; reason: string | null };
 

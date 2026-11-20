@@ -20,6 +20,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Find leads",
     items: [
       { to: "/leads", label: "Google Maps Leads", icon: "☰" },
+      { to: "/justdial", label: "Justdial Leads", icon: "J" },
       { to: "/linkedin", label: "LinkedIn Leads", icon: "in" },
       { to: "/collections", label: "Collections", icon: "⌖" },
       { to: "/contacts", label: "Contacts (Sheets)", icon: "▤" },

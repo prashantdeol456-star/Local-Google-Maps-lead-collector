@@ -91,6 +91,30 @@ async function seed() {
   }
   await j("PATCH", `/api/jobs/${job.id}`, { status: "completed" }, cu);
 
+  // Justdial demo leads (as the extension sends them in Justdial mode)
+  const jdJob = (await j("POST", "/api/jobs", { searchKeyword: "Study Visa Consultants", location: "Delhi" }, cu)).job;
+  await j("PATCH", `/api/jobs/${jdJob.id}`, { status: "running" }, cu);
+  const jd = [
+    ["Global Study Visa Point", "Visa Assistance, Immigration Consultants", "Punjabi Bagh", "1999", 4.5, 209, true, 4.6, 980, "globalstudyvisa.example.in"],
+    ["Pathway Overseas Education", "Overseas Education Consultants, Visa Assistance", "Laxmi Nagar", "2011", 4.8, 612, true, 4.7, 455, "pathwayoverseas.example.in"],
+    ["Canada Dream Consultants", "Immigration Consultants For Canada", "Rajouri Garden", "2016", 4.2, 88, true, 4.4, 131, null],
+    ["Student Visa Hub", "Student Visa Assistance", "Janakpuri", null, 4.0, 35, false, null, null, null],
+  ];
+  let m = 0;
+  for (const [name, categories, area, established, jdRating, jdReviews, onMaps, mapsRating, mapsReviews, site] of jd) {
+    m++;
+    await j("POST", "/api/leads", {
+      jobId: jdJob.id,
+      clientKey: `jd:${m}`,
+      lead: { name, category: categories.split(",")[0], phone: onMaps ? `+91 90000 3000${m}` : null, website: site && `https://${site}`, email: site ? `info@${site}` : null, address: `Shop ${m}, Main Market, ${area}, New Delhi`, city: "New Delhi", state: "Delhi", country: "India", postalCode: "110026", rating: jdRating, reviewCount: jdReviews, searchKeyword: "Study Visa Consultants", source: "justdial" },
+      justdial: {
+        docid: `011PXX11.XX11.DEMO${m}`, jdUrl: `https://www.justdial.com/Delhi/demo-${m}`, jdPhone: `0794700000${m}`, jdRating, jdReviewCount: jdReviews, categories, area, established, hours: "Open until 7:00 pm", photos: [],
+        mapsMatched: onMaps, mapsName: onMaps ? name : null, mapsPhone: onMaps ? `+91 90000 3000${m}` : null, mapsWebsite: site && `https://${site}`, mapsRating, mapsReviewCount: mapsReviews, mapsUrl: onMaps ? "https://www.google.com/maps/place/?q=place_id:ChIJdemo" : null,
+      },
+    }, cu);
+  }
+  await j("PATCH", `/api/jobs/${jdJob.id}`, { status: "completed" }, cu);
+
   for (const [slug, name, headline, company] of [
     ["rahul-hr-demo", "Rahul Verma", "HR Manager at Acme Healthcare", "Acme Healthcare"],
     ["neha-ops-demo", "Neha Singh", "Operations Head | Hospital administration", "City Care Hospital"],
@@ -173,6 +197,7 @@ async function shoot(page) {
   });
   await shot("19-contacts", "/admin/contacts");
   await shot("21-billing", "/admin/billing");
+  await shot("24-justdial-leads", "/admin/justdial");
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));
@@ -187,8 +212,17 @@ async function printPdfs(page) {
   await page.setViewport({ width: 1100, height: 1400 });
   await page.goto(B + "/admin/", { waitUntil: "load" });
   async function print(path, file, title) {
+    const errors = [];
+    const onError = (err) => errors.push(String(err));
+    page.on("pageerror", onError);
     await page.goto(B + path, { waitUntil: "load" });
-    await page.waitForSelector("#overview");
+    await page.waitForSelector("#overview", { timeout: 60_000 }).catch(async (err) => {
+      const text = await page.evaluate(() => document.body.innerText.slice(0, 500)).catch(() => "");
+      throw new Error(`The guide page did not show (${path}). Page text: ${text}
+Page errors: ${errors.join(" | ")}
+${err}`);
+    });
+    page.off("pageerror", onError);
     await page.evaluate(async () => {
       for (const img of document.querySelectorAll("img")) img.loading = "eager";
       await Promise.all([...document.images].map((img) => (img.complete ? null : new Promise((r) => (img.onload = img.onerror = r)))));

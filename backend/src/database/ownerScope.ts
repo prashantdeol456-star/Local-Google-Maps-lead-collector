@@ -25,6 +25,8 @@ export const OWNED_MODELS = new Set([
   "Lead",
   "CollectionJob",
   "LinkedInLead",
+  "JustdialDetail",
+  "JustdialJob",
   // Outreach (phase B)
   "MessageTemplate",
   "Campaign",

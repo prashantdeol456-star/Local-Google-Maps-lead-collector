@@ -54,7 +54,7 @@ function isRetryable(err: ApiError): boolean {
 function request(item: OutboxItem): { method: "POST" | "PATCH"; path: string; body: unknown } {
   switch (item.kind) {
     case "lead":
-      return { method: "POST", path: "/api/leads", body: { jobId: item.jobId, clientKey: item.clientKey, lead: item.lead } };
+      return { method: "POST", path: "/api/leads", body: { jobId: item.jobId, clientKey: item.clientKey, lead: item.lead, ...(item.justdial ? { justdial: item.justdial } : {}) } };
     case "error":
       return {
         method: "POST",

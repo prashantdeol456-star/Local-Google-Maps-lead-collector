@@ -48,6 +48,8 @@ export const TABLES = [
   "InboxDraft",
   "AiAssistantSettings",
   "SocialLead",
+  "JustdialDetail",
+  "JustdialJob",
 ] as const;
 
 const BATCH = 500;

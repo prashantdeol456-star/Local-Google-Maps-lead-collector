@@ -41,7 +41,7 @@ export interface ExtractedListing {
   mapsUrl: string | null;
   placeId: string | null;
   searchKeyword: string;
-  source: "google_maps";
+  source: "google_maps" | "justdial";
   /** Internal: processed-tracking key (feature id). */
   clientKey: string;
 }

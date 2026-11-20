@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { LEAD_SORT_FIELDS } from "../../database/repositories/index.js";
+import type { JustdialService } from "../../services/justdial/justdialService.js";
 import type { DedupeService } from "../../services/lead/dedupeService.js";
 import { toLeadView, type LeadService } from "../../services/lead/leadService.js";
 import { IdParams, Pagination, parse, toSkipTake } from "../validation.js";
@@ -36,12 +37,34 @@ const LeadBody = z.object({
   source: z.string().trim().min(1).max(50).optional(),
 });
 
+/** Extra details when the lead comes from Justdial (Maps Data Collector in Justdial mode). */
+const JustdialBody = z.object({
+  docid: z.string().trim().min(1).max(200),
+  jdUrl: z.url().max(2000).nullish(),
+  jdPhone: text(50),
+  jdRating: z.number().min(0).max(5).nullish(),
+  jdReviewCount: z.number().int().min(0).nullish(),
+  categories: text(500),
+  area: text(200),
+  established: text(100),
+  hours: text(300),
+  photos: z.array(z.url().max(2000)).max(30).nullish(),
+  mapsMatched: z.boolean().optional(),
+  mapsName: text(300),
+  mapsPhone: text(50),
+  mapsWebsite: text(2000),
+  mapsRating: z.number().min(0).max(5).nullish(),
+  mapsReviewCount: z.number().int().min(0).nullish(),
+  mapsUrl: text(2000),
+});
+
 const CreateLeadBody = z
   .object({
     jobId: z.string().min(1).max(64).optional(),
     /** Stable per-listing key from the extension; makes retries idempotent within a job. */
     clientKey: z.string().min(1).max(500).optional(),
     lead: LeadBody,
+    justdial: JustdialBody.optional(),
   })
   .refine((b) => !b.jobId || b.clientKey, { message: "clientKey is required with jobId", path: ["clientKey"] });
 
@@ -62,12 +85,17 @@ const UpdateLeadBody = z
   .partial()
   .strict();
 
-export async function leadRoutes(app: FastifyInstance, opts: { leads: LeadService; dedupe: DedupeService; timeZone: string }) {
+export async function leadRoutes(
+  app: FastifyInstance,
+  opts: { leads: LeadService; dedupe: DedupeService; timeZone: string; justdial?: JustdialService },
+) {
   const { leads, dedupe } = opts;
 
   app.post("/api/leads", async (request, reply) => {
     const body = parse(CreateLeadBody, request.body);
     const saved = await dedupe.save(body.lead, { jobId: body.jobId, clientKey: body.clientKey });
+    // Justdial details go with the saved lead (also when it was a duplicate: the details refresh).
+    if (body.justdial && opts.justdial && saved.lead) await opts.justdial.saveDetail(saved.lead.id, body.justdial);
     const job = saved.job && {
       id: saved.job.id,
       totalFound: saved.job.totalFound,

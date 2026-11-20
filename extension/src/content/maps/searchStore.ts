@@ -25,8 +25,8 @@ export class SearchStore implements SearchSource {
   /** Adds one raw response; returns how many new places it brought. */
   add(text: string): number {
     const payload = parseSearchPayload(text);
-    if (!payload || payload.places.length === 0 || !payload.query) return 0;
-    const key = payload.query.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!payload || payload.places.length === 0) return 0;
+    const key = (payload.query ?? "").toLowerCase().replace(/\s+/g, " ").trim();
     let places = this.byQuery.get(key);
     if (!places) {
       places = new Map();
@@ -39,7 +39,7 @@ export class SearchStore implements SearchSource {
         added++;
       }
     }
-    this.latest = payload.query;
+    if (payload.query) this.latest = payload.query;
     this.v++;
     for (const wake of this.waiters) wake();
     return added;
@@ -48,6 +48,13 @@ export class SearchStore implements SearchSource {
   placesFor(query: string): SearchPlace[] {
     for (const [key, places] of this.byQuery) if (sameQuery(key, query)) return [...places.values()];
     return [];
+  }
+
+  /** Every place seen on this page, whatever the search (for looking up one business). */
+  allPlaces(): SearchPlace[] {
+    const out = new Map<string, SearchPlace>();
+    for (const places of this.byQuery.values()) for (const [id, p] of places) out.set(id, p);
+    return [...out.values()];
   }
 
   latestQuery() {

@@ -39,10 +39,13 @@ import {
   applyListing,
   applyStartNext,
   applySyncEvent,
+  applyJustdialNext,
   applyWatchdog,
   backendStatusFor,
   isCurrentRun,
+  newJustdialRun,
 } from "./jobController";
+import { JustdialRunner } from "./justdialRunner";
 import { checkLocalDuplicate } from "./localDedupe";
 import { SyncEngine, type SyncEvent } from "./sync";
 
@@ -167,6 +170,68 @@ async function enqueue(payload: OutboxPayload) {
 
 function statusUpdate(jobId: string | null, status: Extract<OutboxPayload, { kind: "status" }>["status"], reason: string | null) {
   return jobId ? enqueue({ kind: "status", jobId, status, reason }) : Promise.resolve();
+}
+
+// ---- Justdial jobs (the background drives the Justdial tab) ----
+
+const justdial = new JustdialRunner({
+  loadState: loadCollectorState,
+  updateState,
+  enqueue,
+  statusUpdate,
+  finished: (state) => afterRun(state),
+});
+
+const isJustdial = (s: CollectorState) => s.jobSettings?.source === "justdial";
+
+async function startJustdialJob(settings: CollectorSettings): Promise<MessageResponse<unknown>> {
+  const keywords = parseKeywords(settings.keyword);
+  const current = await loadCollectorState();
+  if (!nextStatus(current.status, "start")) return { ok: false, error: `Cannot start while ${current.status}` };
+  const firstError = Object.values(validateCollectorSettings(settings))[0];
+  if (firstError) return { ok: false, error: firstError };
+
+  if (current.queue) {
+    for (const job of current.queue.jobs.slice(current.queue.index + 1)) await statusUpdate(job.id, "stopped", "queue_replaced");
+  }
+  await sync.flush();
+  const created = await createBackendJob(settings, keywords);
+  if (!created.ok) return created;
+
+  const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+  if (tab.id === undefined) return { ok: false, error: "Could not open a Justdial tab" };
+  const now = Date.now();
+  let state = newJustdialRun({ ...current, queue: null }, settings, keywords[0]!, now, tab.id);
+  await clearOtherProcessedKeys(state.runId);
+  state = await updateState(() => ({ ...state, backendJobId: created.jobId, queue: created.queue }));
+
+  // "Send the new leads to an email campaign" for every search of this job.
+  if (settings.jdTemplateId) {
+    const ids = created.queue ? created.queue.jobs.map((j) => j.id) : [created.jobId];
+    for (const id of ids) {
+      const res = await api("POST", `/api/justdial/jobs/${encodeURIComponent(id)}/auto-campaign`, { templateId: settings.jdTemplateId });
+      if (!res.ok) state = await updateState((s) => withLog(s, "warning", `Automatic email campaign not set: ${res.error.message}`));
+    }
+    state = await updateState((s) => withLog(s, "info", "New leads with an email will go into an email campaign when the search finishes"));
+  }
+  await chrome.alarms.create(WATCHDOG_ALARM, { periodInMinutes: 0.5 });
+  justdial.run().catch(console.error);
+  return { ok: true, data: state };
+}
+
+async function startNextJustdial(): Promise<MessageResponse<unknown>> {
+  const current = await loadCollectorState();
+  const dry = applyJustdialNext(current);
+  if (!dry.ok) return dry;
+  await sync.flush();
+  const run = await markRunning(dry.state.backendJobId!);
+  if (!run.ok) return { ok: false, error: `Backend: ${run.error}` };
+  let tabId = dry.state.tabId;
+  if (!(await tabExists(tabId))) tabId = (await chrome.tabs.create({ url: "about:blank", active: false })).id ?? null;
+  await clearOtherProcessedKeys(dry.state.runId);
+  const state = await updateState(() => ({ ...dry.state, tabId }));
+  justdial.run().catch(console.error);
+  return { ok: true, data: state };
 }
 
 // ---- Content script runner ----
@@ -325,7 +390,7 @@ async function afterRun(state: CollectorState): Promise<void> {
     // The user may have started something else meanwhile.
     const now = await loadCollectorState();
     if (now.runId !== state.runId || now.status !== "completed") return;
-    const res = await startNextInQueue(true);
+    const res = isJustdial(now) ? await startNextJustdial() : await startNextInQueue(true);
     if (!res.ok) {
       await updateState((s) => withLog(s, "error", `Could not start the next search: ${res.error}. Press START NEXT`));
       await notify("Maps collector needs you", `Could not start the next search: ${res.error}`);
@@ -385,6 +450,7 @@ async function openBackgroundSearch(query: string): Promise<{ tabId: number; pag
 }
 
 async function startNewJob(settings: CollectorSettings): Promise<MessageResponse<unknown>> {
+  if (settings.source === "justdial") return startJustdialJob(settings);
   const keywords = parseKeywords(settings.keyword);
   const current = await loadCollectorState();
   let tabId = await getActiveTabId();
@@ -463,6 +529,16 @@ async function startNextInQueue(inJobTab = false): Promise<MessageResponse<unkno
 async function handleCommand(command: CollectorCommand, settings: CollectorSettings): Promise<MessageResponse<unknown>> {
   const current = await loadCollectorState();
   if (command === "start" && startsNewJob(current.status)) return startNewJob(settings);
+  if (command === "start" && isJustdial(current) && current.status === "paused") {
+    // Justdial runs from the background: resume in the job's tab (reopened if it was closed).
+    let tabId = current.tabId;
+    if (!(await tabExists(tabId))) tabId = (await chrome.tabs.create({ url: "about:blank", active: false })).id ?? null;
+    const state = await updateState((s) => withLog({ ...s, status: "running", tabId, lastHeartbeatAt: Date.now() }, "info", "Job resumed"));
+    await statusUpdate(state.backendJobId, "running", null);
+    await chrome.alarms.create(WATCHDOG_ALARM, { periodInMinutes: 0.5 });
+    justdial.run().catch(console.error);
+    return { ok: true, data: state };
+  }
 
   let error: string | null = null;
   const state = await updateState(async (s) => {
@@ -534,7 +610,13 @@ async function handle(message: ExtensionMessage, sender: chrome.runtime.MessageS
 
     case "START_NEXT":
       await chrome.action.setBadgeText({ text: "" }).catch(() => undefined);
-      return startNextInQueue();
+      return isJustdial(await loadCollectorState()) ? startNextJustdial() : startNextInQueue();
+
+    case "GET_EMAIL_TEMPLATES": {
+      const res = await api<{ items: { id: string; name: string; channel?: string }[] }>("GET", "/api/templates");
+      if (!res.ok) return { ok: false, error: res.error.message };
+      return { ok: true, data: res.data.items.filter((t) => !t.channel || t.channel === "email").map((t) => ({ id: t.id, name: t.name })) };
+    }
 
     case "RETRY_SYNC":
       flushSoon();
@@ -564,6 +646,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   updateState(async (state) => {
     if (state.status !== "running") {
       await chrome.alarms.clear(WATCHDOG_ALARM);
+      return null;
+    }
+    if (isJustdial(state)) {
+      // The background drives Justdial jobs: if Chrome restarted the background, carry on.
+      if (!justdial.isActive(state.runId)) justdial.run().catch(console.error);
       return null;
     }
     const next = applyWatchdog(state);

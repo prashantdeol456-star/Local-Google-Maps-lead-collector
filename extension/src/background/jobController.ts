@@ -292,3 +292,36 @@ export function applySyncEvent(state: CollectorState, event: SyncEvent, pending:
     }
   }
 }
+
+// ---- Justdial jobs (driven by the background; no Maps page needed) ----
+
+/** Fresh state for a Justdial run of one keyword. */
+export function newJustdialRun(state: CollectorState, settings: CollectorSettings, keyword: string, now: number, tabId: number | null): CollectorState {
+  const label = `Justdial: ${keyword} in ${settings.location.trim()}`;
+  const s: CollectorState = {
+    ...state,
+    status: "running",
+    jobLabel: label,
+    startedAt: now,
+    counters: { ...EMPTY_COUNTERS },
+    log: [],
+    jobSettings: { ...settings, keyword },
+    runId: String(now),
+    tabId,
+    lastHeartbeatAt: now,
+    recent: [],
+    backendJobId: null,
+    aiSearches: 0,
+  };
+  return withLog(s, "info", `${label}: job started (max ${settings.maxRecords} records)`, now);
+}
+
+/** The next keyword of a Justdial queue, in the same tab. */
+export function applyJustdialNext(state: CollectorState, now = Date.now()): CommandResult {
+  const q = state.queue;
+  if (!q || q.index + 1 >= q.jobs.length) return { ok: false, error: "No more searches in the queue" };
+  if (!state.jobSettings) return { ok: false, error: "Queue settings are missing; start a new search" };
+  const next = q.jobs[q.index + 1]!;
+  const s = newJustdialRun(state, state.jobSettings, next.keyword, now, state.tabId);
+  return { ok: true, state: withLog({ ...s, queue: { ...q, index: q.index + 1 }, backendJobId: next.id }, "info", `Search ${q.index + 2} of ${q.jobs.length}`, now) };
+}
