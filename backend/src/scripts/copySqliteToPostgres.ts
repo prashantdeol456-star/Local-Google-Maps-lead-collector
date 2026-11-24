@@ -50,6 +50,9 @@ export const TABLES = [
   "SocialLead",
   "JustdialDetail",
   "JustdialJob",
+  "WaChat",
+  "WaMessage",
+  "WaMedia",
 ] as const;
 
 const BATCH = 500;

@@ -27,6 +27,9 @@ export const OWNED_MODELS = new Set([
   "LinkedInLead",
   "JustdialDetail",
   "JustdialJob",
+  "WaChat",
+  "WaMessage",
+  "WaMedia",
   // Outreach (phase B)
   "MessageTemplate",
   "Campaign",

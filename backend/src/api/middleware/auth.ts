@@ -39,6 +39,8 @@ const CUSTOMER_ROUTES = new RegExp(
       "email/campaigns|email/campaigns/recipients|email/campaigns/:id|email/campaigns/:id/(attempts|start|pause|stop)|email/attempts/:id/reply",
       "whatsapp/templates|whatsapp/templates/:id|whatsapp/templates/preview",
       "whatsapp/campaigns|whatsapp/campaigns/recipients|whatsapp/campaigns/:id|whatsapp/campaigns/:id/(attempts|start|pause|stop)",
+      // WhatsApp Chat (their own number)
+      "whatsapp/chats|whatsapp/chats/:id|whatsapp/chats/:id/(messages|read|text|file|template|draft)|whatsapp/media/:id",
       // Their own sender (phase C)
       "senders|senders/email|senders/whatsapp|senders/:channel|senders/test",
       // AI Inbox and social accounts (phase C2); the LinkedIn inbox (extension) stays with super admins

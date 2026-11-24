@@ -30,6 +30,8 @@ import { whatsappRoutes, whatsappWebhookRoutes } from "./api/routes/whatsapp.js"
 import { createWhatsAppProvider, type WhatsAppProvider } from "./providers/whatsapp/index.js";
 import { WhatsAppService } from "./services/whatsapp/whatsappService.js";
 import { whatsappCampaignRoutes } from "./api/routes/whatsappCampaigns.js";
+import { whatsappChatRoutes } from "./api/routes/whatsappChat.js";
+import { WhatsAppChatService } from "./services/whatsapp/chatService.js";
 import { WhatsAppConsentService } from "./services/whatsapp/consent.js";
 import { WhatsAppCampaignService } from "./services/whatsapp/whatsappCampaignService.js";
 import { WhatsAppTemplateService } from "./services/whatsapp/whatsappTemplateService.js";
@@ -195,6 +197,15 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const maintenance = new MaintenanceWorker(repos, { log: (msg) => app.log.info(msg) });
   const navigation = new AiNavigationService(aiNavigator === undefined ? createAiNavigator(config.ai) : aiNavigator, config.ai, repos);
   const waTracking = new WhatsAppTrackingService(repos, waProvider.name, bus);
+  const waChats = new WhatsAppChatService(db, {
+    providerFor: (ownerId) => senders.whatsappFor(ownerId),
+    repos,
+    bus,
+    runtime: inboxRuntime,
+    timeZone: config.timeZone,
+    log: (msg) => app.log.error(msg),
+  });
+  waTracking.attachChats(waChats);
   const whatsappWorker = new WhatsAppWorker(repos, (campaign) => senders.whatsappFor(campaign.ownerId), { bus, log: (msg) => app.log.error(msg) });
   const emailWorker = new EmailWorker(repos, (campaign) => senders.emailFor(campaign.ownerId), {
     trackClicks: config.trackClicks,
@@ -263,6 +274,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(replyRoutes, { tracking });
   await app.register(whatsappRoutes, { whatsapp });
   await app.register(whatsappCampaignRoutes, { templates: waTemplates, campaigns: waCampaigns, consent: waConsent, repos });
+  await app.register(whatsappChatRoutes, { chats: waChats });
   await app.register(preferenceRoutes, { preferences });
   await app.register(aiRoutes, { navigation });
   await app.register(integrationRoutes, { integrations, worker: webhookWorker });

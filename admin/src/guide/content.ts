@@ -271,6 +271,21 @@ export const GUIDE: GuideSection[] = [
       "Unsubscribes, STOP replies and spam reports are added automatically. You can add addresses yourself (one per line). Campaigns never message an address on this list, even for leads collected or pasted again later.",
   },
   {
+    id: "whatsapp-chat",
+    title: "WhatsApp Chat",
+    audience: "all",
+    pages: ["/whatsapp-chat"],
+    image: img("25-whatsapp-chat", "WhatsApp Chat: chats on the left, the open chat with ticks and the 24-hour reply window on the right"),
+    steps: [
+      "Connect your own WhatsApp number on My sender (Meta WhatsApp Cloud API: Phone Number ID, permanent access token, App Secret and Verify Token). Copy the webhook URL shown there into Meta App Dashboard → WhatsApp → Configuration, and subscribe to the “messages” field.",
+      "Every message people send to that number appears in WhatsApp Chat by itself, newest chat on top, with an unread count. Photos, documents and voice notes are saved here (up to 5 MB each), because WhatsApp's own links expire.",
+      "Open a chat to read it: the person gets blue ticks. Your messages show ✓ sent, ✓✓ delivered and blue ✓✓ read, or ⚠ with the reason if WhatsApp did not deliver it.",
+      "For 24 hours after the person's last message you can reply freely: type, attach a photo or file (📎), and press Send. After 24 hours, and for a new chat (+ New chat), WhatsApp allows only an approved template; when they reply, free chat opens again.",
+      "The AI writes a draft of the next reply for every new message, using your business information from AI Inbox → Setup. Press “Use this”, change it if needed, and Send. Nothing is sent without you.",
+      "Templates: add them on the Templates page with the exact name from WhatsApp Manager and mark them Approved once Meta approves them.",
+    ],
+  },
+  {
     id: "inbox",
     title: "AI Inbox",
     audience: "all",

@@ -16,6 +16,34 @@ export class LogWhatsAppProvider implements WhatsAppProvider {
     return { externalMessageId };
   }
 
+  /** Chat messages "sent" in development (nothing leaves the server). */
+  readonly sentChats: { to: string; type: string; text: string | null; externalMessageId: string; at: Date }[] = [];
+
+  private keep(to: string, type: string, text: string | null): WhatsAppSendResult {
+    const externalMessageId = `wa_log_${randomUUID()}`;
+    this.sentChats.unshift({ to, type, text, externalMessageId, at: new Date() });
+    this.sentChats.length = Math.min(this.sentChats.length, 50);
+    return { externalMessageId };
+  }
+
+  async sendText(to: string, text: string): Promise<WhatsAppSendResult> {
+    return this.keep(to, "text", text);
+  }
+
+  async uploadMedia(): Promise<string> {
+    return `log_media_${randomUUID()}`;
+  }
+
+  async sendMedia(to: string, media: { kind: string; caption?: string | null }): Promise<WhatsAppSendResult> {
+    return this.keep(to, media.kind, media.caption ?? null);
+  }
+
+  async markRead(): Promise<void> {}
+
+  async downloadMedia(): Promise<null> {
+    return null;
+  }
+
   verifySubscription(): string | null {
     return null;
   }

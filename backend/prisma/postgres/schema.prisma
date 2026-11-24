@@ -1291,3 +1291,72 @@ model JustdialJob {
 
   @@index([ownerId])
 }
+
+/// One WhatsApp chat (WhatsApp Chat page), through the owner's own WhatsApp sender (Cloud API).
+model WaChat {
+  id              String      @id @default(cuid())
+  ownerId         String?
+  /// E.164 without "+", e.g. 919876543210
+  phone           String
+  /// Name from the person's WhatsApp profile (self-chosen)
+  profileName     String?
+  /// Name you gave the contact
+  customName      String?
+  leadId          String?
+  /// Last message from the person: free-form replies are allowed for 24 hours after it
+  lastInboundAt   DateTime?
+  lastMessageAt   DateTime    @default(now())
+  lastMessageText String?
+  unreadCount     Int         @default(0)
+  /// AI draft of the next reply (sent only when you press Send)
+  aiDraft         String?
+  aiDraftAt       DateTime?
+  /// Why the AI could not write a draft, or what the owner should check
+  aiNote          String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  messages        WaMessage[]
+
+  @@index([ownerId, lastMessageAt])
+  @@index([ownerId, phone])
+}
+
+/// One message bubble. direction "in" = from the person, "out" = from you.
+model WaMessage {
+  id           String   @id @default(cuid())
+  ownerId      String?
+  chatId       String
+  /// WhatsApp message id; tick updates (sent → delivered → read) arrive with it
+  wamid        String?
+  direction    String
+  /// text | image | document | audio | video | sticker | template | location | contacts | unknown
+  type         String
+  body         String?
+  /// WaMedia id of the stored file
+  mediaId      String?
+  mediaMime    String?
+  mediaName    String?
+  mediaSize    Int?
+  /// received | sending | sent | delivered | read | failed
+  status       String
+  error        String?
+  templateName String?
+  createdAt    DateTime @default(now())
+  chat         WaChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
+  @@index([wamid])
+}
+
+/// A photo, document or voice note of a WhatsApp chat, kept here (WhatsApp's own links expire).
+model WaMedia {
+  id        String   @id @default(cuid())
+  ownerId   String?
+  mime      String
+  name      String?
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+}

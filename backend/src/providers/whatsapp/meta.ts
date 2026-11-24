@@ -9,6 +9,8 @@ import {
   type RawWebhook,
   type WhatsAppEvent,
   type WhatsAppProvider,
+  type IncomingMedia,
+  type MediaKind,
   type WhatsAppSendResult,
 } from "./types.js";
 
@@ -37,6 +39,16 @@ function safeEqual(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** The file of an incoming photo, document, voice note, video or sticker. */
+function mediaOf(m: Record<string, unknown>): IncomingMedia | null {
+  const kind = String(m.type ?? "");
+  if (!["image", "document", "audio", "video", "sticker", "voice"].includes(kind)) return null;
+  const o = m[kind] as { id?: unknown; mime_type?: unknown; filename?: unknown; caption?: unknown } | undefined;
+  if (!o || typeof o.id !== "string") return null;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  return { id: o.id, mime: str(o.mime_type), filename: str(o.filename), caption: str(o.caption) };
 }
 
 const fromUnix = (ts: unknown) => (typeof ts === "string" && /^\d+$/.test(ts) ? new Date(Number(ts) * 1000) : new Date());
@@ -77,29 +89,37 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
       ...(endpoint === "marketing_messages" ? { product_policy: "CLOUD_API_FALLBACK" } : {}),
     };
 
+    const data = await this.post<{ messages?: { id?: string }[] }>(endpoint, JSON.stringify(body), "application/json");
+    const id = data?.messages?.[0]?.id;
+    if (!id) throw new WhatsAppProviderError("WhatsApp did not return a message id", true);
+    return { externalMessageId: id };
+  }
+
+  private graphUrl(path: string) {
+    return `https://graph.facebook.com/${this.options.apiVersion ?? "v26.0"}/${path}`;
+  }
+
+  /** POST to /<phone number id>/<path>; throws WhatsAppProviderError with Meta's message. */
+  private async post<T>(path: string, body: BodyInit, contentType: string | null): Promise<T | null> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     let res: Response;
     try {
-      res = await this.fetchImpl(
-        `https://graph.facebook.com/${this.options.apiVersion ?? "v26.0"}/${encodeURIComponent(this.options.phoneNumberId)}/${endpoint}`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${this.options.accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        },
-      );
+      res = await this.fetchImpl(this.graphUrl(`${encodeURIComponent(this.options.phoneNumberId)}/${path}`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${this.options.accessToken}`, ...(contentType ? { "Content-Type": contentType } : {}) },
+        body,
+        signal: controller.signal,
+      });
     } catch {
       throw new WhatsAppProviderError("Could not reach WhatsApp (graph.facebook.com)", true);
     } finally {
       clearTimeout(timer);
     }
 
-    const data = (await res.json().catch(() => null)) as {
-      messages?: { id?: string }[];
+    const data = (await res.json().catch(() => null)) as (T & {
       error?: { message?: string; code?: number; error_data?: { details?: string } };
-    } | null;
+    }) | null;
     if (!res.ok) {
       const err = data?.error;
       const detail = err?.error_data?.details ? ` (${err.error_data.details})` : "";
@@ -120,9 +140,58 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         err?.code,
       );
     }
+    return data;
+  }
+
+  private async sendMessage(body: Record<string, unknown>): Promise<WhatsAppSendResult> {
+    const data = await this.post<{ messages?: { id?: string }[] }>(
+      "messages",
+      JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...body }),
+      "application/json",
+    );
     const id = data?.messages?.[0]?.id;
     if (!id) throw new WhatsAppProviderError("WhatsApp did not return a message id", true);
     return { externalMessageId: id };
+  }
+
+  async sendText(to: string, text: string, replyTo?: string | null): Promise<WhatsAppSendResult> {
+    return this.sendMessage({ to, type: "text", text: { preview_url: true, body: text }, ...(replyTo ? { context: { message_id: replyTo } } : {}) });
+  }
+
+  async uploadMedia(file: { data: Buffer; mime: string; filename: string }): Promise<string> {
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", file.mime);
+    form.append("file", new Blob([new Uint8Array(file.data)], { type: file.mime }), file.filename);
+    const data = await this.post<{ id?: string }>("media", form, null);
+    if (!data?.id) throw new WhatsAppProviderError("WhatsApp did not return a media id", true);
+    return data.id;
+  }
+
+  async sendMedia(to: string, media: { kind: MediaKind; mediaId: string; caption?: string | null; filename?: string | null }): Promise<WhatsAppSendResult> {
+    const object: Record<string, unknown> = { id: media.mediaId };
+    if (media.caption && media.kind !== "audio") object.caption = media.caption.slice(0, 1024);
+    if (media.kind === "document" && media.filename) object.filename = media.filename;
+    return this.sendMessage({ to, type: media.kind, [media.kind]: object });
+  }
+
+  async markRead(wamid: string): Promise<void> {
+    await this.post("messages", JSON.stringify({ messaging_product: "whatsapp", status: "read", message_id: wamid }), "application/json");
+  }
+
+  async downloadMedia(mediaId: string, maxBytes: number): Promise<{ data: Buffer; mime: string } | null> {
+    const auth = { Authorization: `Bearer ${this.options.accessToken}` };
+    const info = await this.fetchImpl(this.graphUrl(encodeURIComponent(mediaId)), { headers: auth, signal: AbortSignal.timeout(TIMEOUT_MS) })
+      .then((r) => (r.ok ? (r.json() as Promise<{ url?: string; mime_type?: string; file_size?: number }>) : null))
+      .catch(() => null);
+    if (!info?.url || (info.file_size ?? 0) > maxBytes) return null;
+    // The file link is on Meta's own CDN and needs the same token.
+    if (!/^https:\/\/([a-z0-9-]+\.)*(fbsbx|facebook|whatsapp)\.(com|net)\//i.test(info.url)) return null;
+    const res = await this.fetchImpl(info.url, { headers: auth, signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    if (!res?.ok) return null;
+    const data = Buffer.from(await res.arrayBuffer());
+    if (data.length > maxBytes) return null;
+    return { data, mime: info.mime_type ?? res.headers.get("content-type") ?? "application/octet-stream" };
   }
 
   verifySubscription(query: Record<string, string | undefined>): string | null {
@@ -206,6 +275,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             messageType: String(m.type ?? "unknown"),
             inReplyTo: (m.context as { id?: string } | undefined)?.id ?? null,
             profileName: contact?.profile?.name ?? null,
+            media: mediaOf(m),
             occurredAt: fromUnix(m.timestamp),
             metadata: { type: m.type },
           });

@@ -23,7 +23,7 @@ export const ReplySchema = z.object({
 export type WrittenReply = z.infer<typeof ReplySchema>;
 
 export interface ReplyContext {
-  platform: "telegram" | "facebook" | "instagram" | "linkedin";
+  platform: "telegram" | "facebook" | "instagram" | "linkedin" | "whatsapp";
   participantName: string;
   participantUsername: string | null;
   /** Oldest first; "in" = from the person, "out" = from the business */
@@ -46,7 +46,7 @@ export class ReplyWriterError extends Error {
   }
 }
 
-const PLATFORM_NAME = { telegram: "Telegram", facebook: "Facebook Messenger", instagram: "Instagram Direct", linkedin: "LinkedIn" } as const;
+const PLATFORM_NAME = { telegram: "Telegram", facebook: "Facebook Messenger", instagram: "Instagram Direct", linkedin: "LinkedIn", whatsapp: "WhatsApp" } as const;
 
 const section = (title: string, body: string) => `<${title}>\n${body.trim() || "(not provided)"}\n</${title}>`;
 

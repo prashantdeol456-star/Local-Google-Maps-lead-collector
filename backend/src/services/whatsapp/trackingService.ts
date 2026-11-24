@@ -72,11 +72,18 @@ export async function recordWhatsAppOptOut(repos: Repositories, input: OptOutInp
 }
 
 export class WhatsAppTrackingService {
+  /** WhatsApp Chat: also gets every event (incoming messages and ticks for chat messages). */
+  private chats: { handle(events: WhatsAppEvent[]): Promise<void> } | null = null;
+
   constructor(
     private readonly repos: Repositories,
     private readonly providerName: string,
     private readonly bus?: EventBus,
   ) {}
+
+  attachChats(chats: { handle(events: WhatsAppEvent[]): Promise<void> }) {
+    this.chats = chats;
+  }
 
   /** Handles verified webhook events; returns how many were new (retries count as 0). */
   async handle(events: WhatsAppEvent[]): Promise<number> {
@@ -86,6 +93,7 @@ export class WhatsAppTrackingService {
         event.kind === "status" ? await this.status(event) : event.kind === "inbound" ? await this.inbound(event) : await this.preference(event);
       if (isNew) handled++;
     }
+    await this.chats?.handle(events);
     return handled;
   }
 

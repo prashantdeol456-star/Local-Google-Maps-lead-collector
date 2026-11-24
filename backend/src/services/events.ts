@@ -16,7 +16,9 @@ export type AppEvent =
   /** A new suppression entry (unsubscribe, STOP, spam report, do-not-contact…). */
   | { type: "optout.recorded"; suppressionId: string }
   /** A chat in the AI Inbox changed (new message, draft, reply). */
-  | { type: "inbox.updated"; conversationId: string };
+  | { type: "inbox.updated"; conversationId: string }
+  /** A WhatsApp chat changed (new message, tick update, draft). */
+  | { type: "whatsapp.chat"; chatId: string };
 
 /** An event as delivered: with the user who caused it (from the request's data scope), if any. */
 export type ScopedAppEvent = AppEvent & { ownerId?: string };

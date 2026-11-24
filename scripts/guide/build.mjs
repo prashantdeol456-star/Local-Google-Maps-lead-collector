@@ -132,6 +132,12 @@ async function seed() {
   await j("POST", "/api/email/campaigns", { name: "Hospitals Lucknow – intro", templateId: tpl.id, recipients: { leadIds }, intervalSec: 60, dailyLimit: 50, windowStart: "10:00", windowEnd: "18:00" }, cu);
   await j("POST", "/api/opt-outs", { channel: "email", addresses: "no-marketing@example.com", reason: "Asked not to be contacted" }, cu);
 
+  // WhatsApp Chat: the demo number ("log": nothing leaves the server) and two chats started with a template
+  await j("PUT", "/api/senders/whatsapp", { provider: "log" }, cu);
+  const waTpl = (await j("POST", "/api/whatsapp/templates", { name: "visa_followup", language: "en", category: "marketing", paramFormat: "positional", approvalStatus: "approved", body: "Hello {{name|there}}, thanks for your enquiry about studying abroad. When can our counsellor call you?" }, cu)).template;
+  await j("POST", "/api/whatsapp/chats", { phone: "+91 90000 40001", name: "Riya Sharma", templateId: waTpl.id }, cu);
+  await j("POST", "/api/whatsapp/chats", { phone: "+91 90000 40002", name: "Aman Verma", templateId: waTpl.id }, cu);
+
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
   await j("POST", `/api/billing/accounts/${users[0].id}/adjust`, { amountInr: 500, note: "Paid by bank transfer" }, sa);
@@ -198,6 +204,8 @@ async function shoot(page) {
   await shot("19-contacts", "/admin/contacts");
   await shot("21-billing", "/admin/billing");
   await shot("24-justdial-leads", "/admin/justdial");
+  const waChat = await page.evaluate(async () => (await (await fetch("/api/whatsapp/chats")).json()).items[0].id);
+  await shot("25-whatsapp-chat", `/admin/whatsapp-chat?chat=${waChat}`);
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));

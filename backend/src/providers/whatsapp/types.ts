@@ -54,6 +54,8 @@ export type WhatsAppEvent =
       inReplyTo: string | null;
       /** Name from the sender's WhatsApp profile (self-chosen, not verified). */
       profileName: string | null;
+      /** Photo, document, voice note, video or sticker: WhatsApp's media id (download with downloadMedia). */
+      media: IncomingMedia | null;
       occurredAt: Date;
       metadata: Record<string, unknown>;
     }
@@ -67,6 +69,16 @@ export type WhatsAppEvent =
       occurredAt: Date;
       metadata: Record<string, unknown>;
     };
+
+export interface IncomingMedia {
+  id: string;
+  mime: string | null;
+  filename: string | null;
+  caption: string | null;
+}
+
+/** Kinds of file WhatsApp can send. */
+export type MediaKind = "image" | "document" | "audio" | "video";
 
 export interface RawWebhook {
   headers: Record<string, string | string[] | undefined>;
@@ -83,6 +95,16 @@ export interface WhatsAppProvider {
   verifySubscription(query: Record<string, string | undefined>): string | null;
   /** Verifies the signature and returns the events. Throws WhatsAppWebhookRejected if not genuine. */
   handleWebhook(request: RawWebhook): Promise<WhatsAppEvent[]>;
+
+  // ---- Chats (WhatsApp Chat page). Free-form messages only within 24 hours of the person's last message. ----
+  sendText?(to: string, text: string, replyTo?: string | null): Promise<WhatsAppSendResult>;
+  /** Uploads a file to WhatsApp and returns its media id (valid for sending for a while). */
+  uploadMedia?(file: { data: Buffer; mime: string; filename: string }): Promise<string>;
+  sendMedia?(to: string, media: { kind: MediaKind; mediaId: string; caption?: string | null; filename?: string | null }): Promise<WhatsAppSendResult>;
+  /** Shows blue ticks on the person's phone for this message (and the ones before it). */
+  markRead?(wamid: string): Promise<void>;
+  /** Downloads a received file (null if it is too big or gone). */
+  downloadMedia?(mediaId: string, maxBytes: number): Promise<{ data: Buffer; mime: string } | null>;
 }
 
 export class WhatsAppProviderError extends Error {
