@@ -185,7 +185,10 @@ export class InboxService {
       // A newer message makes an unsent draft out of date.
       await this.repos.inbox.supersedePending(conversation.id);
     }
-    conversation = await this.repos.inbox.updateConversation(conversation.id, { lastInboundAt, lastOutboundAt, lastMessageAt, status });
+    const newIn = added.filter((m) => m.direction === "in").length;
+    // You answered in the app itself: what came before is seen.
+    const unreadCount = customerLast ? conversation.unreadCount + newIn : 0;
+    conversation = await this.repos.inbox.updateConversation(conversation.id, { lastInboundAt, lastOutboundAt, lastMessageAt, status, unreadCount });
     this.changed(conversation.id);
     return { conversation, added: added.length };
   }
@@ -429,6 +432,17 @@ export class InboxService {
 
   list(query: { platform?: string; status?: string; q?: string; skip: number; take: number }) {
     return this.repos.inbox.listConversations(query);
+  }
+
+  /** Opened in the admin panel: nothing unread. */
+  async markRead(conversationId: string) {
+    const conversation = await this.repos.inbox.findConversation(conversationId);
+    if (!conversation) throw Errors.notFound("Chat not found");
+    if (conversation.unreadCount > 0) {
+      await this.repos.inbox.updateConversation(conversationId, { unreadCount: 0 });
+      this.changed(conversationId);
+    }
+    return { ok: true };
   }
 
   async get(conversationId: string) {

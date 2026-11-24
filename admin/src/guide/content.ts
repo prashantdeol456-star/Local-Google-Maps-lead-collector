@@ -271,6 +271,23 @@ export const GUIDE: GuideSection[] = [
       "Unsubscribes, STOP replies and spam reports are added automatically. You can add addresses yourself (one per line). Campaigns never message an address on this list, even for leads collected or pasted again later.",
   },
   {
+    id: "all-messages",
+    title: "All messages",
+    audience: "all",
+    pages: ["/messages"],
+    image: img("27-all-messages", "All messages: WhatsApp, Facebook, Instagram, Telegram and LinkedIn chats in one list"),
+    intro:
+      "One list of every chat on every app you connected: WhatsApp (your own number), Facebook Page Messenger, Instagram DMs, your Telegram bot and LinkedIn. The newest chat is on top, with the app, an unread count and how long you may still reply.",
+    steps: [
+      "Connect the apps once: WhatsApp on My sender; Telegram, Facebook, Instagram and LinkedIn under AI Inbox → Setup and Social Accounts.",
+      "Use the app tabs (All, WhatsApp, Facebook…) to see one app, and Unread or Needs reply to see what waits for you. Search finds a name, number or username.",
+      "Click a chat to open it on the right. WhatsApp chats open with everything WhatsApp Chat has (files, voice notes, reactions, templates); the other apps open with their AI Inbox chat (AI draft, Send, Mark as done).",
+      "The small label shows the reply window: WhatsApp, Facebook and Instagram allow a free reply for 24 hours after the person's last message (“5 h left”). After that WhatsApp needs an approved template, and Facebook/Instagram need a reply in their own app.",
+      "🔔 Notifications on: a sound and a browser notification when a new message arrives on any app. + New WhatsApp chat starts a chat with an approved template.",
+    ],
+    notes: ["Settings stay where they were: WhatsApp Chat ⚙ (greeting, away message, quick replies, business profile) and AI Inbox (AI instructions, keys, Telegram bot)."],
+  },
+  {
     id: "whatsapp-chat",
     title: "WhatsApp Chat",
     audience: "all",
@@ -446,6 +463,9 @@ export const GUIDE: GuideSection[] = [
         ["Online recharge with Razorpay", "Built — waiting for keys", "Enter Razorpay test keys on the Integrations page and test a recharge; after KYC switch to live keys."],
         ["Justdial collection (Maps extension v0.3.0, Justdial Leads page, website emails, automatic email campaign)", "Done", "Customers re-download the Maps extension."],
         ["Social Engagement phase 1: Facebook Page and Instagram comments, reactions, shares", "Built — needs Meta setup", "Meta app: Page webhooks (feed) and Instagram webhooks (comments) with the callback URL and verify token shown on the Social Engagement page; App Review for pages_read_user_content, pages_manage_engagement and instagram_manage_comments so customer accounts work."],
+        ["All messages phase 1: one list of WhatsApp, Facebook, Instagram, Telegram and LinkedIn chats", "Done", "—"],
+        ["All messages phase 2: Meta webhooks for Messenger/Instagram, photos and voice, Instagram private reply, Telegram Business (your own Telegram number)", "Agreed", "Meta App Review for pages_messaging and instagram_manage_messages; Business Mode on the Telegram bot."],
+        ["All messages phase 3: one contact across apps, labels, team assignment, WhatsApp Coexistence", "Agreed", "Meta Tech Provider status for Coexistence (Embedded Signup)."],
         ["Social Engagement phase 2: YouTube comments and subscribers", "Agreed", "Google Cloud project with the YouTube Data API and OAuth consent screen."],
         ["Social Engagement phase 3: LinkedIn company page comments, reactions, reposts", "Agreed", "LinkedIn Community Management API approval."],
         ["Customers re-download the Maps extension (v0.2.0)", "Recommended", "Fast hands-off collecting: reads the list without opening listings, runs in a background tab, starts the next keyword by itself, notifies when done. Also keeps leads waiting when credit runs out."],

@@ -24,6 +24,7 @@ interface Conversation {
   summary: string | null;
   lastInboundAt: string | null;
   lastMessageAt: string;
+  unreadCount: number;
 }
 interface ListItem extends Conversation {
   lastMessage: { direction: "in" | "out"; text: string; author: string; sentAt: string } | null;
@@ -99,7 +100,7 @@ const MODE_LABEL: Record<Mode, string> = {
 
 const AUTHOR_LABEL: Record<string, string> = { ai_auto: "AI · sent automatically", ai_approved: "AI · approved by you", admin: "You", elsewhere: "You (in the app)", customer: "" };
 
-function PlatformIcon({ platform, size = "h-8 w-8" }: { platform: Platform; size?: string }) {
+export function PlatformIcon({ platform, size = "h-8 w-8" }: { platform: Platform; size?: string }) {
   return (
     <span className={`flex ${size} shrink-0 items-center justify-center rounded-full text-xs font-bold ${PLATFORM[platform].tone}`} title={PLATFORM[platform].label} aria-hidden>
       {PLATFORM[platform].icon}
@@ -149,10 +150,13 @@ function DraftCard({ draft, conversation, canReplyHere, onDone }: { draft: Draft
   );
 }
 
-function ChatView({ id }: { id: string }) {
+export function ChatView({ id, onBack }: { id: string; onBack?: () => void }) {
   const client = useQueryClient();
   const detail = useQuery({ queryKey: ["inbox", "conversation", id], queryFn: () => api<Detail>(`/inbox/conversations/${id}`), refetchInterval: 20_000 });
-  const refresh = () => client.invalidateQueries({ queryKey: ["inbox"] });
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: ["inbox"] });
+    void client.invalidateQueries({ queryKey: ["messages"] });
+  };
   const [reply, setReply] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
   const write = useMutation({ mutationFn: () => api(`/inbox/conversations/${id}/ai-reply`, { method: "POST" }), onSettled: refresh });
@@ -163,6 +167,12 @@ function ChatView({ id }: { id: string }) {
   });
   const handled = useMutation({ mutationFn: () => api(`/inbox/conversations/${id}/handled`, { method: "POST" }), onSettled: refresh });
   const setMode = useMutation({ mutationFn: (mode: Mode | null) => api(`/inbox/conversations/${id}/mode`, { method: "PATCH", body: { mode } }), onSettled: refresh });
+
+  // Opening the chat: nothing unread any more.
+  const unread = detail.data?.conversation.unreadCount ?? 0;
+  useEffect(() => {
+    if (unread > 0) void api(`/inbox/conversations/${id}/read`, { method: "POST" }).then(refresh);
+  }, [id, unread]); // refresh only invalidates queries
 
   // Braces matter: newer browsers return a Promise from scrollIntoView, and React would take it as the cleanup.
   useEffect(() => {
@@ -184,6 +194,11 @@ function ChatView({ id }: { id: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-wrap items-start gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+        {onBack && (
+          <button className="btn px-2 py-1 md:hidden" onClick={onBack} aria-label="Back to chats">
+            ←
+          </button>
+        )}
         <PlatformIcon platform={c.platform} size="h-10 w-10" />
         <div className="min-w-0 flex-1">
           <p className="font-medium">

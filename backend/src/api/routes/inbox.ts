@@ -111,6 +111,7 @@ export async function inboxRoutes(app: FastifyInstance, opts: { inbox: InboxServ
   app.get("/api/inbox/conversations/:id", async (request) => inbox.get(parse(IdParams, request.params).id));
   app.post("/api/inbox/conversations/:id/ai-reply", async (request) => ({ draft: await inbox.respond(parse(IdParams, request.params).id, { force: true }) }));
   app.post("/api/inbox/conversations/:id/send", async (request) => inbox.sendManual(parse(IdParams, request.params).id, parse(TextBody, request.body).text));
+  app.post("/api/inbox/conversations/:id/read", async (request) => inbox.markRead(parse(IdParams, request.params).id));
   app.post("/api/inbox/conversations/:id/handled", async (request) => ({ conversation: await inbox.markHandled(parse(IdParams, request.params).id) }));
   app.patch("/api/inbox/conversations/:id/mode", async (request) => {
     const { mode } = parse(z.object({ mode: Mode.nullable() }), request.body);

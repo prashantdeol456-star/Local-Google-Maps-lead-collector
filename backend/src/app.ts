@@ -64,6 +64,8 @@ import { MetaMessaging } from "./services/inbox/channels.js";
 import { InboxRuntime } from "./services/inbox/runtime.js";
 import { InboxWorker } from "./jobs/inboxWorker.js";
 import { EngagementWorker } from "./jobs/engagementWorker.js";
+import { messageRoutes } from "./api/routes/messages.js";
+import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
 import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
 import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
 import { MetaEngagementApi } from "./services/engagement/metaEngagement.js";
@@ -303,6 +305,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(engagementRoutes, { engagement });
+  await app.register(messageRoutes, { unified: new UnifiedInboxService({ whatsapp: waChats, inbox }) });
   await app.register(engagementWebhookRoutes, { engagement });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
   await app.register(senderRoutes, { senders });

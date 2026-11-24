@@ -142,6 +142,7 @@ async function seed() {
 
   // Social Engagement: there is no Facebook in the demo, so the rows a sync would save go straight into the demo database.
   seedEngagement(users[0].id);
+  seedInbox(users[0].id);
 
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
@@ -222,6 +223,33 @@ function seedEngagement(ownerId) {
   db.close();
 }
 
+/** Demo AI Inbox chats (Instagram, Facebook, Telegram, LinkedIn) for All messages (made-up people). */
+function seedInbox(ownerId) {
+  const db = new DatabaseSync(DB_FILE);
+  const at = (minutesAgo) => new Date(Date.now() - minutesAgo * 60_000).toISOString().replace("Z", "+00:00");
+  const id = () => randomUUID().replace(/-/g, "").slice(0, 25);
+  const now = at(0);
+  const chats = [
+    ["instagram", "Karan Mehta", "karan.mehta_", 4, 2, "needs_reply", [["in", "Hi! Is the IELTS weekend batch still open?", 6], ["in", "Fees kitni hai?", 4]]],
+    ["facebook", "Sneha Kapoor", null, 50, 0, "replied", [["in", "Can I book a free profile check for Canada?", 70], ["out", "Sure Sneha! Tomorrow 11 am works?", 50]]],
+    ["telegram", "Rahul Verma", "rahulv", 140, 1, "needs_reply", [["in", "Please send the document checklist for UK student visa", 140]]],
+    ["linkedin", "Neha Singh", null, 26 * 60, 0, "replied", [["in", "Hello, we are looking for a visa partner for our students.", 27 * 60], ["out", "Happy to help, Neha. Can we talk this week?", 26 * 60]]],
+  ];
+  for (const [platform, name, username, lastMin, unread, status, messages] of chats) {
+    const cid = id();
+    const inbound = messages.filter((m) => m[0] === "in").map((m) => m[2]);
+    db.prepare(
+      `INSERT INTO "InboxConversation" ("id","ownerId","platform","accountKey","externalThreadId","participantName","participantUsername","status","lastInboundAt","lastMessageAt","unreadCount","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(cid, ownerId, platform, platform === "telegram" ? "bot" : "demo", `demo-${cid}`, name, username, status, inbound.length ? at(Math.min(...inbound)) : null, at(lastMin), unread, now, now);
+    for (const [direction, text, minutesAgo] of messages) {
+      db.prepare(`INSERT INTO "InboxMessage" ("id","ownerId","conversationId","direction","text","author","sentAt","createdAt") VALUES (?,?,?,?,?,?,?,?)`).run(
+        id(), ownerId, cid, direction, text, direction === "in" ? "customer" : "admin", at(minutesAgo), now,
+      );
+    }
+  }
+  db.close();
+}
+
 // ---------- screenshots ----------
 async function shoot(page) {
   async function login(email, password) {
@@ -279,6 +307,8 @@ async function shoot(page) {
   const waChat = await page.evaluate(async () => (await (await fetch("/api/whatsapp/chats")).json()).items[0].id);
   await shot("25-whatsapp-chat", `/admin/whatsapp-chat?chat=${waChat}`);
   await shot("26-social-engagement", "/admin/engagement");
+  const igChat = await page.evaluate(async () => (await (await fetch("/api/messages/chats?platform=instagram")).json()).items[0].id);
+  await shot("27-all-messages", `/admin/messages?chat=in:${igChat}`);
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));

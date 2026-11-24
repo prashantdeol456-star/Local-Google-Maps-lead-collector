@@ -901,6 +901,8 @@ model InboxConversation {
   lastInboundAt       DateTime?
   lastOutboundAt      DateTime?
   lastMessageAt       DateTime
+  /// Messages from the person not yet opened in the admin panel
+  unreadCount         Int            @default(0)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   messages            InboxMessage[]
