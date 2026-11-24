@@ -198,7 +198,8 @@ async function startJustdialJob(settings: CollectorSettings): Promise<MessageRes
   const created = await createBackendJob(settings, keywords);
   if (!created.ok) return created;
 
-  const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+  // Shown to the user (they asked for Justdial); the Google Maps look-up tab stays in the background.
+  const tab = await chrome.tabs.create({ url: "about:blank", active: true });
   if (tab.id === undefined) return { ok: false, error: "Could not open a Justdial tab" };
   const now = Date.now();
   let state = newJustdialRun({ ...current, queue: null }, settings, keywords[0]!, now, tab.id);

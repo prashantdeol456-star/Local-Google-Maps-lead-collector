@@ -232,7 +232,7 @@ export class JustdialRunner {
       const alive = await chrome.tabs.get(this.mapsTabId).then(() => true, () => false);
       if (alive) return this.mapsTabId;
     }
-    const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+    const tab = await chrome.tabs.create({ url: "about:blank", active: false, index: 9999 });
     this.mapsTabId = tab.id ?? null;
     if (this.mapsTabId === null) throw new Error("Could not open a Google Maps tab");
     return this.mapsTabId;
@@ -263,6 +263,7 @@ export class JustdialRunner {
     const list = await loadList(runId);
     if (!list.done) {
       let url = list.nextUrl ?? justdialSearchUrl(keyword, location);
+      if (list.pages === 0) await this.log(runId, "info", `Opening Justdial: ${keyword} in ${location}`);
       while (list.pages < MAX_LIST_PAGES) {
         if (!(await this.stillRunning(runId))) return "paused";
         await open(tabId, url);
@@ -289,6 +290,7 @@ export class JustdialRunner {
     }
 
     // 2. Each business.
+    if (isOn(settings.jdMatchMaps)) await this.log(runId, "info", "Reading each business; Google Maps opens in a background tab only to find phone and website");
     const processed = new Set(await loadProcessedKeys(runId));
     let reveal = settings.jdShowNumber === true;
     for (const l of list.listings.slice(0, max)) {

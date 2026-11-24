@@ -74,7 +74,7 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
       </header>
 
       <BackendStatusBar status={backendStatus} onLogout={onLogout} onRetry={onRetry} />
-      <PageStatus page={page} />
+      <PageStatus page={page} justdial={(active ? state.jobSettings?.source : settings.source) === "justdial"} />
 
       {active && state.jobLabel && (
         <p className="job-label">

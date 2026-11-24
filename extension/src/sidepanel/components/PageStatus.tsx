@@ -1,6 +1,17 @@
 import type { MapsPageState } from "../../utils/maps";
 
-export function PageStatus({ page }: { page: MapsPageState | null }) {
+export function PageStatus({ page, justdial = false }: { page: MapsPageState | null; justdial?: boolean }) {
+  if (justdial) {
+    return (
+      <div className="page-status page-status--on">
+        <span className="dot" />
+        <div>
+          <strong>Justdial mode</strong>
+          <p>START opens Justdial in its own tab (no need to open it yourself). A second tab with Google Maps is used only to find each business's phone and website.</p>
+        </div>
+      </div>
+    );
+  }
   if (!page?.isMaps) {
     return (
       <div className="page-status page-status--off">
