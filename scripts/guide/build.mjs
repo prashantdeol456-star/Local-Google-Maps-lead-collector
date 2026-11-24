@@ -10,6 +10,8 @@
 // admin/src/guide/content.ts). Needs Google Chrome; set CHROME_PATH if it is not found.
 
 import { execSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -138,6 +140,9 @@ async function seed() {
   await j("POST", "/api/whatsapp/chats", { phone: "+91 90000 40001", name: "Riya Sharma", templateId: waTpl.id }, cu);
   await j("POST", "/api/whatsapp/chats", { phone: "+91 90000 40002", name: "Aman Verma", templateId: waTpl.id }, cu);
 
+  // Social Engagement: there is no Facebook in the demo, so the rows a sync would save go straight into the demo database.
+  seedEngagement(users[0].id);
+
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
   await j("POST", `/api/billing/accounts/${users[0].id}/adjust`, { amountInr: 500, note: "Paid by bank transfer" }, sa);
@@ -148,6 +153,73 @@ async function seed() {
     body: new URLSearchParams({ name: "Priya Sharma", email: "priya@example.com", phone: "+91 90000 00009", company: "Priya Digital", message: "Hi, I would like a demo of the Google Maps leads feature for my agency." }),
     redirect: "manual",
   });
+}
+
+/** Demo Facebook Page + Instagram account with comments, reactions and shares (made-up people). */
+function seedEngagement(ownerId) {
+  const db = new DatabaseSync(DB_FILE);
+  const at = (hoursAgo) => new Date(Date.now() - hoursAgo * 3_600_000).toISOString().replace("Z", "+00:00");
+  const id = () => randomUUID().replace(/-/g, "").slice(0, 25);
+  const now = at(0);
+  const insert = (table, row) => {
+    const keys = Object.keys(row);
+    db.prepare(`INSERT INTO "${table}" (${keys.map((k) => `"${k}"`).join(",")}) VALUES (${keys.map(() => "?").join(",")})`).run(...Object.values(row));
+  };
+  const meta = (extra) => JSON.stringify({ ...extra, engagement: { syncedAt: at(0.2), error: null, realtime: true } });
+  const fb = id();
+  const ig = id();
+  insert("SocialAccount", { id: fb, ownerId, platform: "facebook_page", externalId: "demo-page-1", name: "Pathway Overseas Education", tokenEnc: "demo", scopes: "[]", status: "connected", meta: meta({}), createdAt: now, updatedAt: now });
+  insert("SocialAccount", { id: ig, ownerId, platform: "instagram", externalId: "demo-ig-1", name: "Pathway Overseas", username: "pathway.overseas", tokenEnc: "demo", scopes: "[]", status: "connected", meta: meta({ pageId: "demo-page-1" }), createdAt: now, updatedAt: now });
+  const posts = [
+    [fb, "facebook", "Canada September intake: applications open. Free profile check this week!", 30, 14, 9, 3],
+    [fb, "facebook", "Congratulations Simran on your UK student visa 🎉", 70, 6, 41, 2],
+    [ig, "instagram", "IELTS weekend batch starts Saturday ✍️", 20, 8, 126, null],
+  ].map(([accountId, platform, message, hoursAgo, comments, reactions, shares], i) => {
+    const pid = id();
+    insert("SocialPost", { id: pid, ownerId, accountId, platform, externalId: `demo-post-${i}`, message, postedAt: at(hoursAgo), commentCount: comments, reactionCount: reactions, shareCount: shares, lastSyncedAt: now, createdAt: now, updatedAt: now });
+    return { pid, accountId, platform };
+  });
+  const people = {};
+  const person = (platform, name, username) => {
+    const key = platform + name;
+    if (!people[key]) {
+      people[key] = { id: id(), platform, name, username, rows: [] };
+    }
+    return people[key];
+  };
+  const add = (post, p, kind, hoursAgo, extra = {}) => p.rows.push({ post, kind, hoursAgo, ...extra });
+  const [canada, uk, ielts] = posts;
+  add(canada, person("facebook", "Rohit Malhotra"), "comment", 2, { text: "What are the fees for the Canada diploma programs?", lead: 1 });
+  add(canada, person("facebook", "Rohit Malhotra"), "reaction", 2.1, { type: "LIKE" });
+  add(canada, person("facebook", "Sneha Kapoor"), "comment", 5, { text: "Please share details, I want to apply for September", lead: 1, replied: "Hi Sneha, we have sent you the details in Messenger." });
+  add(canada, person("facebook", "Sneha Kapoor"), "share", 5.5);
+  add(canada, person("facebook", "Arjun Bedi"), "reaction", 6, { type: "LOVE" });
+  add(canada, person("facebook", "Manpreet Kaur"), "comment", 9, { text: "Is there any scholarship available?", lead: 1 });
+  add(uk, person("facebook", "Simran Gill"), "comment", 60, { text: "Thank you so much team! Couldn't have done it without you ❤️", replied: "Congratulations Simran!" });
+  add(uk, person("facebook", "Arjun Bedi"), "reaction", 62, { type: "WOW" });
+  add(uk, person("facebook", "Vikas Yadav"), "share", 64);
+  add(ielts, person("instagram", "karan.mehta_", "karan.mehta_"), "comment", 1, { text: "Fees kitni hai weekend batch ki?", lead: 1 });
+  add(ielts, person("instagram", "priya.travels", "priya.travels"), "comment", 3, { text: "Superb 🔥" });
+  add(ielts, person("instagram", "anjali.s", "anjali.s"), "comment", 4, { text: "DM me the timings please", lead: 1 });
+  for (const p of Object.values(people)) {
+    const comments = p.rows.filter((r) => r.kind === "comment");
+    const times = p.rows.map((r) => r.hoursAgo);
+    insert("SocialPerson", {
+      id: p.id, ownerId, platform: p.platform, externalId: `demo-${p.id}`, name: p.name, username: p.username ?? null,
+      profileUrl: p.username ? `https://www.instagram.com/${p.username}/` : null,
+      comments: comments.length, reactions: p.rows.filter((r) => r.kind === "reaction").length, shares: p.rows.filter((r) => r.kind === "share").length,
+      leadSignal: comments.some((c) => c.lead) ? 1 : 0, status: p.name === "Simran Gill" ? "customer" : "new", lastComment: comments.at(0)?.text ?? null,
+      firstSeenAt: at(Math.max(...times)), lastSeenAt: at(Math.min(...times)), createdAt: now, updatedAt: now,
+    });
+    for (const r of p.rows) {
+      insert("SocialEngagement", {
+        id: id(), ownerId, accountId: r.post.accountId, postId: r.post.pid, personId: p.id, platform: p.platform, kind: r.kind, externalId: id(),
+        reactionType: r.type ?? null, text: r.text ?? null, leadSignal: r.lead ? 1 : 0, repliedAt: r.replied ? at(r.hoursAgo - 0.5) : null, replyText: r.replied ?? null,
+        occurredAt: at(r.hoursAgo), createdAt: now, updatedAt: now,
+      });
+    }
+  }
+  db.close();
 }
 
 // ---------- screenshots ----------
@@ -206,6 +278,7 @@ async function shoot(page) {
   await shot("24-justdial-leads", "/admin/justdial");
   const waChat = await page.evaluate(async () => (await (await fetch("/api/whatsapp/chats")).json()).items[0].id);
   await shot("25-whatsapp-chat", `/admin/whatsapp-chat?chat=${waChat}`);
+  await shot("26-social-engagement", "/admin/engagement");
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));

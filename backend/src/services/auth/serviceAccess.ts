@@ -9,7 +9,7 @@ export const SERVICES = [
   { id: "email", label: "Email campaigns", note: "Email campaigns with the user's own sender" },
   { id: "whatsapp", label: "WhatsApp campaigns", note: "WhatsApp templates and campaigns with the user's own sender" },
   { id: "ai_inbox", label: "AI Inbox", note: "Telegram, Facebook and Instagram chats with AI replies" },
-  { id: "social", label: "Social accounts", note: "Connect Facebook Pages, Instagram and LinkedIn" },
+  { id: "social", label: "Social accounts", note: "Connect Facebook Pages, Instagram and LinkedIn; Social Engagement (comments, likes, shares on your posts)" },
 ] as const;
 
 export type ServiceId = (typeof SERVICES)[number]["id"];
@@ -40,7 +40,7 @@ const ROUTE_SERVICES: [RegExp, ServiceId][] = [
   [/^\/api\/email\//, "email"],
   [/^\/api\/whatsapp\//, "whatsapp"],
   [/^\/api\/inbox\//, "ai_inbox"],
-  [/^\/api\/social\//, "social"],
+  [/^\/api\/(social|engagement)\//, "social"],
 ];
 
 export function serviceForRoute(url: string): ServiceId | null {

@@ -310,6 +310,26 @@ export const GUIDE: GuideSection[] = [
     notes: ["The Connect buttons work once the administrator has set up the platform's Facebook and LinkedIn apps (see the server settings section)."],
   },
   {
+    id: "social-engagement",
+    title: "Social Engagement",
+    audience: "all",
+    pages: ["/engagement"],
+    image: img("26-social-engagement", "Social Engagement: who commented, liked and shared your Facebook and Instagram posts"),
+    intro:
+      "Everyone who comments, likes or shares your own Facebook Page and Instagram posts is saved here by itself, with their name (or Instagram username), their ID and what they did. Comments that ask about price, fees, details or say DM are marked “Looks like a lead”.",
+    steps: [
+      "Connect your Facebook Page under Social Accounts (the Instagram Business or Creator account linked to the Page comes with it). If you connected before this feature, press Connect again once and allow all permissions.",
+      "Open Social Engagement and press “Sync now” on an account: your latest 50 posts and who engaged with them are read. After that it checks every 15 minutes by itself, and new comments arrive within seconds once real-time is on.",
+      "Activity: the live feed of comments, likes/reactions and shares. Filter “Looks like a lead” or “Comments not answered”, and press Reply to answer a comment as your Page or Instagram account.",
+      "People: one row per person with how many times they commented, liked and shared, their last comment, status (New, Lead, Customer, Ignore) and your notes. Export CSV downloads the list; Instagram people can be added to Contacts for Instagram Outreach.",
+      "Posts: each post with its counts; “Who engaged” lists the people who commented, reacted and shared on it.",
+    ],
+    notes: [
+      "What the platforms allow: Facebook gives the name of everyone who comments or reacts, and shares only when the share is public. Instagram gives who commented, but likes and shares only as numbers. YouTube and LinkedIn come next.",
+      "Only your own Pages and accounts are read, and only what Meta's API gives. “Forget” deletes a person and everything saved about them (for privacy requests).",
+    ],
+  },
+  {
     id: "integrations",
     title: "Where each integration is needed",
     audience: "all",
@@ -425,6 +445,9 @@ export const GUIDE: GuideSection[] = [
         ["Manual credit / debit with a ledger; Payments page", "Done", "—"],
         ["Online recharge with Razorpay", "Built — waiting for keys", "Enter Razorpay test keys on the Integrations page and test a recharge; after KYC switch to live keys."],
         ["Justdial collection (Maps extension v0.3.0, Justdial Leads page, website emails, automatic email campaign)", "Done", "Customers re-download the Maps extension."],
+        ["Social Engagement phase 1: Facebook Page and Instagram comments, reactions, shares", "Built — needs Meta setup", "Meta app: Page webhooks (feed) and Instagram webhooks (comments) with the callback URL and verify token shown on the Social Engagement page; App Review for pages_read_user_content, pages_manage_engagement and instagram_manage_comments so customer accounts work."],
+        ["Social Engagement phase 2: YouTube comments and subscribers", "Agreed", "Google Cloud project with the YouTube Data API and OAuth consent screen."],
+        ["Social Engagement phase 3: LinkedIn company page comments, reactions, reposts", "Agreed", "LinkedIn Community Management API approval."],
         ["Customers re-download the Maps extension (v0.2.0)", "Recommended", "Fast hands-off collecting: reads the list without opening listings, runs in a background tab, starts the next keyword by itself, notifies when done. Also keeps leads waiting when credit runs out."],
         ["Per-user API tokens and integrations (phase D)", "Pending", "Each customer manages their own tokens and webhooks; final security review."],
         ["Database plan", "Free until 30 Nov 2026", "Upgrade or migrate before it expires."],

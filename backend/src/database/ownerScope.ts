@@ -47,6 +47,10 @@ export const OWNED_MODELS = new Set([
   "InboxConversation",
   "InboxMessage",
   "InboxDraft",
+  // Social Engagement
+  "SocialPost",
+  "SocialPerson",
+  "SocialEngagement",
 ]);
 
 /** Models owned through their collection (CollectionJob): model → relation field. */

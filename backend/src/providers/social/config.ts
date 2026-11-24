@@ -10,6 +10,9 @@ const text = z.preprocess(empty, z.string().trim().optional());
 export const DEFAULT_META_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
+  // Social Engagement: who commented/reacted on the Page's posts, and replying to comments
+  "pages_read_user_content",
+  "pages_manage_engagement",
   "pages_manage_posts",
   "pages_manage_metadata",
   "pages_messaging",

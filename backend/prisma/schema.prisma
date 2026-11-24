@@ -1419,3 +1419,101 @@ model WaChatSettings {
 
   @@index([ownerId])
 }
+
+// ---- Social Engagement: comments, reactions and shares on the user's own Facebook Page and
+// Instagram posts, with who did them (read from the platforms' APIs with the connected
+// accounts; webhooks for real time, and a check every few minutes). ----
+
+/// One post of a connected account.
+model SocialPost {
+  id            String    @id @default(cuid())
+  ownerId       String?
+  /// SocialAccount id
+  accountId     String
+  /// facebook | instagram
+  platform      String
+  /// Post / media id on the platform
+  externalId    String
+  message       String?
+  permalink     String?
+  imageUrl      String?
+  postedAt      DateTime
+  commentCount  Int       @default(0)
+  reactionCount Int       @default(0)
+  /// null = the platform does not say (Instagram)
+  shareCount    Int?
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([accountId, externalId])
+  @@index([ownerId, postedAt])
+}
+
+/// A person who engaged with the user's posts on one platform.
+model SocialPerson {
+  id           String    @id @default(cuid())
+  ownerId      String?
+  /// facebook | instagram
+  platform     String
+  /// Their id on the platform (Page-scoped id on Facebook)
+  externalId   String
+  name         String
+  username     String?
+  profileUrl   String?
+  pictureUrl   String?
+  comments     Int       @default(0)
+  reactions    Int       @default(0)
+  shares       Int       @default(0)
+  /// One of their comments looks like a question about buying (price, details, DM…)
+  leadSignal   Boolean   @default(false)
+  /// new | lead | customer | ignore
+  status       String    @default("new")
+  notes        String?
+  /// OutreachContact id once added to Contacts
+  contactId    String?
+  lastComment  String?
+  firstSeenAt  DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([ownerId, platform, externalId])
+  @@index([ownerId, lastSeenAt])
+}
+
+/// One comment, reply, reaction or share.
+model SocialEngagement {
+  id               String    @id @default(cuid())
+  ownerId          String?
+  accountId        String
+  /// SocialPost id
+  postId           String
+  /// SocialPerson id
+  personId         String
+  platform         String
+  /// comment | reaction | share
+  kind             String
+  /// Comment id, or "reaction:<post>:<person>", or the share's post id
+  externalId       String
+  /// LIKE, LOVE, HAHA, WOW, SAD, ANGRY, CARE (Facebook reactions)
+  reactionType     String?
+  text             String?
+  /// Comment this one answers (replies)
+  parentExternalId String?
+  permalink        String?
+  leadSignal       Boolean   @default(false)
+  /// When the account answered it (here or on the platform)
+  repliedAt        DateTime?
+  replyText        String?
+  /// Removed on the platform
+  removedAt        DateTime?
+  occurredAt       DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([accountId, kind, externalId])
+  @@index([ownerId, occurredAt])
+  @@index([postId])
+  @@index([personId])
+}

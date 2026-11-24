@@ -45,6 +45,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: "/whatsapp-chat", label: "WhatsApp Chat", icon: "✆" },
       { to: "/inbox", label: "AI Inbox", icon: "✦" },
+      { to: "/engagement", label: "Social Engagement", icon: "♥" },
       { to: "/social", label: "Social Accounts", icon: "◎" },
     ],
   },

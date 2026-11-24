@@ -25,6 +25,7 @@ if (waInterrupted) app.log.warn(`${waInterrupted} WhatsApp message(s) were inter
 app.emailWorker.start();
 app.whatsappWorker.start();
 app.inboxWorker.start();
+app.engagementWorker.start();
 app.webhookWorker.start();
 app.maintenance.start();
 app.justdialWorker.start();

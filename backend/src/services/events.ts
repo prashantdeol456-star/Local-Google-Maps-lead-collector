@@ -18,7 +18,9 @@ export type AppEvent =
   /** A chat in the AI Inbox changed (new message, draft, reply). */
   | { type: "inbox.updated"; conversationId: string }
   /** A WhatsApp chat changed (new message, tick update, draft). */
-  | { type: "whatsapp.chat"; chatId: string };
+  | { type: "whatsapp.chat"; chatId: string }
+  /** New comments, reactions or shares were saved (Social Engagement). */
+  | { type: "engagement.updated"; accountId: string };
 
 /** An event as delivered: with the user who caused it (from the request's data scope), if any. */
 export type ScopedAppEvent = AppEvent & { ownerId?: string };

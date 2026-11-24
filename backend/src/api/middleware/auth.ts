@@ -49,6 +49,8 @@ const CUSTOMER_ROUTES = new RegExp(
       "inbox/(ai-config|secrets/:name|test/:what|settings|status|conversations|refresh)",
       "inbox/conversations/:id|inbox/conversations/:id/(ai-reply|send|handled|mode)|inbox/drafts/:id/(approve|dismiss)",
       "social/(providers|accounts|connect/:provider)|social/accounts/:id|social/accounts/:id/check",
+      // Social Engagement (their own Pages and Instagram accounts)
+      "engagement/(summary|accounts|activity|posts|people|people/export\\.csv)|engagement/accounts/:id/sync|engagement/people/:id|engagement/people/:id/contact|engagement/comments/:id/reply",
     ].join("|") +
     ")$",
 );

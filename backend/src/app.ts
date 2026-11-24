@@ -63,6 +63,10 @@ import type { ReplyWriter } from "./services/inbox/replyWriter.js";
 import { MetaMessaging } from "./services/inbox/channels.js";
 import { InboxRuntime } from "./services/inbox/runtime.js";
 import { InboxWorker } from "./jobs/inboxWorker.js";
+import { EngagementWorker } from "./jobs/engagementWorker.js";
+import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
+import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
+import { MetaEngagementApi } from "./services/engagement/metaEngagement.js";
 import { WebhookWorker } from "./jobs/webhookWorker.js";
 import { MaintenanceWorker } from "./jobs/maintenanceWorker.js";
 import { IntegrationService } from "./services/integrations/integrationService.js";
@@ -191,6 +195,20 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const inboxRuntime = new InboxRuntime(repos, new SecretBox(config.sessionSecret, "inbox-secrets"), config.inbox, { writerOverride: replyWriter, fetch: inboxFetch });
   const inbox = new InboxService(repos, { runtime: inboxRuntime, meta: metaMessaging, metaReady, social, timeZone: config.timeZone, bus });
   const inboxWorker = new InboxWorker(repos, inbox, { runtime: inboxRuntime, meta: metaMessaging, metaReady, social, pollSeconds: config.inbox.pollSeconds, log: (msg) => app.log.info(msg) });
+  const engagement = new EngagementService(db, {
+    api: new MetaEngagementApi(() => socialConfig.meta?.graphVersion ?? (process.env.META_GRAPH_VERSION || "v26.0"), socialFetch ?? fetch),
+    social,
+    bus,
+    meta: () => socialConfig.meta,
+    verifyToken: engagementVerifyToken(config.sessionSecret),
+    publicBaseUrl: config.publicBaseUrl,
+    log: (msg) => app.log.warn(msg),
+  });
+  const engagementWorker = new EngagementWorker(db, engagement, {
+    intervalMinutes: Number(process.env.ENGAGEMENT_POLL_MINUTES ?? 15),
+    ready: metaReady,
+    log: (msg) => app.log.warn(msg),
+  });
   const integrations = new IntegrationService(repos, webhookSecrets, bus, (msg) => app.log.error(msg));
   integrations.start();
   const webhookWorker = new WebhookWorker(repos, webhookSecrets, { log: (msg) => app.log.error(msg) });
@@ -284,6 +302,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(socialRoutes, { social });
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
+  await app.register(engagementRoutes, { engagement });
+  await app.register(engagementWebhookRoutes, { engagement });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
   await app.register(senderRoutes, { senders });
   await app.register(senderWebhookRoutes, { senders, tracking, whatsappTracking: waTracking });
@@ -297,6 +317,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   app.decorate("emailWorker", emailWorker);
   app.decorate("whatsappWorker", whatsappWorker);
   app.decorate("inboxWorker", inboxWorker);
+  app.decorate("engagementWorker", engagementWorker);
+  app.decorate("engagement", engagement);
   app.decorate("webhookWorker", webhookWorker);
   app.decorate("maintenance", maintenance);
   app.decorate("justdialWorker", justdialWorker);
@@ -304,7 +326,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     integrations.stop();
     maintenance.stop();
     justdialWorker.stop();
-    await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop()]);
+    await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop(), engagementWorker.stop()]);
   });
   return app;
 }
@@ -316,6 +338,8 @@ declare module "fastify" {
     emailWorker: EmailWorker;
     whatsappWorker: WhatsAppWorker;
     inboxWorker: InboxWorker;
+    engagementWorker: EngagementWorker;
+    engagement: EngagementService;
     justdialWorker: JustdialWorker;
     webhookWorker: WebhookWorker;
     maintenance: MaintenanceWorker;

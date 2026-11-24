@@ -55,6 +55,9 @@ export const TABLES = [
   "WaMedia",
   "WaQuickReply",
   "WaChatSettings",
+  "SocialPost",
+  "SocialPerson",
+  "SocialEngagement",
 ] as const;
 
 const BATCH = 500;
