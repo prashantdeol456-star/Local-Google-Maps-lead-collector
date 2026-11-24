@@ -122,6 +122,7 @@ export class WhatsAppTrackingService {
   }
 
   private async status(e: Extract<WhatsAppEvent, { kind: "status" }>): Promise<boolean> {
+    if (e.status === "played") return false; // voice notes in WhatsApp Chat only
     const attempt = await this.attemptFor(e.externalMessageId, e.callbackData);
     if (!attempt) return false; // a test message or one sent outside this app
     const stored = await this.repos.whatsappEvents.create({
@@ -172,6 +173,8 @@ export class WhatsAppTrackingService {
   }
 
   private async inbound(e: Extract<WhatsAppEvent, { kind: "inbound" }>): Promise<boolean> {
+    // Edits, deletions and reactions belong to WhatsApp Chat, not to campaign replies.
+    if (e.messageType === "edit" || e.messageType === "revoke" || e.messageType === "reaction") return false;
     const phone = `+${e.from}`;
     const { attempt, leadId } = await this.matchNumber(phone, e.inReplyTo);
     const stored = await this.repos.whatsappEvents.create({

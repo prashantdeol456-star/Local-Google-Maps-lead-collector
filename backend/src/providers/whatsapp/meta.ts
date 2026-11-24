@@ -9,13 +9,17 @@ import {
   type RawWebhook,
   type WhatsAppEvent,
   type WhatsAppProvider,
+  type BusinessProfile,
+  type InboundDetails,
   type IncomingMedia,
   type MediaKind,
+  type OutgoingInteractive,
+  type SharedLocation,
   type WhatsAppSendResult,
 } from "./types.js";
 
 const TIMEOUT_MS = 15_000;
-const STATUSES = new Set(["sent", "delivered", "read", "failed"]);
+const STATUSES = new Set(["sent", "delivered", "read", "failed", "played"]);
 
 export interface MetaOptions {
   accessToken: string;
@@ -41,14 +45,78 @@ function safeEqual(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+/** Quote a previous message (contextual reply). */
+const context = (replyTo?: string | null) => (replyTo ? { context: { message_id: replyTo } } : {});
+
 /** The file of an incoming photo, document, voice note, video or sticker. */
 function mediaOf(m: Record<string, unknown>): IncomingMedia | null {
   const kind = String(m.type ?? "");
   if (!["image", "document", "audio", "video", "sticker", "voice"].includes(kind)) return null;
   const o = m[kind] as { id?: unknown; mime_type?: unknown; filename?: unknown; caption?: unknown } | undefined;
   if (!o || typeof o.id !== "string") return null;
-  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
   return { id: o.id, mime: str(o.mime_type), filename: str(o.filename), caption: str(o.caption) };
+}
+
+const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+/** Text of a message object (text body or media caption). */
+function textOf(m: Record<string, unknown> | undefined): string | null {
+  if (!m) return null;
+  const kind = String(m.type ?? "");
+  const o = m[kind] as { body?: unknown; caption?: unknown } | undefined;
+  return str(o?.body) ?? str(o?.caption);
+}
+
+function detailsOf(m: Record<string, unknown>): InboundDetails {
+  const ctx = m.context as { id?: unknown; forwarded?: unknown; frequently_forwarded?: unknown } | undefined;
+  const type = String(m.type ?? "");
+  const reaction = type === "reaction" ? (m.reaction as { message_id?: unknown; emoji?: unknown } | undefined) : undefined;
+  const loc = type === "location" ? (m.location as Record<string, unknown> | undefined) : undefined;
+  const lat = Number(loc?.latitude);
+  const lng = Number(loc?.longitude);
+  const contacts = type === "contacts" && Array.isArray(m.contacts) ? (m.contacts as Record<string, unknown>[]) : null;
+  const interactive = m.interactive as
+    | { type?: string; button_reply?: { id?: string; title?: string }; list_reply?: { id?: string; title?: string; description?: string }; nfm_reply?: { name?: string; body?: string } }
+    | undefined;
+  const button = m.button as { payload?: string; text?: string } | undefined;
+  const edit = type === "edit" ? (m.edit as { original_message_id?: unknown; message?: Record<string, unknown> } | undefined) : undefined;
+  const revoke = type === "revoke" ? (m.revoke as { original_message_id?: unknown } | undefined) : undefined;
+  const system = type === "system" ? (m.system as { body?: unknown } | undefined) : undefined;
+  return {
+    context: ctx ? { id: str(ctx.id), forwarded: ctx.forwarded === true, frequentlyForwarded: ctx.frequently_forwarded === true } : null,
+    reaction: reaction && typeof reaction.message_id === "string" ? { messageId: reaction.message_id, emoji: str(reaction.emoji) } : null,
+    location:
+      loc && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+        ? { latitude: lat, longitude: lng, name: str(loc.name), address: str(loc.address), url: str(loc.url) }
+        : null,
+    contacts: contacts
+      ? contacts.slice(0, 20).map((c) => {
+          const name = c.name as { formatted_name?: unknown; first_name?: unknown } | undefined;
+          const phones = Array.isArray(c.phones) ? (c.phones as Record<string, unknown>[]) : [];
+          const emails = Array.isArray(c.emails) ? (c.emails as Record<string, unknown>[]) : [];
+          const org = c.org as { company?: unknown } | undefined;
+          return {
+            name: str(name?.formatted_name) ?? str(name?.first_name) ?? "Contact",
+            phones: phones.slice(0, 10).map((p) => ({ phone: str(p.phone) ?? "", waId: str(p.wa_id), type: str(p.type) })).filter((p) => p.phone),
+            emails: emails.map((e) => str(e.email)).filter((e): e is string => !!e).slice(0, 5),
+            org: str(org?.company),
+          };
+        })
+      : null,
+    choice:
+      type === "button" && button
+        ? { kind: "template_button", id: str(button.payload), title: str(button.text), description: null }
+        : interactive?.button_reply
+          ? { kind: "button", id: str(interactive.button_reply.id), title: str(interactive.button_reply.title), description: null }
+          : interactive?.list_reply
+            ? { kind: "list", id: str(interactive.list_reply.id), title: str(interactive.list_reply.title), description: str(interactive.list_reply.description) }
+            : interactive?.nfm_reply
+              ? { kind: "flow", id: str(interactive.nfm_reply.name), title: str(interactive.nfm_reply.body), description: null }
+              : null,
+    edit: edit && typeof edit.original_message_id === "string" ? { originalId: edit.original_message_id, text: textOf(edit.message) } : null,
+    revoke: revoke && typeof revoke.original_message_id === "string" ? { originalId: revoke.original_message_id } : null,
+    system: str(system?.body),
+  };
 }
 
 const fromUnix = (ts: unknown) => (typeof ts === "string" && /^\d+$/.test(ts) ? new Date(Number(ts) * 1000) : new Date());
@@ -100,15 +168,19 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
   }
 
   /** POST to /<phone number id>/<path>; throws WhatsAppProviderError with Meta's message. */
-  private async post<T>(path: string, body: BodyInit, contentType: string | null): Promise<T | null> {
+  private post<T>(path: string, body: BodyInit, contentType: string | null): Promise<T | null> {
+    return this.request<T>("POST", path, body, contentType);
+  }
+
+  private async request<T>(method: "GET" | "POST" | "DELETE", path: string, body: BodyInit | null, contentType: string | null): Promise<T | null> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     let res: Response;
     try {
       res = await this.fetchImpl(this.graphUrl(`${encodeURIComponent(this.options.phoneNumberId)}/${path}`), {
-        method: "POST",
+        method,
         headers: { Authorization: `Bearer ${this.options.accessToken}`, ...(contentType ? { "Content-Type": contentType } : {}) },
-        body,
+        ...(body !== null ? { body } : {}),
         signal: controller.signal,
       });
     } catch {
@@ -155,7 +227,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
   }
 
   async sendText(to: string, text: string, replyTo?: string | null): Promise<WhatsAppSendResult> {
-    return this.sendMessage({ to, type: "text", text: { preview_url: true, body: text }, ...(replyTo ? { context: { message_id: replyTo } } : {}) });
+    return this.sendMessage({ to, type: "text", text: { preview_url: true, body: text }, ...context(replyTo) });
   }
 
   async uploadMedia(file: { data: Buffer; mime: string; filename: string }): Promise<string> {
@@ -168,11 +240,103 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     return data.id;
   }
 
-  async sendMedia(to: string, media: { kind: MediaKind; mediaId: string; caption?: string | null; filename?: string | null }): Promise<WhatsAppSendResult> {
+  async sendMedia(
+    to: string,
+    media: { kind: MediaKind | "sticker"; mediaId: string; caption?: string | null; filename?: string | null; voice?: boolean },
+    replyTo?: string | null,
+  ): Promise<WhatsAppSendResult> {
     const object: Record<string, unknown> = { id: media.mediaId };
-    if (media.caption && media.kind !== "audio") object.caption = media.caption.slice(0, 1024);
+    if (media.caption && media.kind !== "audio" && media.kind !== "sticker") object.caption = media.caption.slice(0, 1024);
     if (media.kind === "document" && media.filename) object.filename = media.filename;
-    return this.sendMessage({ to, type: media.kind, [media.kind]: object });
+    if (media.kind === "audio" && media.voice) object.voice = true;
+    return this.sendMessage({ to, type: media.kind, [media.kind]: object, ...context(replyTo) });
+  }
+
+  async sendReaction(to: string, messageId: string, emoji: string): Promise<WhatsAppSendResult> {
+    return this.sendMessage({ to, type: "reaction", reaction: { message_id: messageId, emoji } });
+  }
+
+  async sendLocation(to: string, location: Omit<SharedLocation, "url">, replyTo?: string | null): Promise<WhatsAppSendResult> {
+    return this.sendMessage({
+      to,
+      type: "location",
+      location: { latitude: location.latitude, longitude: location.longitude, ...(location.name ? { name: location.name } : {}), ...(location.address ? { address: location.address } : {}) },
+      ...context(replyTo),
+    });
+  }
+
+  async sendContacts(to: string, contacts: { name: string; phone: string }[], replyTo?: string | null): Promise<WhatsAppSendResult> {
+    return this.sendMessage({
+      to,
+      type: "contacts",
+      contacts: contacts.map((c) => ({
+        name: { formatted_name: c.name, first_name: c.name.split(" ")[0] ?? c.name },
+        phones: [{ phone: c.phone, type: "CELL" }],
+      })),
+      ...context(replyTo),
+    });
+  }
+
+  async sendInteractive(to: string, message: OutgoingInteractive, replyTo?: string | null): Promise<WhatsAppSendResult> {
+    const common = (m: { body: string; footer?: string | null; header?: string | null }) => ({
+      ...(m.header ? { header: { type: "text", text: m.header } } : {}),
+      body: { text: m.body },
+      ...(m.footer ? { footer: { text: m.footer } } : {}),
+    });
+    let interactive: Record<string, unknown>;
+    if (message.type === "buttons") {
+      interactive = { type: "button", ...common(message), action: { buttons: message.buttons.map((b) => ({ type: "reply", reply: { id: b.id, title: b.title } })) } };
+    } else if (message.type === "list") {
+      interactive = {
+        type: "list",
+        ...common(message),
+        action: {
+          button: message.button,
+          sections: message.sections.map((s) => ({ title: s.title, rows: s.rows.map((r) => ({ id: r.id, title: r.title, ...(r.description ? { description: r.description } : {}) })) })),
+        },
+      };
+    } else if (message.type === "cta_url") {
+      interactive = { type: "cta_url", ...common(message), action: { name: "cta_url", parameters: { display_text: message.displayText, url: message.url } } };
+    } else {
+      interactive = { type: "location_request_message", body: { text: message.body }, action: { name: "send_location" } };
+    }
+    return this.sendMessage({ to, type: "interactive", interactive, ...context(replyTo) });
+  }
+
+  async sendTyping(wamid: string): Promise<void> {
+    await this.post("messages", JSON.stringify({ messaging_product: "whatsapp", status: "read", message_id: wamid, typing_indicator: { type: "text" } }), "application/json");
+  }
+
+  async setBlocked(phones: string[], blocked: boolean): Promise<void> {
+    await this.request(
+      blocked ? "POST" : "DELETE",
+      "block_users",
+      JSON.stringify({ messaging_product: "whatsapp", block_users: phones.map((p) => ({ user: p.startsWith("+") ? p : `+${p}` })) }),
+      "application/json",
+    );
+  }
+
+  async getProfile(): Promise<BusinessProfile> {
+    const data = await this.request<{ data?: Record<string, unknown>[] }>(
+      "GET",
+      "whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical",
+      null,
+      null,
+    );
+    const p = data?.data?.[0] ?? {};
+    return {
+      about: str(p.about),
+      address: str(p.address),
+      description: str(p.description),
+      email: str(p.email),
+      websites: Array.isArray(p.websites) ? p.websites.filter((w): w is string => typeof w === "string") : [],
+      vertical: str(p.vertical),
+      profilePictureUrl: str(p.profile_picture_url),
+    };
+  }
+
+  async updateProfile(profile: Partial<Omit<BusinessProfile, "profilePictureUrl">>): Promise<void> {
+    await this.post("whatsapp_business_profile", JSON.stringify({ messaging_product: "whatsapp", ...profile }), "application/json");
   }
 
   async markRead(wamid: string): Promise<void> {
@@ -248,7 +412,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             kind: "status",
             providerEventId: `${s.id}:${status}`,
             externalMessageId: s.id,
-            status: status as "sent" | "delivered" | "read" | "failed",
+            status: status as "sent" | "delivered" | "read" | "failed" | "played",
             occurredAt: fromUnix(s.timestamp),
             callbackData: typeof s.biz_opaque_callback_data === "string" ? s.biz_opaque_callback_data : null,
             error: first ? [first.code, first.title ?? first.message, first.error_data?.details].filter(Boolean).join(": ") : null,
@@ -275,7 +439,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             messageType: String(m.type ?? "unknown"),
             inReplyTo: (m.context as { id?: string } | undefined)?.id ?? null,
             profileName: contact?.profile?.name ?? null,
-            media: mediaOf(m),
+            media: mediaOf(m.type === "edit" ? ((m.edit as { message?: Record<string, unknown> } | undefined)?.message ?? {}) : m),
+            details: detailsOf(m),
             occurredAt: fromUnix(m.timestamp),
             metadata: { type: m.type },
           });

@@ -30,6 +30,8 @@ export const OWNED_MODELS = new Set([
   "WaChat",
   "WaMessage",
   "WaMedia",
+  "WaQuickReply",
+  "WaChatSettings",
   // Outreach (phase B)
   "MessageTemplate",
   "Campaign",

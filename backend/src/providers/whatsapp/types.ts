@@ -35,7 +35,8 @@ export type WhatsAppEvent =
       kind: "status";
       providerEventId: string;
       externalMessageId: string;
-      status: "sent" | "delivered" | "read" | "failed";
+      /** "played": the person played a voice message (voice notes only). */
+      status: "sent" | "delivered" | "read" | "failed" | "played";
       occurredAt: Date;
       callbackData: string | null;
       error: string | null;
@@ -56,6 +57,8 @@ export type WhatsAppEvent =
       profileName: string | null;
       /** Photo, document, voice note, video or sticker: WhatsApp's media id (download with downloadMedia). */
       media: IncomingMedia | null;
+      /** Reply/forward context, reactions, locations, contact cards, button choices, edits and deletions. */
+      details?: InboundDetails;
       occurredAt: Date;
       metadata: Record<string, unknown>;
     }
@@ -69,6 +72,55 @@ export type WhatsAppEvent =
       occurredAt: Date;
       metadata: Record<string, unknown>;
     };
+
+export interface SharedContact {
+  name: string;
+  phones: { phone: string; waId: string | null; type: string | null }[];
+  emails: string[];
+  org: string | null;
+}
+
+export interface SharedLocation {
+  latitude: number;
+  longitude: number;
+  name: string | null;
+  address: string | null;
+  url: string | null;
+}
+
+export interface InboundDetails {
+  /** The message this one quotes, and whether it was forwarded */
+  context: { id: string | null; forwarded: boolean; frequentlyForwarded: boolean } | null;
+  /** A reaction to an earlier message (emoji null = reaction removed) */
+  reaction: { messageId: string; emoji: string | null } | null;
+  location: SharedLocation | null;
+  contacts: SharedContact[] | null;
+  /** The button or list row the person tapped */
+  choice: { kind: "button" | "list" | "flow" | "template_button"; id: string | null; title: string | null; description: string | null } | null;
+  /** The person edited an earlier message (new text or caption) */
+  edit: { originalId: string; text: string | null } | null;
+  /** The person deleted an earlier message for everyone */
+  revoke: { originalId: string } | null;
+  /** WhatsApp system notice, e.g. the person changed their number */
+  system: string | null;
+}
+
+/** Interactive messages (sent within 24 hours of the person's last message). */
+export type OutgoingInteractive =
+  | { type: "buttons"; body: string; footer?: string | null; header?: string | null; buttons: { id: string; title: string }[] }
+  | { type: "list"; body: string; footer?: string | null; header?: string | null; button: string; sections: { title: string; rows: { id: string; title: string; description?: string | null }[] }[] }
+  | { type: "cta_url"; body: string; footer?: string | null; header?: string | null; displayText: string; url: string }
+  | { type: "location_request"; body: string };
+
+export interface BusinessProfile {
+  about: string | null;
+  address: string | null;
+  description: string | null;
+  email: string | null;
+  websites: string[];
+  vertical: string | null;
+  profilePictureUrl: string | null;
+}
 
 export interface IncomingMedia {
   id: string;
@@ -100,7 +152,22 @@ export interface WhatsAppProvider {
   sendText?(to: string, text: string, replyTo?: string | null): Promise<WhatsAppSendResult>;
   /** Uploads a file to WhatsApp and returns its media id (valid for sending for a while). */
   uploadMedia?(file: { data: Buffer; mime: string; filename: string }): Promise<string>;
-  sendMedia?(to: string, media: { kind: MediaKind; mediaId: string; caption?: string | null; filename?: string | null }): Promise<WhatsAppSendResult>;
+  sendMedia?(
+    to: string,
+    media: { kind: MediaKind | "sticker"; mediaId: string; caption?: string | null; filename?: string | null; voice?: boolean },
+    replyTo?: string | null,
+  ): Promise<WhatsAppSendResult>;
+  /** Emoji reaction on one of the person's messages ("" removes it). */
+  sendReaction?(to: string, messageId: string, emoji: string): Promise<WhatsAppSendResult>;
+  sendLocation?(to: string, location: Omit<SharedLocation, "url">, replyTo?: string | null): Promise<WhatsAppSendResult>;
+  sendContacts?(to: string, contacts: { name: string; phone: string }[], replyTo?: string | null): Promise<WhatsAppSendResult>;
+  sendInteractive?(to: string, message: OutgoingInteractive, replyTo?: string | null): Promise<WhatsAppSendResult>;
+  /** "typing…" on the person's phone (up to 25 s or until you reply), with blue ticks on this message. */
+  sendTyping?(wamid: string): Promise<void>;
+  /** Block or unblock numbers that messaged you in the last 24 hours. */
+  setBlocked?(phones: string[], blocked: boolean): Promise<void>;
+  getProfile?(): Promise<BusinessProfile>;
+  updateProfile?(profile: Partial<Omit<BusinessProfile, "profilePictureUrl">>): Promise<void>;
   /** Shows blue ticks on the person's phone for this message (and the ones before it). */
   markRead?(wamid: string): Promise<void>;
   /** Downloads a received file (null if it is too big or gone). */

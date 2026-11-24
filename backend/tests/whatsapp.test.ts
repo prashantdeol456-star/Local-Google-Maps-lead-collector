@@ -145,6 +145,8 @@ describe("Meta webhooks", () => {
     expect(events).toEqual([
       expect.objectContaining({ kind: "status", providerEventId: "wamid.A:delivered", externalMessageId: "wamid.A", status: "delivered", callbackData: "att_1", error: null, occurredAt: new Date(1749416383000) }),
       expect.objectContaining({ kind: "status", status: "failed", error: "131026: Message undeliverable: Not a WhatsApp user" }),
+      // "played": the person played a voice message (WhatsApp Chat shows it).
+      expect.objectContaining({ kind: "status", externalMessageId: "wamid.C", status: "played" }),
       expect.objectContaining({ kind: "inbound", providerEventId: "wamid.IN1", from: "918957926677", text: "Yes, interested", inReplyTo: "wamid.A", messageType: "text" }),
     ]);
   });

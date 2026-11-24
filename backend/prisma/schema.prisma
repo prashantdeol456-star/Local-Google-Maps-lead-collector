@@ -1311,6 +1311,21 @@ model WaChat {
   aiDraftAt       DateTime?
   /// Why the AI could not write a draft, or what the owner should check
   aiNote          String?
+  /// Pinned chats stay on top (like the WhatsApp app)
+  pinnedAt        DateTime?
+  /// Archived chats are hidden from the main list
+  archivedAt      DateTime?
+  /// No browser notifications until this time
+  mutedUntil      DateTime?
+  /// JSON array of label names (WhatsApp Business labels)
+  labels          String?
+  /// Your private notes about this contact
+  notes           String?
+  /// Blocked through WhatsApp (they cannot message you)
+  blockedAt       DateTime?
+  /// Greeting / away message last sent
+  greetedAt       DateTime?
+  awaySentAt      DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   messages        WaMessage[]
@@ -1339,6 +1354,20 @@ model WaMessage {
   status       String
   error        String?
   templateName String?
+  /// wamid of the message this one quotes (swipe-reply)
+  replyToWamid String?
+  /// "forwarded" or "frequently_forwarded" (from the person's WhatsApp)
+  forwarded    String?
+  /// Reactions: JSON {"in": "👍", "out": "❤️"} (theirs and yours)
+  reactions    String?
+  /// Location, contact cards, buttons/list or the person's button choice: JSON
+  payload      String?
+  /// The person edited / deleted this message in WhatsApp
+  editedAt     DateTime?
+  revokedAt    DateTime?
+  /// Your own marks (not sent to WhatsApp)
+  starred      Boolean  @default(false)
+  hiddenAt     DateTime?
   createdAt    DateTime @default(now())
   chat         WaChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
@@ -1355,6 +1384,38 @@ model WaMedia {
   size      Int
   data      Bytes
   createdAt DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+/// Saved replies for WhatsApp Chat: type "/" and the shortcut (like WhatsApp Business quick replies).
+model WaQuickReply {
+  id        String   @id @default(cuid())
+  ownerId   String?
+  shortcut  String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+/// WhatsApp Chat settings of one user: greeting and away messages (like WhatsApp Business).
+model WaChatSettings {
+  id            String   @id @default(cuid())
+  ownerId       String?
+  greetingOn    Boolean  @default(false)
+  greetingText  String?
+  awayOn        Boolean  @default(false)
+  awayText      String?
+  /// Working hours "HH:MM" (away message outside them), in the platform time zone
+  workStart     String   @default("10:00")
+  workEnd       String   @default("19:00")
+  /// Working days, JSON array of 0–6 (0 = Sunday)
+  workDays      String   @default("[1,2,3,4,5,6]")
+  /// Browser notification and sound for new messages
+  notify        Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
 
   @@index([ownerId])
 }
