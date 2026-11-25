@@ -8,6 +8,7 @@
     "linkedin-extension",
     "linkedin-messenger",
     "meta-helper",
+    "contact-finder",
     "admin"
   ],
   "scripts": {
@@ -20,12 +21,14 @@
     "build:messenger": "npm run build -w linkedin-messenger",
     "dev:meta": "npm run dev -w meta-helper",
     "build:meta": "npm run build -w meta-helper",
+    "dev:contact-finder": "npm run dev -w contact-finder",
+    "build:contact-finder": "npm run build -w contact-finder",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "dev:admin": "npm run dev -w admin",
     "build:admin": "npm run build -w admin",
     "guide:build": "node scripts/guide/build.mjs",
-    "build:extensions": "npm run build -w extension && npm run build -w linkedin-extension && npm run build -w linkedin-messenger && npm run build -w meta-helper && npm run pack:extensions -w backend"
+    "build:extensions": "npm run build -w extension && npm run build -w linkedin-extension && npm run build -w linkedin-messenger && npm run build -w meta-helper && npm run build -w contact-finder && npm run pack:extensions -w backend"
   },
   "allowScripts": {
     "@prisma/engines@7.10.0": true,

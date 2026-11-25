@@ -58,7 +58,7 @@ export const GUIDE: GuideSection[] = [
       rows: [
         ["An approved account", "Signing in to the panel and the extensions", "Always"],
         ["Lead credit (after your 1,000 free leads)", "Saving new Google Maps / LinkedIn leads — ₹0.50 each, recharge on Billing", "After 1,000 leads"],
-        ["Google Chrome on a computer", "The Chrome extensions (Maps Data Collector, LinkedIn Helper, LinkedIn Messenger, Meta Helper)", "To collect leads and send LinkedIn / Instagram messages"],
+        ["Google Chrome on a computer", "The Chrome extensions (Maps Data Collector, LinkedIn Helper, LinkedIn Messenger, Meta Helper, Contact Finder)", "To collect leads and send LinkedIn / Instagram messages"],
         ["Your own Resend account (or SMTP mailbox)", "Sending email campaigns", "For email"],
         ["Your own Meta WhatsApp Business (Cloud API) number + approved templates", "Sending WhatsApp campaigns", "For WhatsApp"],
         ["Claude or Gemini API key, Telegram bot", "AI replies in the AI Inbox", "Optional"],
@@ -123,7 +123,7 @@ export const GUIDE: GuideSection[] = [
     pages: ["/extensions"],
     image: img("06-extensions", "Extensions page with download buttons and the backend URL"),
     steps: [
-      "Open Extensions in the menu and click “Download zip” for the ones you need: Maps Data Collector (Google Maps and Justdial leads), LinkedIn Helper (save LinkedIn profiles), LinkedIn Messenger (send LinkedIn Outreach campaigns) and Meta Helper (Instagram and Facebook search, Instagram Outreach). You only see the ones for the services your account has.",
+      "Open Extensions in the menu and click “Download zip” for the ones you need: Maps Data Collector (Google Maps and Justdial leads), LinkedIn Helper (save LinkedIn profiles), LinkedIn Messenger (send LinkedIn Outreach campaigns) Meta Helper (Instagram and Facebook search, Instagram Outreach) and Contact Finder (emails and phones on the websites and LinkedIn profiles you open). You only see the ones for the services your account has.",
       "Extract the zip into a folder (right click → Extract All).",
       "In Chrome open chrome://extensions and switch on Developer mode (top right).",
       "Click “Load unpacked” and choose the extracted folder (the one with manifest.json).",
@@ -157,7 +157,8 @@ export const GUIDE: GuideSection[] = [
     steps: [
       "Open the Maps Data Collector side panel and choose “Justdial” under Collect from.",
       "Type the keyword (e.g. “Study Visa Consultants”) and the city (e.g. “Delhi”); several keywords separated by commas run one after another. Press START.",
-      "The extension opens Justdial in a tab behind yours and goes through the list page by page, then each business page: name, categories, area, address, website, year established, timings, Justdial rating and photo links (photos stay on Justdial).",
+      "The extension opens Justdial in its own tab and scrolls down the list by itself, the way you would: Justdial loads 10 more businesses each time, until your “Max records” (e.g. 200) are read or the list ends; then it opens Justdial's next page if there is one. Keep that tab open (you can work in other tabs). The “Justdial speed” slider (Slow ↔ Fast) sets the pace, even while a job runs: Slow waits for each new set of businesses to load and pauses before scrolling on; faster saves time but Justdial may show a security check sooner. If Justdial stops giving more businesses before your “Max records” (the list ended, or it stopped loading), the log says how many were found and the job goes on to the business pages with those; a business page that does not load is saved with the list details and the job continues. Then it opens each business page: name, categories, area, address, website, year established, timings, Justdial rating and photo links (photos stay on Justdial).",
+      "Numbers and emails: the number Justdial shows on the list card (the green call button) or on the business page is saved, and so is a WhatsApp number Justdial lists. An email is saved when the business page shows one (most show only an enquiry form, which is never used). The phone from Google Maps comes first when found, because Justdial's numbers are often call-forwarding numbers.",
       "“Add phone and website from Google Maps” looks the same business up on Google Maps in a second background tab. Only a clear match (same name, close by) is used, so no business gets someone else's number.",
       "“Show Number” is off by default. Turned on, it is pressed only for businesses without a phone, at most 30 times a day; Justdial may share your number with the business or ask you to log in, and then the job stops pressing it.",
       "After the search, the platform looks for a public email on each business's own website. If you chose an email template under “Email campaign for new leads”, the new leads with an email go into an email campaign that starts by itself (your sender, with an unsubscribe link). The extension never fills in Justdial's enquiry forms.",
@@ -185,6 +186,21 @@ export const GUIDE: GuideSection[] = [
       "Filter by company, tag, email, phone, website, source and date added, and export to CSV.",
     ],
     notes: ["Keep a human pace (the helper shows a daily limit); LinkedIn may restrict accounts that open too many profiles."],
+  },
+  {
+    id: "contact-finder",
+    title: "Contact Finder: emails and phones on any website or LinkedIn profile",
+    audience: "all",
+    intro:
+      "A separate Chrome extension (Extensions page → Contact Finder). Open a company website or a LinkedIn profile and it shows the emails and phone numbers that page displays, with where each came from, and keeps them in your browser. Nothing is sent anywhere until you press “Send to Lead Platform”.",
+    steps: [
+      "Install it like the other extensions and click its icon: the side panel opens with three tabs, This page, Saved and Settings. The icon shows how many emails and phones the open page has.",
+      "Websites: emails and phones written on the page, in email/phone links and WhatsApp links are read, also spellings like “info [at] shop [dot] com”. If the page has no email, its Contact/About pages (up to 4, same site, once a day) are read too, or press “Check Contact/About pages”.",
+      "LinkedIn profiles: name, headline, company and location, plus the email and phone in “Contact info”, which LinkedIn shows only when the person shares them with you (often your 1st-degree connections). Press “Open Contact info” in the panel to read it. Nothing is guessed and no personal number is looked up elsewhere.",
+      "Settings: “Save what a page shows by itself” (on), “Read every website I open” (Chrome asks once; otherwise allow one site at a time from the panel), the Contact/About pages option, and sites never to read.",
+      "Saved: search, Export CSV (Excel), delete, and “Send to Lead Platform”, which adds the chosen ones to Contacts (Contacts (Sheets)) under a list name, after you log in under Settings with your admin panel login.",
+    ],
+    notes: ["LinkedIn does not allow tools that collect data from its site. Contact Finder only reads the profile you open yourself and what LinkedIn shows you, and never opens other profiles; use it at your own risk."],
   },
   {
     id: "contacts",
@@ -300,6 +316,10 @@ export const GUIDE: GuideSection[] = [
       "For 24 hours after the person's last message you can reply freely: type, attach a photo or file (📎), and press Send. After 24 hours, and for a new chat (+ New chat), WhatsApp allows only an approved template; when they reply, free chat opens again.",
       "The AI writes a draft of the next reply for every new message, using your business information from AI Inbox → Setup. Press “Use this”, change it if needed, and Send. Nothing is sent without you.",
       "Templates: add them on the Templates page with the exact name from WhatsApp Manager and mark them Approved once Meta approves them.",
+      "Like the WhatsApp app: hover a message to Reply (quoted), React with an emoji, Star, Forward to other chats, Copy or Delete for me. Incoming replies, reactions, edits, deleted messages, locations, contact cards and button choices show as they do on the phone.",
+      "The composer also sends a voice note (🎤, recorded in the browser), your location or any place, a contact card, up to 3 reply buttons, a list of options, a link button or a location request, and quick replies: type “/” and the shortcut.",
+      "The ⋮ menu: contact info (your name for the contact, labels, notes), pin, archive, mute, mark as unread, starred messages and block. Search finds a name or number; the filters show unread, starred and archived chats, or one label.",
+      "⚙ Settings: notifications (sound and browser notification), a greeting message for new chats, an away message outside your working hours, quick replies, and your WhatsApp business profile (about, description, address, email, website).",
     ],
   },
   {

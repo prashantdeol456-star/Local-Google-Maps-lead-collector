@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Contact Finder (Lead Platform)",
+  "version": "0.1.0",
+  "description": "Shows and saves the emails and phone numbers that the websites and LinkedIn profiles you open display. Saved in your browser; send them to your Lead Platform when you choose.",
+  "minimum_chrome_version": "120",
+  "action": { "default_title": "Open Contact Finder" },
+  "side_panel": { "default_path": "src/sidepanel/index.html" },
+  "background": { "service_worker": "src/background/service-worker.ts", "type": "module" },
+  "permissions": ["sidePanel", "storage", "unlimitedStorage", "scripting", "activeTab"],
+  "host_permissions": ["https://www.linkedin.com/*", "http://127.0.0.1:3000/*", "http://localhost:3000/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["https://*/*", "http://*/*"],
+      "use_dynamic_url": false
+    }
+  ]
+}

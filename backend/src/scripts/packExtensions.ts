@@ -1,7 +1,7 @@
 // Packs the built Chrome extensions into zip files that the admin panel offers for download
 // (Extensions page). Run after building them:
 //
-//   npm run build:extensions        (root: builds all four extensions, then runs this)
+//   npm run build:extensions        (root: builds all five extensions, then runs this)
 
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -27,6 +27,11 @@ export const DOWNLOADABLE_EXTENSIONS = [
     id: "meta-helper",
     folder: "meta-helper",
     description: "Finds Instagram profiles and Facebook Pages, groups and people by keyword (Social Leads) and sends your Instagram Outreach campaigns.",
+  },
+  {
+    id: "contact-finder",
+    folder: "contact-finder",
+    description: "Shows and saves the emails and phone numbers on the websites and LinkedIn profiles you open; send them to Contacts when you choose.",
   },
 ] as const;
 

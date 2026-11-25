@@ -53,4 +53,5 @@ export const EXTENSION_SERVICES: Record<string, ServiceId> = {
   "linkedin-helper": "linkedin",
   "linkedin-messenger": "linkedin",
   "meta-helper": "social",
+  "contact-finder": "contacts",
 };
