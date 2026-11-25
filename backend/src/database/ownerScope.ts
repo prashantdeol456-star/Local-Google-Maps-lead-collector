@@ -53,6 +53,8 @@ export const OWNED_MODELS = new Set([
   "SocialEngagement",
   // Email finder (Contact Finder)
   "EnrichLookup",
+  "EnrichJob",
+  "EnrichJobRow",
 ]);
 
 /** Models owned through their collection (CollectionJob): model → relation field. */

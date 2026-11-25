@@ -3,6 +3,8 @@ import { useState, type FormEvent } from "react";
 import { EmptyState, ErrorBox, PageHeader, Spinner, StatCard } from "../components/ui";
 import { api } from "../lib/api";
 import { formatDate, formatRelative } from "../lib/format";
+import { setSearchParams, useSearchParams } from "../lib/router";
+import { EmailFinderBulk } from "./EmailFinderBulk";
 
 // Email finder: your own Hunter API key for Contact Finder (find a person's work email, check an
 // email, emails at a company's domain). Every lookup checks your free credits first and never
@@ -134,6 +136,8 @@ function TryIt({ onDone }: { onDone: () => void }) {
 
 export function EmailFinderPage() {
   const client = useQueryClient();
+  const params = useSearchParams();
+  const tab = params.get("tab") === "bulk" || params.get("job") ? "bulk" : "key";
   const status = useQuery({ queryKey: ["enrich"], queryFn: () => api<Status>("/enrich/status") });
   const refresh = useMutation({ mutationFn: () => api<Status>("/enrich/refresh", { method: "POST" }), onSuccess: (s) => client.setQueryData(["enrich"], s) });
   const s = status.data;
@@ -141,7 +145,7 @@ export function EmailFinderPage() {
     <>
       <PageHeader
         title="Email finder"
-        subtitle="Your own Hunter key for Contact Finder: a person's work email from their name and company, or the emails at a company's website. Only your free credits are used, never more."
+        subtitle="Emails and phones for people and companies: Contact Finder, a whole sheet at once (Bulk), and your own Hunter key for work emails. Only your free Hunter credits are used, never more."
         actions={
           s?.configured ? (
             <button className="btn" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
@@ -150,10 +154,29 @@ export function EmailFinderPage() {
           ) : undefined
         }
       />
+      <nav className="mb-4 flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Email finder">
+        {(
+          [
+            ["key", "Hunter key and credits"],
+            ["bulk", "Bulk (sheet)"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-current={tab === id ? "page" : undefined}
+            onClick={() => setSearchParams({ tab: id === "key" ? null : id, job: null })}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === id ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
       {status.isPending && <Spinner />}
+      {s && tab === "bulk" && <EmailFinderBulk hunterReady={s.configured && s.status !== "disabled"} creditsLeft={s.credits?.left ?? null} />}
       {status.error && <ErrorBox error={status.error} />}
       {refresh.error && <ErrorBox error={refresh.error} />}
-      {s && (
+      {s && tab === "key" && (
         <div className="space-y-6">
           {s.credits && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

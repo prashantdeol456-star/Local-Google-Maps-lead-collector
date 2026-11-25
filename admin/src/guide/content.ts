@@ -208,7 +208,7 @@ export const GUIDE: GuideSection[] = [
     title: "Email finder (Hunter)",
     audience: "all",
     pages: ["/email-finder"],
-    image: img("28-email-finder", "Email finder: your Hunter key, credits left and recent lookups"),
+    image: img("29-email-finder-bulk", "Email finder → Bulk: a sheet's rows with the emails and phones found and where"),
     intro:
       "Finds a person's work email from their name and company, or the emails at a company's website, with your own free Hunter account (50 credits a month). Contact Finder uses it from LinkedIn profiles and websites; you can also try it on this page.",
     steps: [
@@ -216,6 +216,8 @@ export const GUIDE: GuideSection[] = [
       "Credits: finding an email costs 1 credit only when one is found; checking an email 0.5; emails at a website 1 per email found (at most 5 per search). The same search again within 30 days is answered from your earlier result for free.",
       "Before every lookup the platform asks Hunter how many credits are left and keeps 10 % as a safety margin, so nothing is ever spent beyond your free credits and nothing paid is used. When they run out, lookups wait until Hunter renews them (the date is shown).",
       "Recent lookups lists each search with its result and the credits it used. A lookup that did not answer in time keeps its credit “held” until the month's numbers settle.",
+      "Bulk (sheet): upload an Excel or CSV sheet (up to 2,000 rows) with a Website column, and Name, Company, LinkedIn URL, Designation if you have them (“Download a sample sheet”). Each row's website and up to 3 of its Contact/About pages are read for the emails and phones they show (free). Tick “ask Hunter” and set a credit limit to also get work emails for named people whose website shows none.",
+      "The sheet is worked through in the background, one row at a time; you can pause, resume or stop it. Each row shows what was found and where (website, contact page, Hunter, or already in the sheet). Export CSV downloads the results; “Add the found ones to Contacts” puts the rows with an email or phone into Contacts under a list name, ready for a campaign.",
     ],
     notes: ["Hunter's emails are its best guess with a confidence score: check them before writing. Personal mobile numbers are never looked up."],
   },
@@ -502,7 +504,7 @@ export const GUIDE: GuideSection[] = [
         ["Social Engagement phase 1: Facebook Page and Instagram comments, reactions, shares", "Built — needs Meta setup", "Meta app: Page webhooks (feed) and Instagram webhooks (comments) with the callback URL and verify token shown on the Social Engagement page; App Review for pages_read_user_content, pages_manage_engagement and instagram_manage_comments so customer accounts work."],
         ["All messages phase 1: one list of WhatsApp, Facebook, Instagram, Telegram and LinkedIn chats", "Done", "—"],
         ["Contact Finder phases 1–2: extension (emails and phones on websites and LinkedIn) and Hunter email finder with a credit guard", "Done", "Each customer adds a free Hunter key on the Email finder page."],
-        ["Contact Finder phase 3: upload a CSV of companies/people and fill in emails and phones (websites first, Hunter for the rest)", "Agreed", "—"],
+        ["Contact Finder phase 3: upload a sheet of companies/people and fill in emails and phones (websites first, Hunter within a budget)", "Done", "—"],
         ["All messages phase 2: Meta webhooks for Messenger/Instagram, photos and voice, Instagram private reply, Telegram Business (your own Telegram number)", "Agreed", "Meta App Review for pages_messaging and instagram_manage_messages; Business Mode on the Telegram bot."],
         ["All messages phase 3: one contact across apps, labels, team assignment, WhatsApp Coexistence", "Agreed", "Meta Tech Provider status for Coexistence (Embedded Signup)."],
         ["Social Engagement phase 2: YouTube comments and subscribers", "Agreed", "Google Cloud project with the YouTube Data API and OAuth consent screen."],

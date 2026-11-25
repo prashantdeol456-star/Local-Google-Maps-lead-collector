@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactPageLinks, deobfuscate, displayPhone, findContacts, htmlToParts, looksLikePhone, siteKey } from "../src/core/find";
+import { contactPageLinks, deobfuscate, displayPhone, findContacts, htmlToParts, looksLikePhone, siteKey } from "../src/contactFind";
 
 describe("emails on a page", () => {
   it("reads email links and written addresses, including [at] / [dot] spellings", () => {

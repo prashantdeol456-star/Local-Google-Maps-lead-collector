@@ -1570,3 +1570,56 @@ model EnrichLookup {
   @@index([ownerId, queryKey])
   @@index([ownerId, createdAt])
 }
+
+/// A sheet of companies / people whose emails and phones are being filled in (Email finder → Bulk).
+model EnrichJob {
+  id           String    @id @default(cuid())
+  ownerId      String?
+  name         String
+  fileName     String?
+  /// queued | running | paused | done | stopped
+  status       String    @default("running")
+  /// Read each row's website (and its Contact/About pages) for published emails and phones
+  useWebsites  Boolean   @default(true)
+  /// Ask Hunter for a person's work email when the website shows none
+  useHunter    Boolean   @default(false)
+  /// Hunter credits this job may use at most
+  hunterBudget Int       @default(0)
+  hunterUsed   Float     @default(0)
+  total        Int
+  done         Int       @default(0)
+  /// Rows with at least one email or phone found
+  found        Int       @default(0)
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  finishedAt   DateTime?
+
+  @@index([ownerId, createdAt])
+  @@index([status])
+}
+
+/// One row of an EnrichJob: what was given and what was found.
+model EnrichJobRow {
+  id          String   @id @default(cuid())
+  ownerId     String?
+  jobId       String
+  idx         Int
+  name        String?
+  company     String?
+  website     String?
+  linkedinUrl String?
+  designation String?
+  inputEmail  String?
+  inputPhone  String?
+  /// pending | found | not_found | failed | skipped
+  status      String   @default("pending")
+  /// JSON [{ value, source }]: source = given | website | contact_page | hunter
+  emails      String   @default("[]")
+  phones      String   @default("[]")
+  note        String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId, idx])
+  @@index([jobId, status])
+}

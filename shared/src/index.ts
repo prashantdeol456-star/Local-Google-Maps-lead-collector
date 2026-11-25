@@ -4,3 +4,4 @@ export * from "./normalize.js";
 export * from "./aiNavigation.js";
 export * from "./linkedin.js";
 export * from "./meta.js";
+export * from "./contactFind.js";

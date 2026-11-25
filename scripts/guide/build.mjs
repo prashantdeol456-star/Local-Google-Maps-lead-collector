@@ -143,6 +143,7 @@ async function seed() {
   // Social Engagement: there is no Facebook in the demo, so the rows a sync would save go straight into the demo database.
   seedEngagement(users[0].id);
   seedInbox(users[0].id);
+  seedBulkJob(users[0].id);
 
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
@@ -250,6 +251,31 @@ function seedInbox(ownerId) {
   db.close();
 }
 
+/** A finished Email finder sheet (made-up businesses) for Email finder → Bulk. */
+function seedBulkJob(ownerId) {
+  const db = new DatabaseSync(DB_FILE);
+  const now = new Date().toISOString().replace("Z", "+00:00");
+  const id = () => randomUUID().replace(/-/g, "").slice(0, 25);
+  const jobId = id();
+  const rows = [
+    ["Rohit Malhotra", "Global Study Visa Point", "globalstudyvisa.example.in", "Director", "found", [["info@globalstudyvisa.example.in", "contact_page"]], [["+91 98100 30001", "website"]], null],
+    ["Sneha Kapoor", "Pathway Overseas Education", "pathwayoverseas.example.in", "Counsellor", "found", [["sneha.kapoor@pathwayoverseas.example.in", "hunter"]], [["011 4501 2345", "contact_page"]], null],
+    [null, "Canada Dream Consultants", "canadadream.example.in", null, "found", [], [["+91 98111 22233", "website"]], null],
+    ["Karan Mehta", "Student Visa Hub", null, "Owner", "not_found", [], [], "Hunter: not found"],
+    [null, "Lifeline Dental Care", "lifelinedental.example.in", null, "found", [["care@lifelinedental.example.in", "website"]], [], null],
+  ];
+  db.prepare(`INSERT INTO "EnrichJob" ("id","ownerId","name","fileName","status","useWebsites","useHunter","hunterBudget","hunterUsed","total","done","found","createdAt","updatedAt","finishedAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    jobId, ownerId, "Visa consultants Delhi", "visa-delhi.xlsx", "done", 1, 1, 10, 1, rows.length, rows.length, 4, now, now, now,
+  );
+  rows.forEach(([name, company, website, designation, status, emails, phones, note], i) => {
+    db.prepare(`INSERT INTO "EnrichJobRow" ("id","ownerId","jobId","idx","name","company","website","designation","status","emails","phones","note","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id(), ownerId, jobId, i, name, company, website, designation, status,
+      JSON.stringify(emails.map(([value, source]) => ({ value, source }))), JSON.stringify(phones.map(([value, source]) => ({ value, source }))), note, now,
+    );
+  });
+  db.close();
+}
+
 // ---------- screenshots ----------
 async function shoot(page) {
   async function login(email, password) {
@@ -309,7 +335,8 @@ async function shoot(page) {
   await shot("26-social-engagement", "/admin/engagement");
   const igChat = await page.evaluate(async () => (await (await fetch("/api/messages/chats?platform=instagram")).json()).items[0].id);
   await shot("27-all-messages", `/admin/messages?chat=in:${igChat}`);
-  await shot("28-email-finder", "/admin/email-finder");
+  const bulkJob = await page.evaluate(async () => (await (await fetch("/api/enrich/jobs")).json()).items[0].id);
+  await shot("29-email-finder-bulk", `/admin/email-finder?job=${bulkJob}`);
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));

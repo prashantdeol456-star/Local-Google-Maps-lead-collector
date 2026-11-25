@@ -26,6 +26,7 @@ app.emailWorker.start();
 app.whatsappWorker.start();
 app.inboxWorker.start();
 app.engagementWorker.start();
+app.enrichWorker.start();
 app.webhookWorker.start();
 app.maintenance.start();
 app.justdialWorker.start();

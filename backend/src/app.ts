@@ -68,6 +68,8 @@ import { messageRoutes } from "./api/routes/messages.js";
 import { enrichRoutes } from "./api/routes/enrich.js";
 import { EnrichmentService } from "./services/enrich/enrichmentService.js";
 import { HunterClient } from "./services/enrich/hunter.js";
+import { BulkEnrichService } from "./services/enrich/bulkEnrich.js";
+import { EnrichWorker } from "./jobs/enrichWorker.js";
 import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
 import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
 import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
@@ -111,6 +113,8 @@ export interface AppDeps {
   socialFetch?: typeof fetch;
   /** Tests: fake Hunter API */
   hunterFetch?: typeof fetch;
+  /** Tests: fake websites for Email finder → Bulk */
+  siteFetch?: (url: string) => Promise<{ url: string; html: string } | null>;
   /** Fake AI writer / network for the AI Inbox (tests). */
   replyWriter?: ReplyWriter | null;
   inboxFetch?: typeof fetch;
@@ -118,7 +122,7 @@ export interface AppDeps {
   razorpayFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, siteFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -310,7 +314,10 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(engagementRoutes, { engagement });
-  await app.register(enrichRoutes, { enrich: new EnrichmentService(db, new HunterClient(hunterFetch ?? fetch), new SecretBox(config.sessionSecret, "hunter-keys")) });
+  const enrich = new EnrichmentService(db, new HunterClient(hunterFetch ?? fetch), new SecretBox(config.sessionSecret, "hunter-keys"));
+  const bulkEnrich = new BulkEnrichService(db, enrich, { fetchText: siteFetch, importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName) });
+  const enrichWorker = new EnrichWorker(bulkEnrich, { log: (msg) => app.log.warn(msg) });
+  await app.register(enrichRoutes, { enrich, bulk: bulkEnrich });
   await app.register(messageRoutes, { unified: new UnifiedInboxService({ whatsapp: waChats, inbox }) });
   await app.register(engagementWebhookRoutes, { engagement });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
@@ -328,6 +335,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   app.decorate("inboxWorker", inboxWorker);
   app.decorate("engagementWorker", engagementWorker);
   app.decorate("engagement", engagement);
+  app.decorate("enrichWorker", enrichWorker);
+  app.decorate("bulkEnrich", bulkEnrich);
   app.decorate("webhookWorker", webhookWorker);
   app.decorate("maintenance", maintenance);
   app.decorate("justdialWorker", justdialWorker);
@@ -335,7 +344,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     integrations.stop();
     maintenance.stop();
     justdialWorker.stop();
-    await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop(), engagementWorker.stop()]);
+    await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop(), engagementWorker.stop(), enrichWorker.stop()]);
   });
   return app;
 }
@@ -349,6 +358,8 @@ declare module "fastify" {
     inboxWorker: InboxWorker;
     engagementWorker: EngagementWorker;
     engagement: EngagementService;
+    enrichWorker: EnrichWorker;
+    bulkEnrich: BulkEnrichService;
     justdialWorker: JustdialWorker;
     webhookWorker: WebhookWorker;
     maintenance: MaintenanceWorker;

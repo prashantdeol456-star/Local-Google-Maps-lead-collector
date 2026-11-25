@@ -60,6 +60,8 @@ export const TABLES = [
   "SocialEngagement",
   "HunterAccount",
   "EnrichLookup",
+  "EnrichJob",
+  "EnrichJobRow",
 ] as const;
 
 const BATCH = 500;
