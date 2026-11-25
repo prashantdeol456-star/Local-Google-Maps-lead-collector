@@ -15,7 +15,11 @@ export type PanelRequest =
   | { type: "CF_DELETE"; ids: string[] | "all" }
   | { type: "CF_SETTINGS" }
   | { type: "CF_SET_SETTINGS"; patch: Partial<Settings> }
-  | { type: "CF_SEND"; ids: string[]; listName: string | null };
+  | { type: "CF_SEND"; ids: string[]; listName: string | null }
+  | { type: "CF_ENRICH_STATUS" }
+  | { type: "CF_FIND_EMAIL"; sighting: Sighting; domain: string | null }
+  | { type: "CF_DOMAIN_EMAILS"; sighting: Sighting; domain: string }
+  | { type: "CF_VERIFY"; sighting: Sighting; email: string };
 
 export type Response<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -35,4 +39,19 @@ export interface SendResult {
   sent: number;
   created: number;
   updated: number;
+}
+
+/** The platform's Email finder status (GET /api/enrich/status), as far as the panel needs it. */
+export interface EnrichStatus {
+  configured: boolean;
+  status: "ok" | "disabled" | "error" | null;
+  statusReason: string | null;
+  credits: { used: number; available: number; left: number; held: number } | null;
+  exhaustedUntil: string | null;
+}
+
+export interface EnrichResult {
+  status: "found" | "not_found" | "cached";
+  emails: string[];
+  creditsLeft: number | null;
 }

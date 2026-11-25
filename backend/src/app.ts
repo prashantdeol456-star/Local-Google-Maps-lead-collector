@@ -65,6 +65,9 @@ import { InboxRuntime } from "./services/inbox/runtime.js";
 import { InboxWorker } from "./jobs/inboxWorker.js";
 import { EngagementWorker } from "./jobs/engagementWorker.js";
 import { messageRoutes } from "./api/routes/messages.js";
+import { enrichRoutes } from "./api/routes/enrich.js";
+import { EnrichmentService } from "./services/enrich/enrichmentService.js";
+import { HunterClient } from "./services/enrich/hunter.js";
 import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
 import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
 import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
@@ -106,6 +109,8 @@ export interface AppDeps {
   aiNavigator?: AiNavigator | null;
   /** Fake network for Facebook/LinkedIn OAuth (tests). */
   socialFetch?: typeof fetch;
+  /** Tests: fake Hunter API */
+  hunterFetch?: typeof fetch;
   /** Fake AI writer / network for the AI Inbox (tests). */
   replyWriter?: ReplyWriter | null;
   inboxFetch?: typeof fetch;
@@ -113,7 +118,7 @@ export interface AppDeps {
   razorpayFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -305,6 +310,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(engagementRoutes, { engagement });
+  await app.register(enrichRoutes, { enrich: new EnrichmentService(db, new HunterClient(hunterFetch ?? fetch), new SecretBox(config.sessionSecret, "hunter-keys")) });
   await app.register(messageRoutes, { unified: new UnifiedInboxService({ whatsapp: waChats, inbox }) });
   await app.register(engagementWebhookRoutes, { engagement });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });

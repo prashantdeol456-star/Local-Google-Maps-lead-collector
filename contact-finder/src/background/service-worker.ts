@@ -8,7 +8,7 @@
 import { contactsToPlatformCsv, hasSomething, type Sighting } from "../core/contacts";
 import { findContacts, htmlToParts, siteKey } from "../core/find";
 import type { PageReading } from "../content/index";
-import type { PanelRequest, Response, SendResult, TabInfo } from "../messages";
+import type { EnrichResult, EnrichStatus, PanelRequest, Response, SendResult, TabInfo } from "../messages";
 import { loadAuthState } from "../storage/auth";
 import { deleteContacts, loadContacts, loadSettings, markSent, saveSettings, saveSighting } from "../storage/contacts";
 import { apiRequest } from "./apiClient";
@@ -215,6 +215,54 @@ async function sendToPlatform(ids: string[], listName: string | null): Promise<S
   return { sent: rows, created: res.data.created, updated: res.data.updated };
 }
 
+// ---- Email finder (Hunter, through the platform: the key never comes to the extension) ----
+
+async function platform<T>(path: string, body?: unknown): Promise<T> {
+  const auth = await loadAuthState();
+  if (!auth.token) throw new Error("Log in to your Lead Platform under Settings to use the email finder");
+  const res = await apiRequest<T>({ baseUrl: auth.backendUrl, token: auth.token, timeoutMs: 40_000 }, path, body === undefined ? {} : { method: "POST", body });
+  if (!res.ok) throw new Error(res.error.message);
+  return res.data;
+}
+
+type Found = { email: string; score: number | null; verification: string | null };
+
+/** Saves what Hunter returned on the contact (marked "hunter", with its confidence). */
+async function saveFound(s: Sighting, found: Found[]) {
+  if (!found.length) return;
+  await saveSighting({
+    ...s,
+    how: "hunter",
+    findings: { emails: found.map((f) => ({ value: f.email, how: "text" as const, score: f.score, verified: f.verification })), phones: [], socials: [] },
+  });
+}
+
+async function findEmail(s: Sighting, domain: string | null): Promise<EnrichResult> {
+  if (!s.name) throw new Error("No name on this page");
+  const res = await platform<{ status: EnrichResult["status"]; result: Found | null; creditsLeft: number | null }>("/api/enrich/find-email", {
+    fullName: s.name,
+    company: s.company ?? null,
+    domain: domain ?? (s.website ? siteKey(s.website) : null),
+    linkedinUrl: s.kind === "linkedin_profile" ? s.linkedinUrl : null,
+  });
+  if (res.result) await saveFound(s, [res.result]);
+  return { status: res.status, emails: res.result ? [res.result.email] : [], creditsLeft: res.creditsLeft };
+}
+
+async function domainEmails(s: Sighting, domain: string): Promise<EnrichResult> {
+  const res = await platform<{ status: EnrichResult["status"]; result: Found[] | null; creditsLeft: number | null }>("/api/enrich/domain-emails", { domain, limit: 5 });
+  await saveFound(s, res.result ?? []);
+  return { status: res.status, emails: (res.result ?? []).map((f) => f.email), creditsLeft: res.creditsLeft };
+}
+
+async function verify(s: Sighting, email: string): Promise<string> {
+  const res = await platform<{ result: { status: string } | null }>("/api/enrich/verify-email", { email });
+  const status = res.result?.status ?? "unknown";
+  // Keep the check result on the saved contact.
+  await saveSighting({ ...s, how: undefined, findings: { emails: [{ value: email, how: "text", verified: status }], phones: [], socials: [] } });
+  return status;
+}
+
 // ---- Messages ----
 
 async function handle(req: PanelRequest): Promise<unknown> {
@@ -246,6 +294,14 @@ async function handle(req: PanelRequest): Promise<unknown> {
       return saveSettings(req.patch);
     case "CF_SEND":
       return sendToPlatform(req.ids, req.listName);
+    case "CF_ENRICH_STATUS":
+      return platform<EnrichStatus>("/api/enrich/status");
+    case "CF_FIND_EMAIL":
+      return findEmail(req.sighting, req.domain);
+    case "CF_DOMAIN_EMAILS":
+      return domainEmails(req.sighting, req.domain);
+    case "CF_VERIFY":
+      return verify(req.sighting, req.email);
   }
 }
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Contact, SavedValue, ValueSource } from "../core/contacts";
+import type { Contact, ValueSource } from "../core/contacts";
 import { contactsToCsv } from "../core/contacts";
-import type { FoundValue } from "../core/find";
-import type { PanelRequest, Response, SendResult, TabInfo } from "../messages";
+import type { EnrichResult, EnrichStatus, PanelRequest, Response, SendResult, TabInfo } from "../messages";
+import type { Sighting } from "../core/contacts";
 import type { BackendStatus } from "../storage/auth";
 import type { Settings } from "../storage/contacts";
 
@@ -21,6 +21,7 @@ const HOW: Record<ValueSource, string> = {
   whatsapp: "WhatsApp link",
   contact_page: "Contact/About page",
   contact_info: "LinkedIn Contact info",
+  hunter: "Hunter (email finder)",
 };
 
 const ALL_SITES = ["https://*/*", "http://*/*"];
@@ -43,7 +44,10 @@ function Copy({ value }: { value: string }) {
   );
 }
 
-function Values({ title, items }: { title: string; items: (FoundValue | SavedValue)[] }) {
+type Shown = { value: string; how: string; score?: number | null; verified?: string | null };
+
+function Values({ title, items, onCheck }: { title: string; items: Shown[]; onCheck?: (value: string) => Promise<void> }) {
+  const [checking, setChecking] = useState<string | null>(null);
   return (
     <div className="field">
       <span>
@@ -56,7 +60,25 @@ function Values({ title, items }: { title: string; items: (FoundValue | SavedVal
           {items.map((v) => (
             <li key={v.value} className="value">
               <span className="value__text">{v.value}</span>
-              <span className="value__how">{HOW[v.how as ValueSource] ?? v.how}</span>
+              <span className="value__how">
+                {HOW[v.how as ValueSource] ?? v.how}
+                {v.score != null && ` · ${v.score}%`}
+                {v.verified && ` · ${v.verified}`}
+              </span>
+              {onCheck && !v.verified && (
+                <button
+                  className="btn btn--ghost"
+                  style={{ flex: "none", padding: "2px 8px" }}
+                  disabled={checking === v.value}
+                  title="Check with Hunter if this email works (0.5 credit)"
+                  onClick={() => {
+                    setChecking(v.value);
+                    void onCheck(v.value).finally(() => setChecking(null));
+                  }}
+                >
+                  {checking === v.value ? "…" : "Check"}
+                </button>
+              )}
               <Copy value={v.value} />
             </li>
           ))}
@@ -68,7 +90,78 @@ function Values({ title, items }: { title: string; items: (FoundValue | SavedVal
 
 // ---- This page ----
 
-function ThisPage({ settings }: { settings: Settings | null }) {
+/** Hunter through the platform: a person's work email, or emails at the site's domain. */
+function HunterBox({ s, saved, loggedIn, onDone }: { s: Sighting; saved: Contact | null; loggedIn: boolean; onDone: () => void }) {
+  const [status, setStatus] = useState<EnrichStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [domain, setDomain] = useState(() => (s.website ? s.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") : ""));
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    void send<EnrichStatus>({ type: "CF_ENRICH_STATUS" }).then((r) => (r.ok ? setStatus(r.data) : setStatusError(r.error)));
+  }, [loggedIn, s.id]);
+
+  if (!loggedIn) return <p className="hint">Email finder (Hunter): log in to your Lead Platform under Settings to find work emails that pages do not show.</p>;
+  if (statusError) return <p className="msg msg--error">{statusError}</p>;
+  if (!status) return null;
+  if (!status.configured) return <p className="hint">Email finder: add your free Hunter API key on the platform's “Email finder” page (My account), then come back.</p>;
+  if (status.status === "disabled") return <p className="msg msg--warn">Email finder is switched off: {status.statusReason}</p>;
+
+  const left = status.credits?.left ?? 0;
+  const isPerson = s.kind === "linkedin_profile";
+  const hasEmail = (saved?.emails.length ?? 0) + s.findings.emails.length > 0;
+
+  async function run(kind: "person" | "domain") {
+    setBusy(kind);
+    setMsg(null);
+    const res =
+      kind === "person"
+        ? await send<EnrichResult>({ type: "CF_FIND_EMAIL", sighting: s, domain: domain.trim() || null })
+        : await send<EnrichResult>({ type: "CF_DOMAIN_EMAILS", sighting: s, domain: domain.trim() });
+    setBusy(null);
+    if (!res.ok) setMsg({ ok: false, text: res.error });
+    else
+      setMsg({
+        ok: true,
+        text: res.data.emails.length
+          ? `Found: ${res.data.emails.join(", ")}${res.data.status === "cached" ? " (earlier lookup, no credit)" : ""}`
+          : "Hunter found nothing (no credit used)",
+      });
+    void send<EnrichStatus>({ type: "CF_ENRICH_STATUS" }).then((r) => r.ok && setStatus(r.data));
+    onDone();
+  }
+
+  return (
+    <div className="field">
+      <span>Email finder (Hunter) · {left} credits left{status.exhaustedUntil ? `, renew ${status.exhaustedUntil.slice(0, 10)}` : ""}</span>
+      <input
+        style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", color: "var(--text)", font: "inherit" }}
+        placeholder={isPerson ? "Company website (optional), e.g. acme.in" : "Website, e.g. acme.in"}
+        value={domain}
+        onChange={(e) => setDomain(e.target.value)}
+        aria-label="Company website"
+      />
+      <div className="row">
+        {isPerson && s.name && (
+          <button className="btn btn--primary" disabled={!!busy || !!status.exhaustedUntil} onClick={() => void run("person")} title="1 credit only when an email is found">
+            {busy === "person" ? "Finding…" : hasEmail ? "Find work email too" : "Find work email"}
+          </button>
+        )}
+        {!isPerson && (
+          <button className="btn" disabled={!!busy || !domain.trim() || !!status.exhaustedUntil} onClick={() => void run("domain")} title="1 credit per email found, at most 5">
+            {busy === "domain" ? "Searching…" : "Emails at this website (≤ 5 credits)"}
+          </button>
+        )}
+      </div>
+      <small className="hint">{isPerson ? "Uses the name, company and LinkedIn profile: 1 credit only if an email is found." : "1 credit for each email Hunter knows at this website, at most 5."} Hunter's emails are a best guess: check the confidence.</small>
+      {msg && <p className={`msg ${msg.ok ? "msg--ok" : "msg--error"}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+function ThisPage({ settings, loggedIn }: { settings: Settings | null; loggedIn: boolean }) {
   const [info, setInfo] = useState<TabInfo | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -141,6 +234,14 @@ function ThisPage({ settings }: { settings: Settings | null }) {
 
   const isProfile = s.kind === "linkedin_profile";
   const savedHere = !!info.saved;
+  // What the page shows, plus what was found for it before (Hunter, Contact/About pages, checks).
+  const emails = [...s.findings.emails.map((e) => ({ ...e, ...(info.saved?.emails.find((x) => x.value === e.value) ?? {}) })), ...(info.saved?.emails ?? []).filter((e) => !s.findings.emails.some((x) => x.value === e.value))];
+
+  async function check(email: string) {
+    const res = await send<string>({ type: "CF_VERIFY", sighting: s!, email });
+    setMsg(res.ok ? { ok: res.data === "valid", text: `${email}: ${res.data}` } : { ok: false, text: res.error });
+    void refresh();
+  }
   return (
     <div className="card form">
       <div className="who">
@@ -150,8 +251,9 @@ function ThisPage({ settings }: { settings: Settings | null }) {
         {s.website && <span className="who__line">{s.website}</span>}
       </div>
 
-      <Values title="Emails" items={s.findings.emails} />
+      <Values title="Emails" items={emails} onCheck={loggedIn ? check : undefined} />
       <Values title="Phones" items={s.findings.phones} />
+      <HunterBox key={s.id} s={s} saved={info.saved} loggedIn={loggedIn} onDone={() => void refresh()} />
 
       {isProfile && info.reading?.contactInfoUrl && (
         <div className="msg msg--warn">
@@ -450,7 +552,7 @@ export function App() {
           </button>
         ))}
       </nav>
-      {tab === "page" && <ThisPage settings={settings} />}
+      {tab === "page" && <ThisPage settings={settings} loggedIn={!!status?.loggedIn} />}
       {tab === "saved" && <Saved loggedIn={!!status?.loggedIn} />}
       {tab === "settings" && settings && <SettingsTab settings={settings} onSettings={setSettings} status={status} onStatus={setStatus} />}
     </main>

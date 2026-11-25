@@ -1521,3 +1521,52 @@ model SocialEngagement {
   @@index([postId])
   @@index([personId])
 }
+
+// ---- Email finder (Hunter) for Contact Finder: each user's own Hunter API key, and a ledger of
+// every lookup. Requests go only through EnrichmentService, which never spends credits it cannot
+// see on the account (no paid fallback, no over-quota use). ----
+
+/// One user's Hunter account (key encrypted with SESSION_SECRET).
+model HunterAccount {
+  /// The owner's user id ("default" outside a user's scope)
+  id             String    @id
+  keyEnc         String
+  keyHint        String
+  /// ok | disabled | error
+  status         String    @default("ok")
+  statusReason   String?
+  planName       String?
+  creditsUsed    Float?
+  creditsAvailable Float?
+  resetDate      DateTime?
+  /// Hunter said the credits are used up: no request before this time
+  exhaustedUntil DateTime?
+  checkedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+/// One lookup: credits reserved before the request, then settled with what Hunter counted.
+model EnrichLookup {
+  id            String    @id @default(cuid())
+  ownerId       String?
+  provider      String    @default("hunter")
+  /// email_finder | email_verifier | domain_search
+  kind          String
+  /// Normalized question, e.g. "finder:asha verma|acme.in"; repeated questions use the saved answer
+  queryKey      String
+  /// Credits held back before sending (the most it can cost)
+  reservedUnits Float
+  /// What Hunter counted (null while unknown)
+  usedUnits     Float?
+  /// reserved | done | not_found | unknown | failed | blocked
+  status        String
+  /// JSON answer (normalized)
+  result        String?
+  error         String?
+  createdAt     DateTime  @default(now())
+  settledAt     DateTime?
+
+  @@index([ownerId, queryKey])
+  @@index([ownerId, createdAt])
+}

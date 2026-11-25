@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Contact Finder (Lead Platform)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shows and saves the emails and phone numbers that the websites and LinkedIn profiles you open display. Saved in your browser; send them to your Lead Platform when you choose.",
   "minimum_chrome_version": "120",
   "action": { "default_title": "Open Contact Finder" },

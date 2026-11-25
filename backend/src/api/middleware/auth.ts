@@ -49,6 +49,8 @@ const CUSTOMER_ROUTES = new RegExp(
       "inbox/(ai-config|secrets/:name|test/:what|settings|status|conversations|refresh)",
       "inbox/conversations/:id|inbox/conversations/:id/(ai-reply|send|handled|mode|read)|inbox/drafts/:id/(approve|dismiss)",
       "social/(providers|accounts|connect/:provider)|social/accounts/:id|social/accounts/:id/check",
+      // Email finder (their own Hunter key) for Contact Finder
+      "enrich/(status|hunter-key|refresh|find-email|verify-email|domain-emails)",
       // All messages: their WhatsApp and AI Inbox chats in one list
       "messages/(chats|summary)",
       // Social Engagement (their own Pages and Instagram accounts)

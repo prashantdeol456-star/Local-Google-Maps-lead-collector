@@ -56,6 +56,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/sender", label: "My sender", icon: "➚" },
       { to: "/billing", label: "Billing", icon: "₹" },
       { to: "/extensions", label: "Extensions", icon: "⬇" },
+      { to: "/email-finder", label: "Email finder", icon: "@" },
     ],
   },
   {

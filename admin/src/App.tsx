@@ -23,6 +23,7 @@ import { InboxPage } from "./pages/InboxPage";
 import { SocialLeadsPage } from "./pages/SocialLeadsPage";
 import { EngagementPage } from "./pages/EngagementPage";
 import { MessagesPage } from "./pages/MessagesPage";
+import { EmailFinderPage } from "./pages/EmailFinderPage";
 import { JustdialLeadsPage } from "./pages/JustdialLeadsPage";
 import { WhatsAppChatPage } from "./pages/WhatsAppChatPage";
 import { CampaignLogsPage } from "./pages/CampaignLogsPage";
@@ -63,6 +64,7 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/social") return <SocialAccountsPage />;
   if (path === "/inbox") return <InboxPage />;
   if (path === "/messages") return <MessagesPage />;
+  if (path === "/email-finder") return <EmailFinderPage />;
   if (path === "/engagement") return <EngagementPage />;
   if (path === "/collections") return <CollectionsPage />;
   if ((params = matchPath("/collections/:id", path))) return <CollectionDetailPage key={params.id} id={params.id!} />;

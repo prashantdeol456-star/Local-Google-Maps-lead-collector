@@ -6,11 +6,15 @@ import type { FoundHow, PageFindings } from "./find";
 
 export type ContactKind = "website" | "linkedin_profile" | "linkedin_company";
 /** Where a value was found: on the page, on one of the site's Contact/About pages, or in LinkedIn's Contact info */
-export type ValueSource = FoundHow | "contact_page" | "contact_info";
+export type ValueSource = FoundHow | "contact_page" | "contact_info" | "hunter";
 
 export interface SavedValue {
   value: string;
   how: ValueSource;
+  /** Hunter's confidence 0–100 */
+  score?: number | null;
+  /** Deliverability from an email check */
+  verified?: string | null;
   /** Page it was read on */
   source: string;
   foundAt: number;
@@ -56,14 +60,21 @@ const MAX_VALUES = 20;
 
 const phoneKey = (v: string) => v.replace(/\D/g, "").replace(/^(0091|91|0)(?=[6-9]\d{9}$)/, "");
 
-function mergeValues(list: SavedValue[], incoming: { value: string; how: ValueSource }[], source: string, now: number, key: (v: string) => string) {
-  const seen = new Set(list.map((v) => key(v.value)));
+type Incoming = { value: string; how: ValueSource; score?: number | null; verified?: string | null };
+
+function mergeValues(list: SavedValue[], incoming: Incoming[], source: string, now: number, key: (v: string) => string) {
   const out = [...list];
   for (const v of incoming) {
     const k = key(v.value);
-    if (seen.has(k) || out.length >= MAX_VALUES) continue;
-    seen.add(k);
-    out.push({ value: v.value, how: v.how, source, foundAt: now });
+    const at = out.findIndex((x) => key(x.value) === k);
+    if (at >= 0) {
+      // Known already: only add a check result or a confidence it did not have.
+      const cur = out[at]!;
+      if ((v.verified && v.verified !== cur.verified) || (v.score != null && cur.score == null)) out[at] = { ...cur, verified: v.verified ?? cur.verified, score: cur.score ?? v.score };
+      continue;
+    }
+    if (out.length >= MAX_VALUES) continue;
+    out.push({ value: v.value, how: v.how, source, foundAt: now, ...(v.score != null ? { score: v.score } : {}), ...(v.verified ? { verified: v.verified } : {}) });
   }
   return out;
 }
@@ -91,7 +102,7 @@ export function mergeSighting(existing: Contact | undefined, s: Sighting, now = 
     lastSeen: now,
     sentAt: null,
   };
-  const how = (v: { value: string; how: FoundHow }): { value: string; how: ValueSource } => ({ value: v.value, how: s.how ?? v.how });
+  const how = (v: { value: string; how: FoundHow; score?: number | null; verified?: string | null }): Incoming => ({ value: v.value, how: s.how ?? v.how, score: v.score, verified: v.verified });
   return {
     ...base,
     name: s.name || base.name,

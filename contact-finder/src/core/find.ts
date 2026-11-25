@@ -8,6 +8,10 @@ export type FoundHow = "link" | "text" | "whatsapp";
 export interface FoundValue {
   value: string;
   how: FoundHow;
+  /** Hunter's confidence 0–100 (emails from the email finder) */
+  score?: number | null;
+  /** Deliverability: valid | invalid | accept_all | unknown … */
+  verified?: string | null;
 }
 
 export interface PageFindings {

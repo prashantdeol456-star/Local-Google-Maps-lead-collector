@@ -32,6 +32,14 @@ describe("saved contacts", () => {
     expect(hasSomething(site({ findings: { emails: [], phones: [], socials: [] } }))).toBe(false);
   });
 
+  it("keeps Hunter's confidence and adds a later check result to a known email", () => {
+    const first = mergeSighting(undefined, site({ id: "li:in/asha", kind: "linkedin_profile", how: "hunter", findings: { emails: [{ value: "asha@acme.in", how: "text", score: 92 }], phones: [], socials: [] } }), 1);
+    expect(first.emails[0]).toMatchObject({ value: "asha@acme.in", how: "hunter", score: 92 });
+    const checked = mergeSighting(first, site({ id: "li:in/asha", kind: "linkedin_profile", findings: { emails: [{ value: "asha@acme.in", how: "text", verified: "valid" }], phones: [], socials: [] } }), 2);
+    expect(checked.emails).toHaveLength(1);
+    expect(checked.emails[0]).toMatchObject({ how: "hunter", score: 92, verified: "valid" });
+  });
+
   it("keeps the newest contacts when there are too many", () => {
     const all = Object.fromEntries([1, 2, 3].map((i) => [`site:${i}`, mergeSighting(undefined, site({ id: `site:${i}` }), i)]));
     expect(Object.keys(trimContacts(all, 2)).sort()).toEqual(["site:2", "site:3"]);

@@ -309,6 +309,7 @@ async function shoot(page) {
   await shot("26-social-engagement", "/admin/engagement");
   const igChat = await page.evaluate(async () => (await (await fetch("/api/messages/chats?platform=instagram")).json()).items[0].id);
   await shot("27-all-messages", `/admin/messages?chat=in:${igChat}`);
+  await shot("28-email-finder", "/admin/email-finder");
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));
