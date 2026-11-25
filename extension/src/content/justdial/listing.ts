@@ -1,5 +1,6 @@
 // Reads Justdial's own result-list answers (/api/resultsPageListing: { results: { columns, data } }).
-// Verified on justdial.com on 2026-11-20. Pure functions, no DOM access.
+// Verified on justdial.com on 2026-11-20 and 2026-11-25 (10 businesses per answer; each scroll
+// down loads the next answer). Pure functions, no DOM access.
 
 export interface JdListing {
   docid: string;
@@ -19,8 +20,10 @@ export interface JdListing {
   /** Profile page on justdial.com */
   profileUrl: string | null;
   thumbnail: string | null;
-  /** Number Justdial shows in the list (usually empty: shown only after "Show Number") */
+  /** Number Justdial shows on the list card (the green call button); empty when it says "Show Number" */
   phone: string | null;
+  /** WhatsApp number of the business, when Justdial lists one */
+  whatsapp: string | null;
 }
 
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.replace(/\s+/g, " ").trim() : null);
@@ -89,6 +92,7 @@ export function parseListingResponse(body: string): JdListing[] {
       profileUrl: profileUrl(at(row, "weburl")),
       thumbnail: text(at(row, "thumbnail")),
       phone: phoneOf(at(row, "VNumber")),
+      whatsapp: phoneOf(at(row, "wpnumber")),
     });
   }
   return out;

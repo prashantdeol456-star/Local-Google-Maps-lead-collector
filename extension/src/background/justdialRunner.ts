@@ -1,5 +1,6 @@
 // Runs a Justdial job from the background, in the job's own tab behind the user's:
-//   1. list: opens the search, then page-2, page-3… and reads the results Justdial loads
+//   1. list: opens the search and scrolls down, like a person, so Justdial keeps loading more
+//      businesses (10 per scroll) until "Max records" are read or the list ends; then page-2…
 //   2. per business: opens its profile (address, website, photos, timings), optionally presses
 //      "Show Number" (daily limit), and looks it up on Google Maps in a second background tab
 //   3. sends each lead to the backend (same outbox as Google Maps, so nothing is lost offline)
@@ -15,13 +16,17 @@ import type { JdBlock, JdProfile } from "../content/justdial/profile";
 import type { ExtractedListing } from "../content/maps/types";
 import type { JustdialPayload, OutboxPayload } from "../storage/outbox";
 import { addProcessedKey, loadProcessedKeys, withLog, type CollectorState } from "../storage/state";
+import { loadJdSpeed, paceOf } from "../utils/jdSpeed";
 import { buildMapsSearchUrl } from "../utils/maps";
 import type { MessageResponse } from "../utils/messages";
 import { bestMapsMatch } from "./jdMatch";
 import { applyListing } from "./jobController";
 
 const PAGE_DELAY_MS = 3000;
-const PROFILE_DELAY_MS = 2500;
+/** One scroll request to the page (short, so the background stays awake between them). */
+const SCROLL_CALL_MS = 25_000;
+/** At most this many scroll requests on one list page (each brings ≈ 10–20 businesses). */
+const MAX_SCROLL_CALLS = 300;
 const MAX_LIST_PAGES = 50;
 const TAB_LOAD_TIMEOUT_MS = 30_000;
 
@@ -39,10 +44,14 @@ interface StoredList {
   nextUrl: string | null;
   pages: number;
   done: boolean;
+  /** The list page being scrolled (opened again on resume) */
+  url?: string | null;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const listKey = (runId: string) => `jd-list:${runId}`;
+/** Remembers which run's list is stored, so an old one can be removed without reading all storage. */
+const CURRENT_LIST_KEY = "jd-list-current";
 
 /** Waits until the tab has finished loading (after a navigation). */
 function waitForTab(tabId: number, timeoutMs = TAB_LOAD_TIMEOUT_MS): Promise<void> {
@@ -87,11 +96,27 @@ async function loadList(runId: string): Promise<StoredList> {
 }
 
 async function saveList(runId: string, list: StoredList) {
-  // Only the list of the current run is kept.
-  const all = await chrome.storage.local.get(null);
-  const stale = Object.keys(all).filter((k) => k.startsWith("jd-list:") && k !== listKey(runId));
-  if (stale.length) await chrome.storage.local.remove(stale);
-  await chrome.storage.local.set({ [listKey(runId)]: list });
+  // Only the list of the current run is kept (without loading everything else in storage).
+  const current = (await chrome.storage.local.get(CURRENT_LIST_KEY))[CURRENT_LIST_KEY] as string | undefined;
+  if (current && current !== runId) await chrome.storage.local.remove(listKey(current));
+  await chrome.storage.local.set({ [listKey(runId)]: list, [CURRENT_LIST_KEY]: runId });
+}
+
+/** The finished run's list is not needed any more. */
+export async function dropList(runId: string) {
+  await chrome.storage.local.remove([listKey(runId), CURRENT_LIST_KEY]);
+}
+
+/** Adds the businesses not seen yet; returns how many were new. */
+export function addListings(list: StoredList, incoming: JdListing[], known: Set<string>): number {
+  let added = 0;
+  for (const l of incoming) {
+    if (known.has(l.docid)) continue;
+    known.add(l.docid);
+    list.listings.push(l);
+    added++;
+  }
+  return added;
 }
 
 /** "Show Number" presses left today. */
@@ -125,13 +150,15 @@ export function composeLead(
   const parts = parseAddress(maps?.address ?? address, ctx.location);
   const jdCity = l.city ? l.city.replace(/\b\w/g, (c) => c.toUpperCase()) : null;
   const pin = l.pincode ?? address?.match(/\b\d{6}\b/)?.[0] ?? null;
-  const phone = maps?.phone ?? profile?.phone ?? l.phone;
+  // Google Maps has the business's own number; Justdial's (on the list card or the profile) is
+  // often a call-forwarding number, so it comes next, then the WhatsApp number Justdial lists.
+  const phone = maps?.phone ?? profile?.phone ?? l.phone ?? l.whatsapp;
   const website = profile?.website ?? maps?.website ?? null;
   const lead: ExtractedListing = {
     name: l.name,
     category: pick("category", l.categories?.split(",")[0]?.trim() || maps?.category || null),
     phone: pick("phone", phone),
-    email: null,
+    email: profile?.email ?? null,
     website: pick("website", website),
     address: pick("address", address),
     city: pick("city", parts.city ?? jdCity ?? (ctx.location.trim() || null)),
@@ -151,7 +178,7 @@ export function composeLead(
   const justdial: JustdialPayload = {
     docid: l.docid,
     jdUrl: l.profileUrl,
-    jdPhone: profile?.phone ?? l.phone,
+    jdPhone: profile?.phone ?? l.phone ?? l.whatsapp,
     jdRating: l.rating,
     jdReviewCount: l.reviewCount,
     categories: l.categories,
@@ -195,6 +222,7 @@ export class JustdialRunner {
         );
         await this.deps.statusUpdate(done.backendJobId, "completed", "end_of_list");
         await this.closeMapsTab();
+        await dropList(runId);
         await this.deps.finished(done);
       }
     } catch (err) {
@@ -216,6 +244,12 @@ export class JustdialRunner {
     if (!changed) return null;
     await this.deps.statusUpdate(s.backendJobId, "paused", reason);
     return s;
+  }
+
+  private async blocked(runId: string, block: JdBlock): Promise<"paused"> {
+    const paused = await this.pause(runId, BLOCK_TEXT[block], `${block}_detected`);
+    if (paused) await this.deps.finished(paused);
+    return "paused";
   }
 
   private async stillRunning(runId: string) {
@@ -259,34 +293,76 @@ export class JustdialRunner {
     const location = settings.location.trim();
     const max = settings.maxRecords;
 
-    // 1. The list, page by page.
+    // 1. The list: scroll down on each page until Max records, then the next page if any.
     const list = await loadList(runId);
     if (!list.done) {
-      let url = list.nextUrl ?? justdialSearchUrl(keyword, location);
-      if (list.pages === 0) await this.log(runId, "info", `Opening Justdial: ${keyword} in ${location}`);
+      const known = new Set(list.listings.map((l) => l.docid));
+      let url = list.url ?? list.nextUrl ?? justdialSearchUrl(keyword, location);
+      if (list.pages === 0) await this.log(runId, "info", `Opening Justdial: ${keyword} in ${location} (scrolls down until ${max} businesses)`);
+      let stopReason: string | null = null;
       while (list.pages < MAX_LIST_PAGES) {
         if (!(await this.stillRunning(runId))) return "paused";
-        await open(tabId, url);
-        const page = await ask<{ listings: JdListing[]; nextUrl: string | null; block: JdBlock | null }>(tabId, { type: "JD_PAGE" });
-        if (page.block) {
-          const paused = await this.pause(runId, BLOCK_TEXT[page.block], `${page.block}_detected`);
-          if (paused) await this.deps.finished(paused);
-          return "paused";
+        let pageAdded = 0;
+        try {
+          await open(tabId, url);
+          const page = await ask<{ listings: JdListing[]; total: number; nextUrl: string | null; block: JdBlock | null }>(tabId, { type: "JD_PAGE" });
+          if (page.block) return this.blocked(runId, page.block);
+          const first = addListings(list, page.listings, known);
+          pageAdded += first;
+          list.pages++;
+          list.url = url;
+          list.nextUrl = page.nextUrl;
+          await saveList(runId, list);
+          await this.log(runId, "info", `List page ${list.pages}: ${first} businesses (${list.listings.length} so far)`);
+
+          // Scroll for more on this page.
+          let shown = page.total;
+          for (let call = 0; list.listings.length < max && call < MAX_SCROLL_CALLS; call++) {
+            if (!(await this.stillRunning(runId))) return "paused";
+            const more = await ask<{ listings: JdListing[]; total: number; ended: boolean; nextUrl: string | null; block: JdBlock | null }>(tabId, {
+              type: "JD_SCROLL",
+              since: shown,
+              want: shown + (max - list.listings.length),
+              maxMs: SCROLL_CALL_MS,
+            });
+            if (more.block) return this.blocked(runId, more.block);
+            const added = addListings(list, more.listings, known);
+            pageAdded += added;
+            shown = more.total;
+            if (more.nextUrl) list.nextUrl = more.nextUrl;
+            if (added > 0) {
+              await saveList(runId, list);
+              await this.log(runId, "info", `Scrolled down: +${added} businesses (${list.listings.length} of ${max})`);
+            }
+            // The page decides when the list ended (several calm rounds with nothing new).
+            if (more.ended) break;
+          }
+        } catch (err) {
+          // The list stopped loading (page did not answer, tab trouble…): carry on with what was
+          // read, unless nothing was read at all.
+          if (list.listings.length === 0) throw err;
+          stopReason = `the Justdial list stopped loading (${err instanceof Error ? err.message : String(err)})`;
+          break;
         }
-        const known = new Set(list.listings.map((l) => l.docid));
-        const fresh = page.listings.filter((l) => !known.has(l.docid));
-        list.listings.push(...fresh);
-        list.pages++;
-        list.nextUrl = page.nextUrl;
-        await saveList(runId, list);
-        await this.log(runId, "info", `List page ${list.pages}: ${fresh.length} businesses (${list.listings.length} so far)`);
-        if (list.listings.length >= max || !page.nextUrl || fresh.length === 0) break;
-        url = page.nextUrl;
+
+        if (list.listings.length >= max) break;
+        if (!list.nextUrl || list.nextUrl === url || pageAdded === 0) {
+          stopReason = "Justdial shows no more businesses for this search";
+          break;
+        }
+        // This page has no more: Justdial's next page (businesses already read are skipped).
+        url = list.nextUrl;
+        list.url = null;
         await sleep(PAGE_DELAY_MS);
       }
+      if (list.listings.length > 0 && list.listings.length < max) {
+        await this.log(runId, "warning", `${stopReason ?? "Justdial shows no more businesses"}: ${list.listings.length} of ${max} found. Moving on to the business pages.`);
+      }
       list.done = true;
+      list.url = null;
       await saveList(runId, list);
       if (list.listings.length === 0) await this.log(runId, "warning", "Justdial showed no businesses for this search");
+      else await this.log(runId, "success", `List ready: ${Math.min(list.listings.length, max)} businesses to read`);
     }
 
     // 2. Each business.
@@ -301,8 +377,17 @@ export class JustdialRunner {
       let profile: JdProfile | null = null;
       if (isOn(settings.jdOpenProfiles) && l.profileUrl) {
         const pressShowNumber = reveal && !l.phone && (await revealsLeft()) > 0;
-        await open(tabId, l.profileUrl);
-        const res = await ask<{ profile: JdProfile | null; block: JdBlock | null }>(tabId, { type: "JD_PROFILE", reveal: pressShowNumber });
+        let res: { profile: JdProfile | null; block: JdBlock | null };
+        try {
+          await open(tabId, l.profileUrl);
+          res = await ask<{ profile: JdProfile | null; block: JdBlock | null }>(tabId, { type: "JD_PROFILE", reveal: pressShowNumber });
+        } catch (err) {
+          // The job's tab is gone: that stops the job. One page that did not load: keep what the
+          // list showed for this business and go on with the next one.
+          if (!(await chrome.tabs.get(tabId).then(() => true, () => false))) throw err;
+          await this.log(runId, "warning", `${l.name}: business page did not load (${err instanceof Error ? err.message : String(err)}); saved with the list details`);
+          res = { profile: null, block: null };
+        }
         if (pressShowNumber) await countReveal();
         if (res.block === "login") {
           reveal = false;
@@ -329,7 +414,8 @@ export class JustdialRunner {
       await addProcessedKey(runId, key);
       await this.deps.updateState((st) => (st.runId === runId ? applyListing({ ...st, lastHeartbeatAt: Date.now() }, lead) : null));
       if (maps) await this.log(runId, "info", `↳ Google Maps: ${maps.name}${maps.phone ? " (phone)" : ""}${maps.website ? " (website)" : ""}`);
-      await sleep(PROFILE_DELAY_MS);
+      // Pause before the next business page: from the Slow ↔ Fast slider (can change mid-job).
+      await sleep(paceOf(await loadJdSpeed().catch(() => undefined)).profileDelay);
     }
     return "completed";
   }

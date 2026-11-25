@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Maps Data Collector",
-  "version": "0.3.1",
+  "version": "0.3.7",
   "description": "Collects publicly visible Google Maps and Justdial listing information into your lead database.",
   "minimum_chrome_version": "116",
   "action": {

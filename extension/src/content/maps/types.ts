@@ -27,7 +27,8 @@ export interface ExtractedListing {
   name: string;
   category: string | null;
   phone: string | null;
-  email: null;
+  /** Google Maps never shows one; a Justdial profile sometimes does */
+  email: string | null;
   website: string | null;
   address: string | null;
   city: string | null;

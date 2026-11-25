@@ -2,13 +2,13 @@
 import { defaultCollectorSettings } from "@platform/shared";
 import { describe, expect, it } from "vitest";
 import { bestMapsMatch, distanceM, nameSimilarity } from "../src/background/jdMatch";
-import { composeLead } from "../src/background/justdialRunner";
+import { addListings, composeLead } from "../src/background/justdialRunner";
 import { justdialSearchUrl, parseListingResponse } from "../src/content/justdial/listing";
-import { detectBlock, digitsOf, readProfile } from "../src/content/justdial/profile";
+import { detectBlock, digitsOf, emailOf, readProfile } from "../src/content/justdial/profile";
 import type { SearchPlace } from "../src/content/maps/searchData";
 
 // Shaped like justdial.com's /api/resultsPageListing answer (columns + rows), 2026-11-20.
-const COLUMNS = ["docid", "name", "NewAddress", "lat", "lon", "compRating", "area", "type", "VNumber", "totalReviews", "city", "thumbnail", "totJdReviews", "weburl", "pincode"];
+const COLUMNS = ["docid", "name", "NewAddress", "lat", "lon", "compRating", "area", "type", "VNumber", "totalReviews", "city", "thumbnail", "totJdReviews", "weburl", "pincode", "wpnumber"];
 const row = (i: number, extra: Partial<Record<string, unknown>> = {}) => {
   const v: Record<string, unknown> = {
     docid: `011PXX11.XX11.17052${i}.U7L2`,
@@ -26,6 +26,7 @@ const row = (i: number, extra: Partial<Record<string, unknown>> = {}) => {
     totJdReviews: "209",
     weburl: `Delhi/The-Global-Exposure/011PXX11-XX11-13051712461${i}-T2P4_BZDET`,
     pincode: "110026",
+    wpnumber: [],
     ...extra,
   };
   return COLUMNS.map((c) => v[c]);
@@ -50,8 +51,12 @@ describe("Justdial result list", () => {
       profileUrl: "https://www.justdial.com/Delhi/The-Global-Exposure/011PXX11-XX11-130517124611-T2P4_BZDET",
       thumbnail: "https://content.jdmagicbox.com/comp/def_content/visa.jpg",
       phone: null,
+      whatsapp: null,
     });
     expect(second).toMatchObject({ phone: "07947124983", rating: null, latitude: null });
+    // The number on the green call button (VNumber) and a WhatsApp number, as of 2026-11-25.
+    const [third] = parseListingResponse(answer([row(3, { VNumber: "08105177352", wpnumber: ["9810012345"] })]));
+    expect(third).toMatchObject({ phone: "08105177352", whatsapp: "9810012345" });
   });
 
   it("ignores anything that is not a result list, and rows without a name", () => {
@@ -97,7 +102,17 @@ describe("Justdial business page", () => {
         "https://content.jdmagicbox.com/v2/comp/delhi/p4/011pxx11.xx11.130517124611.t2p4/catalogue/b.jpg",
       ],
       phone: null,
+      email: null,
     });
+  });
+
+  it("reads an email the page shows, never Justdial's own", () => {
+    document.body.innerHTML = `<h1>Shop</h1><div>Email</div><div>Sales.Team@Shop-India.co.in</div><footer><a href="mailto:feedback@justdial.com">Feedback</a></footer>`;
+    expect(emailOf(document)).toBe("sales.team@shop-india.co.in");
+    document.body.innerHTML = `<h1>Shop</h1><a href="mailto:owner%40shop.in?subject=Hi">Mail us</a><img alt="logo@2x.png">`;
+    expect(emailOf(document)).toBe("owner@shop.in");
+    document.body.innerHTML = `<h1>Shop</h1><div>Send Enquiry by Email</div><a href="mailto:care@justdial.com">care</a>`;
+    expect(emailOf(document)).toBeNull();
   });
 
   it("reads a number once it is shown, and recognises blocks", () => {
@@ -150,12 +165,13 @@ describe("matching a Justdial business on Google Maps", () => {
 describe("one lead from Justdial + Google Maps", () => {
   it("prefers the Maps phone and keeps Justdial's own details", () => {
     const [l] = parseListingResponse(answer([row(1, { VNumber: "07947124983" })]));
-    const profile = { name: "The Global Exposure", address: "19 NWA, Club Road, Punjabi Bagh Extension, Delhi-110026", website: null, established: "1999", hours: "Open until 7:00 pm", photos: ["https://content.jdmagicbox.com/v2/comp/a.jpg"], phone: null };
+    const profile = { name: "The Global Exposure", address: "19 NWA, Club Road, Punjabi Bagh Extension, Delhi-110026", website: null, established: "1999", hours: "Open until 7:00 pm", photos: ["https://content.jdmagicbox.com/v2/comp/a.jpg"], phone: null, email: "info@theglobalexposure.com" };
     const { lead, justdial } = composeLead(l!, profile, place({}), { keyword: "Study Visa Consultants", location: "Delhi", fields: defaultCollectorSettings().fields });
     expect(lead).toMatchObject({
       name: "The Global Exposure",
       category: "Visa Assistance",
       phone: "01145012345",
+      email: "info@theglobalexposure.com",
       website: "https://theglobalexposure.com/",
       address: "19 NWA, Club Road, Punjabi Bagh Extension, Delhi-110026",
       city: "New Delhi", // from the Maps address
@@ -177,5 +193,23 @@ describe("one lead from Justdial + Google Maps", () => {
     const { lead, justdial } = composeLead({ ...l!, phone: "07947000000" }, null, null, { keyword: "k", location: "Delhi", fields });
     expect(lead).toMatchObject({ phone: null, address: "Punjabi Bagh Extension", city: "Delhi", postalCode: "110026", mapsUrl: null, placeId: null });
     expect(justdial).toMatchObject({ mapsMatched: false, jdPhone: "07947000000", photos: ["https://content.jdmagicbox.com/comp/def_content/visa.jpg"] });
+  });
+
+  it("falls back to the card's number, then the WhatsApp number", () => {
+    const [l] = parseListingResponse(answer([row(4, { VNumber: "", wpnumber: ["9810012345"] })]));
+    const ctx = { keyword: "k", location: "Delhi", fields: defaultCollectorSettings().fields };
+    expect(composeLead(l!, null, null, ctx).lead.phone).toBe("9810012345");
+    expect(composeLead({ ...l!, phone: "08105177352" }, null, null, ctx).lead.phone).toBe("08105177352");
+  });
+});
+
+describe("scrolling the Justdial list", () => {
+  it("adds only businesses not read yet, in the order Justdial showed them", () => {
+    const list = { listings: parseListingResponse(answer([row(1), row(2)])), nextUrl: null, pages: 1, done: false };
+    const known = new Set(list.listings.map((l) => l.docid));
+    // The next scroll answer repeats one business and brings two new ones.
+    expect(addListings(list, parseListingResponse(answer([row(2), row(3), row(4)])), known)).toBe(2);
+    expect(addListings(list, parseListingResponse(answer([row(4)])), known)).toBe(0);
+    expect(list.listings.map((l) => l.name)).toEqual(["The Global Exposure", "Visa Desk 2", "Visa Desk 3", "Visa Desk 4"]);
   });
 });

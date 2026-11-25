@@ -129,7 +129,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
                 : "When the search finishes, leads whose website shows an email go into an email campaign with this template, sent from your sender with an unsubscribe link."}
             </small>
           </label>
-          <small className="hint">Runs in a tab behind yours, page by page with pauses. Justdial does not allow automated collection, so your Justdial access is at your own risk; the job stops if Justdial shows a security check.</small>
+          <small className="hint">Opens Justdial in its own tab and scrolls the list by itself until Maximum Records; set the pace with the speed slider below. Justdial does not allow automated collection, so your Justdial access is at your own risk; the job stops if Justdial shows a security check.</small>
         </div>
       ) : (
       <>

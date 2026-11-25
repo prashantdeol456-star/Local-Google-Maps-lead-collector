@@ -4,6 +4,7 @@ import type { BackendStatus } from "../../storage/auth";
 import { ActivityLog } from "../components/ActivityLog";
 import { BackendStatusBar } from "../components/BackendStatusBar";
 import { Controls } from "../components/Controls";
+import { JdSpeedControl } from "../components/JdSpeedControl";
 import { PageStatus } from "../components/PageStatus";
 import { QueueBar } from "../components/QueueBar";
 import { RecentListings } from "../components/RecentListings";
@@ -89,6 +90,7 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
         onChange={setSettings}
         onOpenSearch={openSearch}
       />
+      {(active ? state.jobSettings?.source : settings.source) === "justdial" && <JdSpeedControl />}
 
       <Controls status={state.status} canStart={canStart} busy={busy} onCommand={run} />
       {error && (

@@ -10,12 +10,37 @@ export interface JdProfile {
   hours: string | null;
   photos: string[];
   phone: string | null;
+  /** Email shown on the page (most profiles show none: only an enquiry form, which is never used) */
+  email: string | null;
 }
 
 export type JdBlock = "captcha" | "access_denied" | "login";
 
 const NOT_WEBSITES = /(^|\.)(justdial\.com|jdmagicbox\.com|google\.[a-z.]+|facebook\.com|instagram\.com|twitter\.com|x\.com|youtube\.com|linkedin\.com|apple\.com|whatsapp\.com|wa\.me)$/i;
 const PHONE = /(?:\+91[\s-]?)?0?\d[\d\s-]{8,13}\d/;
+const EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/gi;
+/** Addresses that belong to Justdial or are not real mailboxes. */
+const NOT_EMAILS = /(@|\.)(justdial\.com|jdmagicbox\.com|jdsoftware\.com|example\.(com|in)|sentry\.io|wixpress\.com)$|\.(png|jpe?g|gif|webp|svg)$/i;
+
+/** The business's email, when the page shows one (an email link, or an address in the text). */
+export function emailOf(doc: Document): string | null {
+  const candidates: string[] = [];
+  for (const a of doc.querySelectorAll<HTMLAnchorElement>("a[href^='mailto:' i]")) {
+    const raw = a.getAttribute("href")!.replace(/^mailto:/i, "").split("?")[0]!;
+    try {
+      candidates.push(decodeURIComponent(raw));
+    } catch {
+      candidates.push(raw);
+    }
+  }
+  const text = (doc.body as HTMLElement | null)?.innerText ?? doc.body?.textContent ?? "";
+  candidates.push(...(text.match(EMAIL) ?? []));
+  for (const c of candidates) {
+    const email = c.trim().toLowerCase();
+    if (/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email) && !NOT_EMAILS.test(email)) return email;
+  }
+  return null;
+}
 
 function lines(doc: Document): string[] {
   const text = (doc.body as HTMLElement | null)?.innerText ?? doc.body?.textContent ?? "";
@@ -91,8 +116,10 @@ export function readProfile(doc: Document): JdProfile {
     hours,
     photos,
     phone: shown,
+    email: emailOf(doc),
   };
 }
+
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

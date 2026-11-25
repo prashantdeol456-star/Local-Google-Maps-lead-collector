@@ -1,12 +1,15 @@
 // Runs inside Justdial pages (MAIN world, from document_start) so it can see the result lists
-// Justdial loads for a search (/api/resultsPageListing). It only passes copies of those answers
+// Justdial loads for a search (/api/resultsPageListing, by XMLHttpRequest). It only passes copies of those answers
 // to the extension's own content script on the same tab; it changes nothing on the page and
 // sends nothing anywhere. Bundled on its own (IIFE).
 
 (() => {
   const TAG = "jd-collector-tap";
-  const MAX_BUFFER = 60;
+  // Answers kept only until the extension's content script has started (it then says "ack");
+  // after that each answer is passed on and forgotten, so a long scroll does not pile up memory.
+  const MAX_BUFFER = 10;
   const buffer: string[] = [];
+  let acked = false;
   const w = window as unknown as { __jdCollectorTap?: boolean };
   if (w.__jdCollectorTap) return;
   w.__jdCollectorTap = true;
@@ -15,8 +18,10 @@
 
   function publish(text: string) {
     if (!text || text[0] !== "{") return;
-    buffer.push(text);
-    if (buffer.length > MAX_BUFFER) buffer.shift();
+    if (!acked) {
+      buffer.push(text);
+      if (buffer.length > MAX_BUFFER) buffer.shift();
+    }
     window.postMessage({ source: TAG, kind: "listing", text }, location.origin);
   }
 
@@ -40,21 +45,16 @@
     return (send as (...a: unknown[]) => void).apply(this, args);
   } as typeof XMLHttpRequest.prototype.send;
 
-  const originalFetch = window.fetch;
-  window.fetch = async function (...args: Parameters<typeof fetch>) {
-    const res = await originalFetch.apply(this, args);
-    try {
-      const input = args[0];
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      if (isListing(url)) res.clone().text().then(publish, () => {});
-    } catch {
-      /* ignore */
-    }
-    return res;
-  };
+  // Justdial loads its result lists with XMLHttpRequest (checked 2026-11-25), so fetch() is left
+  // alone: wrapping it made Chrome list Justdial's own failed requests (ads, trackers) as this
+  // extension's errors.
 
   window.addEventListener("message", (e) => {
-    if (e.source !== window || e.data?.source !== TAG || e.data.kind !== "replay") return;
-    for (const text of buffer) window.postMessage({ source: TAG, kind: "listing", text }, location.origin);
+    if (e.source !== window || e.data?.source !== TAG) return;
+    if (e.data.kind === "replay") for (const text of buffer) window.postMessage({ source: TAG, kind: "listing", text }, location.origin);
+    if (e.data.kind === "ack") {
+      acked = true;
+      buffer.length = 0;
+    }
   });
 })();

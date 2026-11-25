@@ -220,3 +220,7 @@ body {
 .log__item--warning .log__icon { color: var(--warn); }
 .log__item--error .log__icon { color: var(--bad); }
 .log__item--info .log__icon { color: var(--primary); }
+
+/* Justdial Slow ↔ Fast slider */
+.jd-speed__row { display: flex; align-items: center; gap: 8px; }
+.jd-speed__row input[type="range"] { flex: 1; accent-color: var(--primary); padding: 0; border: 0; }
