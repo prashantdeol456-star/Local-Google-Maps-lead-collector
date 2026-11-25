@@ -93,6 +93,7 @@ describe("connected social accounts", () => {
     expect(res.json()).toEqual({
       meta: { configured: true, redirectUri: "http://localhost:3000/api/oauth/callback/meta", scopes: ["pages_show_list", "instagram_basic"], graphVersion: "v26.0" },
       linkedin: { configured: true, redirectUri: "http://localhost:3000/api/oauth/callback/linkedin", scopes: ["openid", "profile", "email", "w_member_social"] },
+      google: { configured: false, redirectUri: "http://localhost:3000/api/oauth/callback/google", scopes: [] },
     });
   });
 
