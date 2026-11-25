@@ -23,6 +23,9 @@ export const DEFAULT_META_SCOPES = [
   "instagram_manage_messages",
 ];
 
+/** YouTube: read the channel's comments and subscribers, and reply to comments. */
+export const DEFAULT_GOOGLE_SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"];
+
 /** "Sign In with LinkedIn using OpenID Connect" + "Share on LinkedIn" products. */
 export const DEFAULT_LINKEDIN_SCOPES = ["openid", "profile", "email", "w_member_social"];
 
@@ -34,6 +37,8 @@ const SocialEnv = z.object({
   LINKEDIN_CLIENT_ID: text,
   LINKEDIN_CLIENT_SECRET: text,
   LINKEDIN_SCOPES: text,
+  GOOGLE_CLIENT_ID: z.preprocess(empty, z.string().trim().regex(/\.apps\.googleusercontent\.com$/, "must end with .apps.googleusercontent.com").optional()),
+  GOOGLE_CLIENT_SECRET: text,
   /** Address the browser uses for this backend; the OAuth redirect URIs are built from it. */
   SOCIAL_REDIRECT_BASE_URL: z.preprocess(empty, z.url().optional()),
 });
@@ -41,6 +46,8 @@ const SocialEnv = z.object({
 export interface SocialConfig {
   meta: { appId: string; appSecret: string; graphVersion: string; scopes: string[] } | null;
   linkedin: { clientId: string; clientSecret: string; scopes: string[] } | null;
+  /** Google Cloud OAuth client (YouTube Data API) */
+  google?: { clientId: string; clientSecret: string; scopes: string[] } | null;
   /** e.g. http://localhost:3000 (no trailing slash) */
   redirectBaseUrl: string;
 }
@@ -69,6 +76,7 @@ export function parseSocialConfig(env: Record<string, string | undefined>, fallb
     linkedin: e.LINKEDIN_CLIENT_ID
       ? { clientId: e.LINKEDIN_CLIENT_ID, clientSecret: e.LINKEDIN_CLIENT_SECRET!, scopes: list(e.LINKEDIN_SCOPES, DEFAULT_LINKEDIN_SCOPES) }
       : null,
+    google: e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET ? { clientId: e.GOOGLE_CLIENT_ID, clientSecret: e.GOOGLE_CLIENT_SECRET, scopes: DEFAULT_GOOGLE_SCOPES } : null,
     redirectBaseUrl: (e.SOCIAL_REDIRECT_BASE_URL ?? fallbackBase).replace(/\/+$/, ""),
   };
 }

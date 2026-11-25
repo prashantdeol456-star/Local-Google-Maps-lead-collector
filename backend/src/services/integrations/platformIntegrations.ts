@@ -5,12 +5,12 @@
 
 import { z } from "zod";
 import type { PrismaClient } from "../../database/client.js";
-import { DEFAULT_LINKEDIN_SCOPES, DEFAULT_META_SCOPES, type SocialConfig } from "../../providers/social/config.js";
+import { DEFAULT_GOOGLE_SCOPES, DEFAULT_LINKEDIN_SCOPES, DEFAULT_META_SCOPES, type SocialConfig } from "../../providers/social/config.js";
 import { Errors } from "../../utils/errors.js";
 import type { SecretBox } from "../../utils/secretBox.js";
 import { RazorpayClient, razorpayMode, type RazorpayKeys } from "../billing/razorpay.js";
 
-export const PLATFORM_PROVIDERS = ["razorpay", "meta", "linkedin"] as const;
+export const PLATFORM_PROVIDERS = ["razorpay", "meta", "linkedin", "google"] as const;
 export type PlatformProvider = (typeof PLATFORM_PROVIDERS)[number];
 
 const id = (re: RegExp, msg: string) => z.string().trim().regex(re, msg);
@@ -21,18 +21,21 @@ const Inputs = {
   razorpay: z.object({ keyId: id(/^rzp_(test|live)_[A-Za-z0-9]+$/, "Key ID starts with rzp_test_ or rzp_live_"), keySecret: secret, webhookSecret: secret }),
   meta: z.object({ appId: id(/^\d{5,25}$/, "App ID is a number"), appSecret: secret }),
   linkedin: z.object({ clientId: id(/^[A-Za-z0-9]{6,50}$/, "Client ID: letters and digits"), clientSecret: secret }),
+  google: z.object({ clientId: id(/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/, "Client ID ends with .apps.googleusercontent.com"), clientSecret: secret }),
 };
 type Stored = {
   razorpay: { keyId: string; keySecret: string; webhookSecret: string };
   meta: { appId: string; appSecret: string };
   linkedin: { clientId: string; clientSecret: string };
+  google: { clientId: string; clientSecret: string };
 };
-const REQUIRED_SECRETS: Record<PlatformProvider, string[]> = { razorpay: ["keySecret"], meta: ["appSecret"], linkedin: ["clientSecret"] };
+const REQUIRED_SECRETS: Record<PlatformProvider, string[]> = { razorpay: ["keySecret"], meta: ["appSecret"], linkedin: ["clientSecret"], google: ["clientSecret"] };
 
 export interface PlatformEnv {
   razorpay: RazorpayKeys | null;
   meta: SocialConfig["meta"];
   linkedin: SocialConfig["linkedin"];
+  google?: SocialConfig["google"];
   metaGraphVersion: string;
 }
 
@@ -67,6 +70,8 @@ export class PlatformIntegrations {
     this.social.meta = m ? { appId: m.appId, appSecret: m.appSecret, graphVersion: this.env.meta?.graphVersion ?? this.env.metaGraphVersion, scopes: this.env.meta?.scopes ?? DEFAULT_META_SCOPES } : this.env.meta;
     const l = this.stored.linkedin;
     this.social.linkedin = l ? { clientId: l.clientId, clientSecret: l.clientSecret, scopes: this.env.linkedin?.scopes ?? DEFAULT_LINKEDIN_SCOPES } : this.env.linkedin;
+    const g = this.stored.google;
+    this.social.google = g ? { clientId: g.clientId, clientSecret: g.clientSecret, scopes: DEFAULT_GOOGLE_SCOPES } : (this.env.google ?? null);
   }
 
   razorpay(): RazorpayKeys | null {
@@ -97,6 +102,7 @@ export class PlatformIntegrations {
       },
       meta: { source: source("meta", !!this.env.meta), appId: this.social.meta?.appId ?? null, redirectUrl: this.url("/api/oauth/callback/meta") },
       linkedin: { source: source("linkedin", !!this.env.linkedin), clientId: this.social.linkedin?.clientId ?? null, redirectUrl: this.url("/api/oauth/callback/linkedin") },
+      google: { source: source("google", !!this.env.google), clientId: this.social.google?.clientId ?? null, redirectUrl: this.url("/api/oauth/callback/google") },
     };
   }
 

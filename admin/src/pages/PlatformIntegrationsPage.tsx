@@ -4,7 +4,7 @@ import { ErrorBox, PageHeader, Spinner } from "../components/ui";
 import { api } from "../lib/api";
 import { Link } from "../lib/router";
 
-// Super admin: every integration in one place. Razorpay, the Meta app and the LinkedIn app are
+// Super admin: every integration in one place. Razorpay, the Meta app, the LinkedIn app and the Google (YouTube) app are
 // entered here (stored encrypted, active immediately); the rest shows where it is set up.
 
 type Source = "panel" | "env" | null;
@@ -12,6 +12,7 @@ interface Status {
   razorpay: { source: Source; keyId: string | null; mode: "test" | "live" | null; webhookSecretSet: boolean; webhookUrl: string };
   meta: { source: Source; appId: string | null; redirectUrl: string };
   linkedin: { source: Source; clientId: string | null; redirectUrl: string };
+  google: { source: Source; clientId: string | null; redirectUrl: string };
 }
 
 function Badge({ source }: { source: Source }) {
@@ -59,7 +60,7 @@ interface Field {
   placeholder?: string;
 }
 
-function KeysForm({ provider, fields, saved, extra }: { provider: "razorpay" | "meta" | "linkedin"; fields: Field[]; saved: boolean; extra?: ReactNode }) {
+function KeysForm({ provider, fields, saved, extra }: { provider: "razorpay" | "meta" | "linkedin" | "google"; fields: Field[]; saved: boolean; extra?: ReactNode }) {
   const client = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.name, f.secret ? "" : (f.value ?? "")])));
   const done = (data: Status) => {
@@ -220,6 +221,32 @@ export function PlatformIntegrationsPage() {
               <div className="space-y-1">
                 <span className="label">Redirect URL</span>
                 <Copy value={s.linkedin.redirectUrl} />
+              </div>
+            }
+          />
+        </Card>
+
+        <Card
+          title="Google app (YouTube)"
+          source={s.google.source}
+          steps={[
+            <>console.cloud.google.com → create a project → APIs &amp; Services → Library → enable <b>YouTube Data API v3</b>.</>,
+            <>OAuth consent screen: External, add the scope <code>youtube.force-ssl</code> (customers' channels need Google's verification for this scope; your own channel works while you are a test user).</>,
+            <>Credentials → Create OAuth client ID → Web application → Authorized redirect URI: paste the Redirect URL below.</>,
+            <>Copy the <b>Client ID</b> and <b>Client secret</b> here and Save. Customers then connect their channel under Social Accounts.</>,
+          ]}
+        >
+          <KeysForm
+            provider="google"
+            saved={s.google.source === "panel"}
+            fields={[
+              { name: "clientId", label: "Client ID", value: s.google.clientId, placeholder: "1234567890-abc….apps.googleusercontent.com" },
+              { name: "clientSecret", label: "Client secret", secret: true },
+            ]}
+            extra={
+              <div className="space-y-1">
+                <span className="label">Redirect URL</span>
+                <Copy value={s.google.redirectUrl} />
               </div>
             }
           />

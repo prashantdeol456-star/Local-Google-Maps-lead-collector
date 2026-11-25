@@ -38,8 +38,9 @@ export class EngagementWorker {
 
   private async all() {
     if (!this.opts.ready()) return;
-    const accounts = await this.db.socialAccount.findMany({ where: { platform: { in: ["facebook_page", "instagram"] }, status: { not: "expired" } } });
+    const accounts = await this.db.socialAccount.findMany({ where: { platform: { in: ["facebook_page", "instagram", "youtube_channel"] }, status: { not: "expired" } } });
     for (const account of accounts) {
+      if (!this.engagement.canSync(account.platform)) continue; // its app (Meta / Google) is not set up
       if (account.tokenExpiresAt && account.tokenExpiresAt.getTime() <= Date.now()) continue;
       const owner = account.ownerId ? await this.db.adminUser.findUnique({ where: { id: account.ownerId } }) : null;
       if (account.ownerId && owner?.status !== "active") continue; // owner disabled or deleted

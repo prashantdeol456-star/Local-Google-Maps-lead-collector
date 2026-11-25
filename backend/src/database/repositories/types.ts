@@ -784,7 +784,7 @@ export interface CampaignLogRepository {
 
 // ---- Social accounts (OAuth) ----
 
-export type SocialPlatform = "facebook_page" | "instagram" | "linkedin";
+export type SocialPlatform = "facebook_page" | "instagram" | "linkedin" | "youtube_channel";
 
 export interface SocialAccountRecord {
   id: string;

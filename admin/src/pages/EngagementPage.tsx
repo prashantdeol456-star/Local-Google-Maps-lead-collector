@@ -11,7 +11,7 @@ import type { Page } from "../lib/types";
 // posts (read with the accounts connected under Social Accounts), as a live feed, a people list
 // and a list of posts. Reply to comments from here.
 
-type Platform = "facebook" | "instagram";
+type Platform = "facebook" | "instagram" | "youtube";
 
 interface Account {
   id: string;
@@ -38,7 +38,7 @@ interface PersonRef {
 interface Engagement {
   id: string;
   platform: Platform;
-  kind: "comment" | "reaction" | "share";
+  kind: "comment" | "reaction" | "share" | "subscribe";
   reactionType: string | null;
   text: string | null;
   parentExternalId: string | null;
@@ -63,6 +63,7 @@ interface Person {
   comments: number;
   reactions: number;
   shares: number;
+  subscribedAt: string | null;
   leadSignal: boolean;
   status: "new" | "lead" | "customer" | "ignore";
   notes: string | null;
@@ -91,6 +92,7 @@ interface Summary {
   comments: number;
   reactions: number;
   shares: number;
+  subscribers: number;
   today: number;
   unreplied: number;
 }
@@ -98,7 +100,7 @@ interface Summary {
 const PAGE_SIZE = 50;
 const REACTION: Record<string, string> = { LIKE: "👍", LOVE: "❤️", HAHA: "😆", WOW: "😮", SAD: "😢", ANGRY: "😡", CARE: "🤗", THANKFUL: "🌸", PRIDE: "🌈" };
 const STATUS_LABEL: Record<Person["status"], string> = { new: "New", lead: "Lead", customer: "Customer", ignore: "Ignore" };
-const platformIcon = (p: Platform) => (p === "instagram" ? "◎ Instagram" : "f Facebook");
+const platformIcon = (p: Platform) => (p === "instagram" ? "◎ Instagram" : p === "youtube" ? "▶ YouTube" : "f Facebook");
 
 function Avatar({ name, url }: { name: string; url: string | null }) {
   return url ? (
@@ -133,7 +135,7 @@ function Accounts() {
   if (!accounts.data.length)
     return (
       <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-        Connect your Facebook Page (and the Instagram Business account linked to it) under{" "}
+        Connect your Facebook Page (and the Instagram Business account linked to it) or your YouTube channel under{" "}
         <Link to="/social" className="font-medium underline">
           Social Accounts
         </Link>{" "}
@@ -151,7 +153,7 @@ function Accounts() {
             </p>
             <p className="text-xs text-slate-500">
               {a.syncedAt ? `Checked ${formatRelative(a.syncedAt)} · ${a.posts} post${a.posts === 1 ? "" : "s"}` : "Not read yet"}
-              {a.realtime && " · real-time on"}
+              {a.platform === "youtube" ? " · checked every 15 min (YouTube has no live updates)" : a.realtime && " · real-time on"}
             </p>
             {a.error && <p className="mt-1 text-xs text-red-600">{a.error}</p>}
             {sync.variables === a.id && sync.data && <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">{sync.data.added} new from {sync.data.posts} posts</p>}
@@ -187,7 +189,7 @@ function ReplyBox({ e, onDone }: { e: Engagement; onDone: () => void }) {
         if (text.trim()) send.mutate();
       }}
     >
-      <input className="input py-1 text-sm" placeholder={`Reply as your ${e.platform === "instagram" ? "Instagram account" : "Page"}…`} value={text} maxLength={2000} onChange={(ev) => setText(ev.target.value)} aria-label="Reply" />
+      <input className="input py-1 text-sm" placeholder={`Reply as your ${e.platform === "instagram" ? "Instagram account" : e.platform === "youtube" ? "channel" : "Page"}…`} value={text} maxLength={2000} onChange={(ev) => setText(ev.target.value)} aria-label="Reply" />
       <button className="btn btn-primary px-3 py-1 text-sm" disabled={send.isPending || !text.trim()}>
         {send.isPending ? "Sending…" : "Reply"}
       </button>
@@ -207,6 +209,7 @@ function PrivateReply({ e, onDone }: { e: Engagement; onDone: () => void }) {
       onDone();
     },
   });
+  if (e.platform === "youtube") return null;
   if (e.privateReplyAt) return <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">✓ Private message sent {formatRelative(e.privateReplyAt)}</p>;
   if (Date.now() - new Date(e.occurredAt).getTime() > 7 * 24 * 3600_000) return null;
   if (!open)
@@ -257,6 +260,7 @@ function Activity({ platform }: { platform: string }) {
             ["comment", "Comments"],
             ["reaction", "Likes & reactions"],
             ["share", "Shares"],
+            ["subscribe", "Subscribers"],
           ].map(([id, label]) => (
             <button key={id || "all"} className={`btn px-3 py-1 text-sm ${kind === id ? "btn-primary" : ""}`} onClick={() => setSearchParams({ kind: id, page: null })}>
               {label}
@@ -294,7 +298,15 @@ function Activity({ platform }: { platform: string }) {
               <p className="flex flex-wrap items-center gap-x-2">
                 {e.person && <PersonName p={e.person} platform={e.platform} />}
                 <span className="text-slate-500">
-                  {e.kind === "comment" ? (e.parentExternalId ? "replied to a comment" : "commented") : e.kind === "share" ? "shared your post" : `reacted ${REACTION[e.reactionType ?? "LIKE"] ?? e.reactionType}`}
+                  {e.kind === "comment"
+                    ? e.parentExternalId
+                      ? "replied to a comment"
+                      : "commented"
+                    : e.kind === "share"
+                      ? "shared your post"
+                      : e.kind === "subscribe"
+                        ? "subscribed to your channel"
+                        : `reacted ${REACTION[e.reactionType ?? "LIKE"] ?? e.reactionType}`}
                 </span>
                 <span className="text-xs text-slate-400">
                   {platformIcon(e.platform)} · {formatRelative(e.occurredAt)}
@@ -302,7 +314,7 @@ function Activity({ platform }: { platform: string }) {
                 {e.leadSignal && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Looks like a lead</span>}
               </p>
               {e.text && <p className="mt-1 whitespace-pre-wrap break-words">{e.text}</p>}
-              {e.post && (
+              {e.post && e.kind !== "subscribe" && (
                 <p className="mt-1 line-clamp-1 text-xs text-slate-500">
                   on{" "}
                   {e.post.permalink ? (
@@ -364,6 +376,7 @@ function PersonRow({ p }: { p: Person }) {
       </td>
       <td className="px-4 py-2 whitespace-nowrap tabular-nums">
         💬 {p.comments} · 👍 {p.reactions} · ↗ {p.shares}
+        {p.subscribedAt && <span className="ml-1 rounded bg-red-50 px-1.5 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">▶ Subscribed</span>}
       </td>
       <td className="max-w-xs px-4 py-2 text-xs">
         {p.leadSignal && <span className="mb-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Looks like a lead</span>}
@@ -624,7 +637,7 @@ export function EngagementPage() {
     <>
       <PageHeader
         title="Social Engagement"
-        subtitle="Everyone who comments, likes or shares your Facebook Page and Instagram posts, saved by itself with their name and ID."
+        subtitle="Everyone who comments, likes or shares your Facebook Page and Instagram posts, and who comments on or subscribes to your YouTube channel, saved by itself with their name and ID."
       />
       {superAdmin && <Setup />}
       <Accounts />
@@ -632,7 +645,7 @@ export function EngagementPage() {
         <StatCard label="People" value={s?.people} icon="☺" />
         <StatCard label="Look like leads" value={s?.leads} icon="★" tone="amber" />
         <StatCard label="Comments not answered" value={s?.unreplied} icon="💬" tone="red" />
-        <StatCard label="Last 24 hours" value={s?.today} hint={s ? `${s.comments} comments · ${s.reactions} reactions · ${s.shares} shares in all` : undefined} icon="↻" tone="green" />
+        <StatCard label="Last 24 hours" value={s?.today} hint={s ? `${s.comments} comments · ${s.reactions} reactions · ${s.shares} shares · ${s.subscribers} subscribers in all` : undefined} icon="↻" tone="green" />
       </div>
       <div className="card">
         <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 p-3 dark:border-slate-800">
@@ -646,9 +659,10 @@ export function EngagementPage() {
             </button>
           ))}
           <select className="input ml-auto w-auto py-1 text-sm" value={platform} onChange={(e) => setSearchParams({ platform: e.target.value, page: null })} aria-label="Platform">
-            <option value="">Facebook + Instagram</option>
+            <option value="">All platforms</option>
             <option value="facebook">Facebook only</option>
             <option value="instagram">Instagram only</option>
+            <option value="youtube">YouTube only</option>
           </select>
         </div>
         {postId ? <PostActivity postId={postId} /> : tab === "people" ? <People platform={platform} /> : tab === "posts" ? <Posts platform={platform} /> : <Activity platform={platform} />}

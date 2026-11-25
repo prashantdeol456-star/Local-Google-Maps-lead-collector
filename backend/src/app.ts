@@ -74,6 +74,7 @@ import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
 import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
 import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
 import { MetaEngagementApi } from "./services/engagement/metaEngagement.js";
+import { YouTubeApi } from "./services/engagement/youtube.js";
 import { WebhookWorker } from "./jobs/webhookWorker.js";
 import { MaintenanceWorker } from "./jobs/maintenanceWorker.js";
 import { IntegrationService } from "./services/integrations/integrationService.js";
@@ -196,6 +197,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     razorpay: razorpayFromEnv(process.env),
     meta: config.social.meta,
     linkedin: config.social.linkedin,
+    google: config.social.google,
     metaGraphVersion: process.env.META_GRAPH_VERSION || "v26.0",
   }, { publicBaseUrl: config.publicBaseUrl, fetch: razorpayFetch });
   await platform.load();
@@ -211,6 +213,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     social,
     bus,
     meta: () => socialConfig.meta,
+    youtube: new YouTubeApi(socialFetch ?? fetch),
+    google: () => socialConfig.google,
     verifyToken: engagementVerifyToken(config.sessionSecret),
     publicBaseUrl: config.publicBaseUrl,
     onMessages: (ids) => inboxWorker.pollAccountsSoon(ids),
@@ -218,7 +222,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   });
   const engagementWorker = new EngagementWorker(db, engagement, {
     intervalMinutes: Number(process.env.ENGAGEMENT_POLL_MINUTES ?? 15),
-    ready: metaReady,
+    ready: () => true,
     log: (msg) => app.log.warn(msg),
   });
   const integrations = new IntegrationService(repos, webhookSecrets, bus, (msg) => app.log.error(msg));

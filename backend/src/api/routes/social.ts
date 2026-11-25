@@ -4,7 +4,7 @@ import { OAuthError, type SocialService } from "../../services/social/socialServ
 import { requireSession } from "../middleware/auth.js";
 import { IdParams, parse } from "../validation.js";
 
-const Provider = z.object({ provider: z.enum(["meta", "linkedin"]) });
+const Provider = z.object({ provider: z.enum(["meta", "linkedin", "google"]) });
 
 const CallbackQuery = z
   .object({

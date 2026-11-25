@@ -7,7 +7,8 @@ import { setSearchParams, useSearchParams } from "../lib/router";
 // Facebook Pages, Instagram professional accounts and LinkedIn profiles connected with each
 // platform's own login (OAuth). Passwords are typed only on facebook.com / linkedin.com.
 
-type Platform = "facebook_page" | "instagram" | "linkedin";
+type Platform = "facebook_page" | "instagram" | "linkedin" | "youtube_channel";
+type Provider = "meta" | "linkedin" | "google";
 
 interface SocialAccount {
   id: string;
@@ -28,12 +29,20 @@ interface SocialAccount {
 interface Providers {
   meta: { configured: boolean; redirectUri: string; scopes: string[]; graphVersion: string | null };
   linkedin: { configured: boolean; redirectUri: string; scopes: string[] };
+  google: { configured: boolean; redirectUri: string; scopes: string[] };
 }
 
 const PLATFORM: Record<Platform, { label: string; icon: string; tone: string }> = {
   facebook_page: { label: "Facebook Page", icon: "f", tone: "bg-[#1877F2] text-white" },
   instagram: { label: "Instagram", icon: "◎", tone: "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white" },
   linkedin: { label: "LinkedIn", icon: "in", tone: "bg-[#0A66C2] text-white" },
+  youtube_channel: { label: "YouTube", icon: "▶", tone: "bg-[#FF0000] text-white" },
+};
+
+const CARD: Record<Provider, { title: string; text: string; button: string; platform: Platform }> = {
+  meta: { title: "Facebook & Instagram", text: "One login connects every Facebook Page you manage and the Instagram Business/Creator account linked to each.", button: "Connect with Facebook", platform: "facebook_page" },
+  linkedin: { title: "LinkedIn", text: "Connects your LinkedIn profile (name, photo, email) and lets the platform post as you.", button: "Connect with LinkedIn", platform: "linkedin" },
+  google: { title: "YouTube", text: "Connects your YouTube channel with your Google login: comments and subscribers then come to Social Engagement.", button: "Connect with Google", platform: "youtube_channel" },
 };
 
 const STATUS_TONE: Record<SocialAccount["status"], string> = {
@@ -89,7 +98,15 @@ function AccountRow({ a, onChanged }: { a: SocialAccount; onChanged: () => void 
   );
 }
 
-function SetupSteps({ provider, info }: { provider: "meta" | "linkedin"; info: Providers["meta"] | Providers["linkedin"] }) {
+function SetupSteps({ provider, info }: { provider: Provider; info: { redirectUri: string } }) {
+  if (provider === "google") {
+    return (
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        The administrator sets up the Google app once on the Integrations page (Google Cloud project with the YouTube Data API, redirect URI{" "}
+        <code className="break-all">{info.redirectUri}</code>).
+      </p>
+    );
+  }
   if (provider === "meta") {
     return (
       <ol className="list-inside list-decimal space-y-1 text-sm text-slate-600 dark:text-slate-300">
@@ -128,36 +145,32 @@ function SetupSteps({ provider, info }: { provider: "meta" | "linkedin"; info: P
   );
 }
 
-function ConnectCard({ provider, info }: { provider: "meta" | "linkedin"; info: Providers["meta"] | Providers["linkedin"] }) {
+function ConnectCard({ provider, info }: { provider: Provider; info: { configured: boolean; redirectUri: string; scopes: string[] } }) {
   const start = useMutation({
     mutationFn: () => api<{ url: string }>(`/social/connect/${provider}`, { method: "POST" }),
     onSuccess: ({ url }) => {
       window.location.href = url; // the platform's own login page
     },
   });
-  const isMeta = provider === "meta";
+  const card = CARD[provider];
   // The platform sends the browser back to the redirect URI: open the admin panel on that host so the session continues.
   const redirectOrigin = new URL(info.redirectUri).origin;
   const wrongHost = redirectOrigin !== window.location.origin;
   return (
     <section className="card space-y-4 p-5">
       <div className="flex items-center gap-3">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${PLATFORM[isMeta ? "facebook_page" : "linkedin"].tone}`} aria-hidden>
-          {isMeta ? "f" : "in"}
+        <span className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${PLATFORM[card.platform].tone}`} aria-hidden>
+          {PLATFORM[card.platform].icon}
         </span>
         <div>
-          <h2 className="font-medium">{isMeta ? "Facebook & Instagram" : "LinkedIn"}</h2>
-          <p className="text-sm text-slate-500">
-            {isMeta
-              ? "One login connects every Facebook Page you manage and the Instagram Business/Creator account linked to each."
-              : "Connects your LinkedIn profile (name, photo, email) and lets the platform post as you."}
-          </p>
+          <h2 className="font-medium">{card.title}</h2>
+          <p className="text-sm text-slate-500">{card.text}</p>
         </div>
       </div>
       {info.configured ? (
         <>
           <button className="btn btn-primary" disabled={start.isPending} onClick={() => start.mutate()}>
-            {start.isPending ? "Opening…" : isMeta ? "Connect with Facebook" : "Connect with LinkedIn"}
+            {start.isPending ? "Opening…" : card.button}
           </button>
           {wrongHost && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -194,7 +207,7 @@ export function SocialAccountsPage() {
 
   return (
     <>
-      <PageHeader title="Social Accounts" subtitle="Connect Facebook, Instagram and LinkedIn with their own login. Your passwords are never typed or stored here." />
+      <PageHeader title="Social Accounts" subtitle="Connect Facebook, Instagram, LinkedIn and YouTube with their own login. Your passwords are never typed or stored here." />
 
       {connected && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300" role="status">
@@ -224,6 +237,7 @@ export function SocialAccountsPage() {
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <ConnectCard provider="meta" info={providers.data.meta} />
           <ConnectCard provider="linkedin" info={providers.data.linkedin} />
+          <ConnectCard provider="google" info={providers.data.google} />
         </div>
       )}
 

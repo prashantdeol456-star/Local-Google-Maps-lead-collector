@@ -1462,9 +1462,9 @@ model SocialPost {
 model SocialPerson {
   id           String    @id @default(cuid())
   ownerId      String?
-  /// facebook | instagram
+  /// facebook | instagram | youtube
   platform     String
-  /// Their id on the platform (Page-scoped id on Facebook)
+  /// Their id on the platform (Page-scoped id on Facebook, channel id on YouTube)
   externalId   String
   name         String
   username     String?
@@ -1473,6 +1473,8 @@ model SocialPerson {
   comments     Int       @default(0)
   reactions    Int       @default(0)
   shares       Int       @default(0)
+  /// YouTube: subscribed to the channel (when their subscriptions are public)
+  subscribedAt DateTime?
   /// One of their comments looks like a question about buying (price, details, DM…)
   leadSignal   Boolean   @default(false)
   /// new | lead | customer | ignore
@@ -1500,7 +1502,7 @@ model SocialEngagement {
   /// SocialPerson id
   personId         String
   platform         String
-  /// comment | reaction | share
+  /// comment | reaction | share | subscribe (YouTube)
   kind             String
   /// Comment id, or "reaction:<post>:<person>", or the share's post id
   externalId       String

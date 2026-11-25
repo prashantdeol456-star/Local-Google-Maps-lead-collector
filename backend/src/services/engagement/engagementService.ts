@@ -23,11 +23,15 @@ import type { EventBus } from "../events.js";
 import { csvRow, UTF8_BOM } from "../export/csv.js";
 import type { SocialService } from "../social/socialService.js";
 import { EngagementApiError, type ApiComment, type ApiPerson, type MetaEngagementApi } from "./metaEngagement.js";
+import type { YouTubeApi } from "./youtube.js";
 
-export const ENGAGEMENT_PLATFORMS = ["facebook", "instagram"] as const;
+export const ENGAGEMENT_PLATFORMS = ["facebook", "instagram", "youtube"] as const;
 export type EngagementPlatform = (typeof ENGAGEMENT_PLATFORMS)[number];
 export const PERSON_STATUSES = ["new", "lead", "customer", "ignore"] as const;
-export const ENGAGEMENT_KINDS = ["comment", "reaction", "share"] as const;
+export const ENGAGEMENT_KINDS = ["comment", "reaction", "share", "subscribe"] as const;
+/** Pseudo post that holds a YouTube channel's subscribers (not listed under Posts). */
+const SUBSCRIBERS_POST = "_subscribers";
+const ENGAGEMENT_ACCOUNTS = ["facebook_page", "instagram", "youtube_channel"];
 
 /** Posts read on the first sync of an account, and on later ones. */
 const BACKFILL_POSTS = 50;
@@ -57,7 +61,7 @@ function readMeta(account: SocialAccount): AccountMeta {
   }
 }
 
-const platformOf = (account: SocialAccount): EngagementPlatform => (account.platform === "instagram" ? "instagram" : "facebook");
+const platformOf = (account: SocialAccount): EngagementPlatform => (account.platform === "instagram" ? "instagram" : account.platform === "youtube_channel" ? "youtube" : "facebook");
 
 export interface PublicAccountSync {
   id: string;
@@ -85,6 +89,9 @@ export class EngagementService {
       bus?: EventBus;
       /** The Meta app (Integrations page or .env), read each time: it can change. */
       meta: () => SocialConfig["meta"];
+      /** YouTube Data API client and the Google app (YouTube channels) */
+      youtube?: YouTubeApi;
+      google?: () => SocialConfig["google"];
       /** Typed on the Meta app's Webhooks page (shown to super admins in the Setup box). */
       verifyToken: string;
       publicBaseUrl: string | null;
@@ -104,7 +111,7 @@ export class EngagementService {
 
   /** Facebook Pages and Instagram accounts of the current user (all accounts for a super admin). */
   async accounts(): Promise<PublicAccountSync[]> {
-    const rows = await this.db.socialAccount.findMany({ where: { platform: { in: ["facebook_page", "instagram"] } }, orderBy: { createdAt: "asc" } });
+    const rows = await this.db.socialAccount.findMany({ where: { platform: { in: ENGAGEMENT_ACCOUNTS } }, orderBy: { createdAt: "asc" } });
     const counts = await this.db.socialPost.groupBy({ by: ["accountId"], _count: { _all: true } });
     const byAccount = new Map(counts.map((c) => [c.accountId, c._count._all]));
     return rows.map((a) => {
@@ -140,13 +147,20 @@ export class EngagementService {
     }
   }
 
+  /** True when the app for this kind of account is set up (Meta app / Google app). */
+  canSync(platform: string): boolean {
+    return platform === "youtube_channel" ? !!this.opts.youtube && !!this.opts.google?.() : !!this.opts.meta();
+  }
+
   /** Reads the latest posts of one account and, for posts that changed, who engaged. */
   async syncAccount(accountId: string): Promise<{ posts: number; added: number }> {
-    if (!this.opts.meta()) throw Errors.badRequest("Facebook login is not set up: the administrator adds the Meta app on the Integrations page");
     const account = await this.db.socialAccount.findUnique({ where: { id: accountId } });
-    if (!account || (account.platform !== "facebook_page" && account.platform !== "instagram")) throw Errors.notFound("Account not found");
+    if (!account || !ENGAGEMENT_ACCOUNTS.includes(account.platform)) throw Errors.notFound("Account not found");
+    if (!this.canSync(account.platform)) {
+      throw Errors.badRequest(account.platform === "youtube_channel" ? "YouTube login is not set up: the administrator adds the Google app on the Integrations page" : "Facebook login is not set up: the administrator adds the Meta app on the Integrations page");
+    }
     try {
-      const result = await this.syncAccountInner(account);
+      const result = account.platform === "youtube_channel" ? await this.syncYouTube(account) : await this.syncAccountInner(account);
       await this.saveSyncState(account, { syncedAt: this.now().toISOString(), error: null });
       return result;
     } catch (err) {
@@ -199,6 +213,102 @@ export class EngagementService {
     }
     if (platform === "instagram" && !meta.engagement?.realtime) await this.saveSyncState(account, { realtime: true });
     return { posts: posts.length, added };
+  }
+
+  private async googleToken(account: SocialAccount): Promise<string> {
+    try {
+      return await this.opts.social.googleAccessToken(account.id);
+    } catch (err) {
+      throw new EngagementApiError(err instanceof Error ? err.message : String(err), false);
+    }
+  }
+
+  /**
+   * A YouTube channel: its newest videos (counts), every new comment and reply with who wrote it,
+   * and its newest public subscribers. No webhooks on YouTube: this runs every few minutes.
+   */
+  private async syncYouTube(account: SocialAccount): Promise<{ posts: number; added: number }> {
+    const yt = this.opts.youtube!;
+    const token = await this.googleToken(account);
+    const first = !readMeta(account).engagement?.syncedAt;
+    const videos = await yt.videos(account.externalId, token, first ? BACKFILL_POSTS : RECENT_POSTS);
+    const postIds = new Map<string, SocialPost>();
+    for (const v of videos) {
+      const data = { message: v.message, permalink: v.permalink, imageUrl: v.imageUrl, postedAt: v.postedAt, commentCount: v.commentCount, reactionCount: v.reactionCount, shareCount: null };
+      const existing = await this.db.socialPost.findFirst({ where: { accountId: account.id, externalId: v.externalId } });
+      const post = existing
+        ? await this.db.socialPost.update({ where: { id: existing.id }, data: { ...data, lastSyncedAt: this.now() } })
+        : await this.db.socialPost.create({ data: { ...data, ownerId: account.ownerId, accountId: account.id, platform: "youtube", externalId: v.externalId, lastSyncedAt: this.now() } });
+      postIds.set(v.externalId, post);
+    }
+
+    const touched = new Set<string>();
+    let added = 0;
+    const comments = await yt.comments(account.externalId, token, first ? 300 : 100);
+    const own = new Map<string, { at: Date; text: string }>();
+    for (const c of comments) {
+      if (!c.from || !c.videoId) continue;
+      if (c.from.externalId === account.externalId) {
+        if (c.parentExternalId && (!own.get(c.parentExternalId) || own.get(c.parentExternalId)!.at > c.occurredAt)) own.set(c.parentExternalId, { at: c.occurredAt, text: c.text });
+        continue;
+      }
+      let post = postIds.get(c.videoId) ?? (await this.db.socialPost.findFirst({ where: { accountId: account.id, externalId: c.videoId } }));
+      if (!post) {
+        // An older video than the ones read: keep it so the comment has its place.
+        post = await this.db.socialPost.create({ data: { ownerId: account.ownerId, accountId: account.id, platform: "youtube", externalId: c.videoId, permalink: `https://www.youtube.com/watch?v=${c.videoId}`, postedAt: c.occurredAt } });
+      }
+      postIds.set(c.videoId, post);
+      const found = await this.db.socialEngagement.findFirst({ where: { accountId: account.id, kind: "comment", externalId: c.externalId } });
+      if (found) {
+        if (found.text !== c.text) await this.db.socialEngagement.update({ where: { id: found.id }, data: { text: c.text, leadSignal: looksLikeLead(c.text) } });
+        continue;
+      }
+      const person = await this.person(account, "youtube", c.from, c.occurredAt);
+      touched.add(person.id);
+      await this.db.socialEngagement.create({
+        data: {
+          ownerId: account.ownerId,
+          accountId: account.id,
+          postId: post.id,
+          personId: person.id,
+          platform: "youtube",
+          kind: "comment",
+          externalId: c.externalId,
+          text: c.text,
+          parentExternalId: c.parentExternalId,
+          permalink: c.permalink,
+          leadSignal: looksLikeLead(c.text),
+          occurredAt: c.occurredAt,
+        },
+      });
+      added++;
+    }
+    for (const [commentId, reply] of own) {
+      await this.db.socialEngagement.updateMany({ where: { accountId: account.id, kind: "comment", externalId: commentId, repliedAt: null }, data: { repliedAt: reply.at, replyText: reply.text } });
+    }
+
+    // Newest subscribers (public subscriptions only).
+    const subs = await yt.subscribers(token, 50).catch(() => []);
+    if (subs.length) {
+      let holder = await this.db.socialPost.findFirst({ where: { accountId: account.id, externalId: SUBSCRIBERS_POST } });
+      holder ??= await this.db.socialPost.create({
+        data: { ownerId: account.ownerId, accountId: account.id, platform: "youtube", externalId: SUBSCRIBERS_POST, message: "Channel subscribers", permalink: `https://www.youtube.com/channel/${account.externalId}`, postedAt: this.now() },
+      });
+      for (const sub of subs) {
+        const externalId = `sub:${sub.person.externalId}`;
+        if (await this.db.socialEngagement.findFirst({ where: { accountId: account.id, kind: "subscribe", externalId } })) continue;
+        const person = await this.person(account, "youtube", sub.person, sub.subscribedAt);
+        touched.add(person.id);
+        await this.db.socialEngagement.create({
+          data: { ownerId: account.ownerId, accountId: account.id, postId: holder.id, personId: person.id, platform: "youtube", kind: "subscribe", externalId, permalink: sub.person.profileUrl, occurredAt: sub.subscribedAt },
+        });
+        added++;
+      }
+    }
+
+    for (const id of touched) await this.recount(id);
+    if (added > 0) this.opts.bus?.publish({ type: "engagement.updated", accountId: account.id });
+    return { posts: videos.length, added };
   }
 
   /** Reads every comment (and on Facebook every reaction and public share) of one post. Returns new rows. */
@@ -354,6 +464,7 @@ export class EngagementService {
         comments: comments.length,
         reactions: rows.filter((r) => r.kind === "reaction").length,
         shares: rows.filter((r) => r.kind === "share").length,
+        subscribedAt: rows.find((r) => r.kind === "subscribe")?.occurredAt ?? null,
         leadSignal: comments.some((c) => c.leadSignal),
         lastComment: comments.at(-1)?.text?.slice(0, 500) ?? null,
         ...(rows.length ? { firstSeenAt: rows[0]!.occurredAt, lastSeenAt: rows.at(-1)!.occurredAt } : {}),
@@ -482,16 +593,17 @@ export class EngagementService {
 
   async summary() {
     const since = new Date(this.now().getTime() - 24 * 60 * 60 * 1000);
-    const [people, leads, comments, reactions, shares, today, unreplied] = await Promise.all([
+    const [people, leads, comments, reactions, shares, subscribers, today, unreplied] = await Promise.all([
       this.db.socialPerson.count(),
       this.db.socialPerson.count({ where: { OR: [{ leadSignal: true }, { status: "lead" }], NOT: { status: "ignore" } } }),
       this.db.socialEngagement.count({ where: { kind: "comment", removedAt: null } }),
       this.db.socialEngagement.count({ where: { kind: "reaction" } }),
       this.db.socialEngagement.count({ where: { kind: "share" } }),
+      this.db.socialEngagement.count({ where: { kind: "subscribe" } }),
       this.db.socialEngagement.count({ where: { occurredAt: { gte: since }, removedAt: null } }),
       this.db.socialEngagement.count({ where: { kind: "comment", repliedAt: null, removedAt: null, parentExternalId: null } }),
     ]);
-    return { people, leads, comments, reactions, shares, today, unreplied };
+    return { people, leads, comments, reactions, shares, subscribers, today, unreplied };
   }
 
   private async attach(rows: SocialEngagement[]) {
@@ -531,7 +643,7 @@ export class EngagementService {
   }
 
   async posts(f: { platform?: EngagementPlatform; accountId?: string; skip: number; take: number }) {
-    const where = { ...(f.platform ? { platform: f.platform } : {}), ...(f.accountId ? { accountId: f.accountId } : {}) };
+    const where = { externalId: { not: SUBSCRIBERS_POST }, ...(f.platform ? { platform: f.platform } : {}), ...(f.accountId ? { accountId: f.accountId } : {}) };
     const [rows, total] = await Promise.all([this.db.socialPost.findMany({ where, orderBy: { postedAt: "desc" }, skip: f.skip, take: f.take }), this.db.socialPost.count({ where })]);
     const counts = await this.db.socialEngagement.groupBy({ by: ["postId", "kind"], where: { postId: { in: rows.map((r) => r.id) }, removedAt: null }, _count: { _all: true } });
     const people = await this.db.socialEngagement.groupBy({ by: ["postId", "personId"], where: { postId: { in: rows.map((r) => r.id) }, removedAt: null } });
@@ -598,11 +710,16 @@ export class EngagementService {
     if (e.removedAt) throw Errors.badRequest("This comment was removed");
     const account = await this.db.socialAccount.findUnique({ where: { id: e.accountId } });
     if (!account) throw Errors.badRequest("The account of this comment is no longer connected");
-    if (!this.opts.meta()) throw Errors.badRequest("Facebook login is not set up");
-    const token = await this.token(account);
+    if (!this.canSync(account.platform)) throw Errors.badRequest(account.platform === "youtube_channel" ? "YouTube login is not set up" : "Facebook login is not set up");
     try {
-      if (e.platform === "instagram") await this.opts.api.replyInstagram(e.externalId, token, text);
-      else await this.opts.api.replyFacebook(e.externalId, token, text);
+      if (e.platform === "youtube") {
+        // YouTube replies go under the top-level comment.
+        await this.opts.youtube!.reply(e.parentExternalId ?? e.externalId, await this.googleToken(account), text);
+      } else {
+        const token = await this.token(account);
+        if (e.platform === "instagram") await this.opts.api.replyInstagram(e.externalId, token, text);
+        else await this.opts.api.replyFacebook(e.externalId, token, text);
+      }
     } catch (err) {
       if (err instanceof EngagementApiError) throw Errors.badRequest(err.message);
       throw err;
@@ -621,6 +738,7 @@ export class EngagementService {
     const e = await this.db.socialEngagement.findUnique({ where: { id: engagementId } });
     if (!e || e.kind !== "comment") throw Errors.notFound("Comment not found");
     if (e.removedAt) throw Errors.badRequest("This comment was removed");
+    if (e.platform === "youtube") throw Errors.badRequest("YouTube has no private messages: reply to the comment instead");
     if (e.privateReplyAt) throw Errors.conflict("ALREADY_SENT", "A private message was already sent for this comment (Meta allows one)");
     if (this.now().getTime() - e.occurredAt.getTime() > 7 * 24 * 60 * 60 * 1000) throw Errors.badRequest("Meta allows a private message only within 7 days of the comment");
     const account = await this.db.socialAccount.findUnique({ where: { id: e.accountId } });

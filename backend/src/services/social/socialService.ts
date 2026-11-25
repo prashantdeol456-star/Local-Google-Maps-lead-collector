@@ -6,6 +6,8 @@
 // Creator account linked to each Page. Page tokens obtained from a long-lived user token do not
 // expire (until the password changes or the app is removed).
 // LinkedIn: the member's own profile ("Sign In with LinkedIn using OpenID Connect").
+// Google: the YouTube channel(s) of the Google account (YouTube Data API); a refresh token is
+// kept (encrypted) and short-lived access tokens are made from it when needed.
 
 import { ownerScope } from "../../database/ownerScope.js";
 import { randomBytes } from "node:crypto";
@@ -14,7 +16,7 @@ import type { SocialConfig } from "../../providers/social/config.js";
 import { Errors } from "../../utils/errors.js";
 import type { SecretBox } from "../../utils/secretBox.js";
 
-export type OAuthProvider = "meta" | "linkedin";
+export type OAuthProvider = "meta" | "linkedin" | "google";
 
 const STATE_TTL_MS = 10 * 60_000;
 const MAX_PENDING_STATES = 50;
@@ -73,6 +75,7 @@ export class SocialService {
     return {
       meta: { configured: !!this.config.meta, redirectUri: this.redirectUri("meta"), scopes: this.config.meta?.scopes ?? [], graphVersion: this.config.meta?.graphVersion ?? null },
       linkedin: { configured: !!this.config.linkedin, redirectUri: this.redirectUri("linkedin"), scopes: this.config.linkedin?.scopes ?? [] },
+      google: { configured: !!this.config.google, redirectUri: this.redirectUri("google"), scopes: this.config.google?.scopes ?? [] },
     };
   }
 
@@ -129,6 +132,15 @@ export class SocialService {
       url.search = new URLSearchParams({ client_id: meta.appId, redirect_uri: this.redirectUri("meta"), state, response_type: "code", scope: meta.scopes.join(",") }).toString();
       return url.toString();
     }
+    if (provider === "google") {
+      const g = this.config.google;
+      if (!g) throw Errors.badRequest("YouTube login is not set up: the administrator adds the Google app on the Integrations page");
+      this.states.set(state, { provider, adminId, expiresAt: now + STATE_TTL_MS });
+      const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+      // offline + consent: Google gives a refresh token, so the channel stays connected.
+      url.search = new URLSearchParams({ client_id: g.clientId, redirect_uri: this.redirectUri("google"), response_type: "code", scope: g.scopes.join(" "), state, access_type: "offline", prompt: "consent", include_granted_scopes: "true" }).toString();
+      return url.toString();
+    }
     const li = this.config.linkedin;
     if (!li) throw Errors.badRequest("LinkedIn login is not set up: add LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to backend/.env");
     this.states.set(state, { provider, adminId, expiresAt: now + STATE_TTL_MS });
@@ -146,14 +158,14 @@ export class SocialService {
     }
     if (query.error) {
       const denied = query.error === "access_denied" || query.error_reason === "user_denied" || query.error === "user_cancelled_login";
-      throw new OAuthError(denied ? "The login was cancelled." : `${provider === "meta" ? "Facebook" : "LinkedIn"} refused: ${query.error_description ?? query.error}`);
+      throw new OAuthError(denied ? "The login was cancelled." : `${provider === "meta" ? "Facebook" : provider === "google" ? "Google" : "LinkedIn"} refused: ${query.error_description ?? query.error}`);
     }
     if (!query.code) throw new OAuthError("No authorization code came back.");
 
     // The redirect carries no login: the accounts belong to whoever started the connection.
     const code = query.code;
     const accounts = await ownerScope.run({ userId: pending.adminId, ownerId: pending.adminId, customer: true }, () =>
-      provider === "meta" ? this.connectMeta(code, pending.adminId) : this.connectLinkedIn(code, pending.adminId),
+      provider === "meta" ? this.connectMeta(code, pending.adminId) : provider === "google" ? this.connectGoogle(code, pending.adminId) : this.connectLinkedIn(code, pending.adminId),
     );
     await this.repos.agentLogs.create({
       jobId: null,
@@ -257,6 +269,87 @@ export class SocialService {
     return saved;
   }
 
+  // ---- Google (YouTube) ----
+
+  private readonly googleTokens = new Map<string, { token: string; expiresAt: number }>();
+
+  private async googleToken(params: Record<string, string>): Promise<{ access_token: string; expires_in?: number; refresh_token?: string; scope?: string }> {
+    let res: Response;
+    try {
+      res = await this.fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams(params).toString(),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new OAuthError("Could not reach Google. Check the internet connection and try again.");
+    }
+    const body = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number; refresh_token?: string; scope?: string; error?: string; error_description?: string } | null;
+    if (!res.ok || !body?.access_token) {
+      if (body?.error === "invalid_grant") throw new OAuthError("Google says the YouTube login was removed or expired. Connect the channel again.");
+      throw new OAuthError(`Google: ${body?.error_description ?? body?.error ?? `HTTP ${res.status}`}`);
+    }
+    return body as { access_token: string; expires_in?: number; refresh_token?: string; scope?: string };
+  }
+
+  private async youtubeChannels(accessToken: string) {
+    let res: Response;
+    try {
+      res = await this.fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+    } catch {
+      throw new OAuthError("Could not reach YouTube. Check the internet connection and try again.");
+    }
+    const body = (await res.json().catch(() => null)) as { items?: { id: string; snippet?: { title?: string; customUrl?: string; thumbnails?: { default?: { url?: string } } } }[]; error?: { message?: string } } | null;
+    if (!res.ok || !body) throw new OAuthError(`YouTube: ${body?.error?.message ?? `HTTP ${res.status}`}`);
+    return body.items ?? [];
+  }
+
+  private async connectGoogle(code: string, adminId: string) {
+    const g = this.config.google!;
+    const token = await this.googleToken({ code, client_id: g.clientId, client_secret: g.clientSecret, redirect_uri: this.redirectUri("google"), grant_type: "authorization_code" });
+    if (!token.refresh_token) {
+      throw new OAuthError("Google gave no lasting login. Remove the app at myaccount.google.com/permissions, then connect again.");
+    }
+    const channels = await this.youtubeChannels(token.access_token);
+    if (!channels.length) throw new OAuthError("This Google account has no YouTube channel. Pick the account (or brand account) that owns the channel.");
+    const saved: SocialAccountRecord[] = [];
+    for (const c of channels) {
+      const account = await this.repos.socialAccounts.upsert({
+        platform: "youtube_channel",
+        externalId: c.id,
+        name: c.snippet?.title || "YouTube channel",
+        username: c.snippet?.customUrl ?? null,
+        pictureUrl: c.snippet?.thumbnails?.default?.url ?? null,
+        tokenEnc: this.box.seal(token.refresh_token),
+        tokenExpiresAt: null,
+        scopes: JSON.stringify((token.scope ?? g.scopes.join(" ")).split(/\s+/).filter(Boolean)),
+        meta: "{}",
+        connectedById: adminId,
+      });
+      this.googleTokens.set(account.id, { token: token.access_token, expiresAt: this.now() + (token.expires_in ?? 3600) * 1000 - 60_000 });
+      saved.push(account);
+    }
+    return saved;
+  }
+
+  /** A fresh access token for a connected YouTube channel (made from its refresh token). */
+  async googleAccessToken(accountId: string): Promise<string> {
+    const cached = this.googleTokens.get(accountId);
+    if (cached && cached.expiresAt > this.now()) return cached.token;
+    const g = this.config.google;
+    if (!g) throw new OAuthError("YouTube login is not set up (Integrations page → Google app)");
+    const { token: refresh } = await this.tokenFor(accountId);
+    try {
+      const t = await this.googleToken({ refresh_token: refresh, client_id: g.clientId, client_secret: g.clientSecret, grant_type: "refresh_token" });
+      this.googleTokens.set(accountId, { token: t.access_token, expiresAt: this.now() + (t.expires_in ?? 3600) * 1000 - 60_000 });
+      return t.access_token;
+    } catch (err) {
+      if (err instanceof OAuthError) await this.repos.socialAccounts.update(accountId, { status: "error", lastError: err.message.slice(0, 500), lastCheckedAt: new Date(this.now()) });
+      throw err;
+    }
+  }
+
   // ---- LinkedIn ----
 
   private async connectLinkedIn(code: string, adminId: string) {
@@ -317,7 +410,11 @@ export class SocialService {
       return this.toPublic((await this.repos.socialAccounts.findById(id))!, this.now());
     }
     try {
-      if (account.platform === "linkedin") {
+      if (account.platform === "youtube_channel") {
+        this.googleTokens.delete(id);
+        const [c] = await this.youtubeChannels(await this.googleAccessToken(id));
+        await this.repos.socialAccounts.update(id, { status: "connected", lastError: null, name: c?.snippet?.title || account.name, pictureUrl: c?.snippet?.thumbnails?.default?.url ?? account.pictureUrl, lastCheckedAt: new Date(this.now()) });
+      } else if (account.platform === "linkedin") {
         if (!this.config.linkedin) throw new OAuthError("LinkedIn login is not set up in backend/.env");
         const user = await this.linkedinUserinfo(token);
         await this.repos.socialAccounts.update(id, { status: "connected", lastError: null, name: user.name ?? account.name, pictureUrl: user.picture ?? account.pictureUrl, lastCheckedAt: new Date(this.now()) });
@@ -360,5 +457,5 @@ export class SocialService {
 }
 
 function label(platform: string) {
-  return platform === "facebook_page" ? "Facebook Page" : platform === "instagram" ? "Instagram" : "LinkedIn";
+  return platform === "facebook_page" ? "Facebook Page" : platform === "instagram" ? "Instagram" : platform === "youtube_channel" ? "YouTube" : "LinkedIn";
 }
