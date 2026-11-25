@@ -33,6 +33,8 @@ export const ENGAGEMENT_KINDS = ["comment", "reaction", "share"] as const;
 const BACKFILL_POSTS = 50;
 const RECENT_POSTS = 25;
 const WEBHOOK_DELAY_MS = 3_000;
+/** Page webhook fields this app subscribes each Page to. */
+const PAGE_FIELDS = "feed,messages";
 
 /** Words in a comment that usually mean the person wants to buy or know more. */
 const LEAD_WORDS =
@@ -44,7 +46,7 @@ export function looksLikeLead(text: string | null | undefined): boolean {
 
 interface AccountMeta {
   pageId?: string;
-  engagement?: { syncedAt?: string; error?: string | null; realtime?: boolean; realtimeError?: string | null };
+  engagement?: { syncedAt?: string; error?: string | null; realtime?: boolean; realtimeError?: string | null; realtimeFields?: string };
 }
 
 function readMeta(account: SocialAccount): AccountMeta {
@@ -87,6 +89,8 @@ export class EngagementService {
       verifyToken: string;
       publicBaseUrl: string | null;
       webhookDelayMs?: number;
+      /** New Messenger / Instagram messages for these accounts (the AI Inbox reads them now) */
+      onMessages?: (accountIds: string[]) => void;
       now?: () => Date;
       log?: (msg: string) => void;
     },
@@ -184,11 +188,11 @@ export class EngagementService {
       if (changed) added += await this.syncPost(account, post, token);
     }
 
-    // Real-time updates: ask Meta to send this Page's events to the app (once).
-    if (platform === "facebook" && !meta.engagement?.realtime) {
+    // Real-time updates: ask Meta to send this Page's posts and messages to the app (once).
+    if (platform === "facebook" && meta.engagement?.realtimeFields !== PAGE_FIELDS) {
       try {
         await this.opts.api.subscribePage(account.externalId, token);
-        await this.saveSyncState(account, { realtime: true, realtimeError: null });
+        await this.saveSyncState(account, { realtime: true, realtimeError: null, realtimeFields: PAGE_FIELDS });
       } catch (err) {
         await this.saveSyncState(account, { realtime: false, realtimeError: (err instanceof Error ? err.message : String(err)).slice(0, 300) });
       }
@@ -366,7 +370,7 @@ export class EngagementService {
       metaConfigured: !!this.opts.meta(),
       callbackUrl: base ? `${base}/api/webhooks/meta/social` : null,
       verifyToken: this.opts.verifyToken,
-      fields: { page: ["feed"], instagram: ["comments"] },
+      fields: { page: ["feed", "messages"], instagram: ["comments", "messages"] },
     };
   }
 
@@ -384,7 +388,7 @@ export class EngagementService {
 
     type FeedValue = { item?: string; verb?: string; post_id?: string; comment_id?: string; from?: { id?: string } };
     type IgValue = { id?: string; media?: { id?: string } };
-    let payload: { object?: string; entry?: { id?: string; changes?: { field?: string; value?: FeedValue & IgValue }[] }[] };
+    let payload: { object?: string; entry?: { id?: string; changes?: { field?: string; value?: FeedValue & IgValue }[]; messaging?: unknown[] }[] };
     try {
       payload = JSON.parse(rawBody);
     } catch {
@@ -397,6 +401,8 @@ export class EngagementService {
       if (!entry.id) continue;
       // One Page can be connected by several users: each gets the update.
       const accounts = await this.db.socialAccount.findMany({ where: { platform: isInstagram ? "instagram" : "facebook_page", externalId: entry.id } });
+      // Messenger / Instagram messages: the AI Inbox reads the chat right away.
+      if (Array.isArray(entry.messaging) && entry.messaging.length && accounts.length) this.opts.onMessages?.(accounts.map((a) => a.id));
       for (const change of entry.changes ?? []) {
         const v = change.value;
         if (!v) continue;
@@ -602,6 +608,34 @@ export class EngagementService {
       throw err;
     }
     const updated = await this.db.socialEngagement.update({ where: { id: e.id }, data: { repliedAt: this.now(), replyText: text } });
+    this.opts.bus?.publish({ type: "engagement.updated", accountId: account.id });
+    return updated;
+  }
+
+  /**
+   * One private message to the person who wrote the comment (Messenger for a Page comment,
+   * Instagram Direct for an Instagram comment). Meta allows one per comment, within 7 days; the
+   * chat then continues in the AI Inbox / All messages when they answer.
+   */
+  async privateReply(engagementId: string, text: string) {
+    const e = await this.db.socialEngagement.findUnique({ where: { id: engagementId } });
+    if (!e || e.kind !== "comment") throw Errors.notFound("Comment not found");
+    if (e.removedAt) throw Errors.badRequest("This comment was removed");
+    if (e.privateReplyAt) throw Errors.conflict("ALREADY_SENT", "A private message was already sent for this comment (Meta allows one)");
+    if (this.now().getTime() - e.occurredAt.getTime() > 7 * 24 * 60 * 60 * 1000) throw Errors.badRequest("Meta allows a private message only within 7 days of the comment");
+    const account = await this.db.socialAccount.findUnique({ where: { id: e.accountId } });
+    if (!account) throw Errors.badRequest("The account of this comment is no longer connected");
+    if (!this.opts.meta()) throw Errors.badRequest("Facebook login is not set up");
+    const pageId = account.platform === "instagram" ? readMeta(account).pageId : account.externalId;
+    if (!pageId) throw Errors.badRequest("This Instagram account has no linked Facebook Page; connect it again");
+    const token = await this.token(account);
+    try {
+      await this.opts.api.privateReply(pageId, token, e.externalId, text);
+    } catch (err) {
+      if (err instanceof EngagementApiError) throw Errors.badRequest(err.message);
+      throw err;
+    }
+    const updated = await this.db.socialEngagement.update({ where: { id: e.id }, data: { privateReplyAt: this.now(), privateReplyText: text } });
     this.opts.bus?.publish({ type: "engagement.updated", accountId: account.id });
     return updated;
   }

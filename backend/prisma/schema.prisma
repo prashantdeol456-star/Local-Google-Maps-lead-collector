@@ -932,6 +932,8 @@ model InboxMessage {
    * customer | ai_auto | ai_approved | admin | elsewhere (sent outside this panel)
    */
   author         String
+  /// JSON [{ type: image | video | audio | file | sticker, url?, ref?, name?, mime? }]: Meta links, or "tg:<file_id>" for Telegram files
+  attachments    String?
   sentAt         DateTime
   createdAt      DateTime          @default(now())
   conversation   InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -1025,6 +1027,10 @@ model AiAssistantSettings {
    * Telegram getUpdates offset, so a restart does not re-read old messages
    */
   telegramOffset       Int      @default(0)
+  /**
+   * Telegram Business: JSON of the account the bot is connected to ({ id, name, username, enabled, canReply, at })
+   */
+  telegramBusiness     String?
   /**
    * anthropic | gemini
    */
@@ -1508,6 +1514,9 @@ model SocialEngagement {
   /// When the account answered it (here or on the platform)
   repliedAt        DateTime?
   replyText        String?
+  /// Private message sent to the commenter (Facebook/Instagram allow one, within 7 days)
+  privateReplyAt   DateTime?
+  privateReplyText String?
   /// Removed on the platform
   removedAt        DateTime?
   occurredAt       DateTime

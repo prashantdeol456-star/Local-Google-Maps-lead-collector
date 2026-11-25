@@ -47,14 +47,14 @@ const CUSTOMER_ROUTES = new RegExp(
       "senders|senders/email|senders/whatsapp|senders/:channel|senders/test",
       // AI Inbox and social accounts (phase C2); the LinkedIn inbox (extension) stays with super admins
       "inbox/(ai-config|secrets/:name|test/:what|settings|status|conversations|refresh)",
-      "inbox/conversations/:id|inbox/conversations/:id/(ai-reply|send|handled|mode|read)|inbox/drafts/:id/(approve|dismiss)",
+      "inbox/conversations/:id|inbox/conversations/:id/(ai-reply|send|handled|mode|read)|inbox/media/:id/:n|inbox/drafts/:id/(approve|dismiss)",
       "social/(providers|accounts|connect/:provider)|social/accounts/:id|social/accounts/:id/check",
       // Email finder (their own Hunter key) for Contact Finder
       "enrich/(status|hunter-key|refresh|find-email|verify-email|domain-emails|template\\.csv|jobs)|enrich/jobs/:id|enrich/jobs/:id/(export\\.csv|to-contacts)|enrich/jobs/:id/:action",
       // All messages: their WhatsApp and AI Inbox chats in one list
       "messages/(chats|summary)",
       // Social Engagement (their own Pages and Instagram accounts)
-      "engagement/(summary|accounts|activity|posts|people|people/export\\.csv)|engagement/accounts/:id/sync|engagement/people/:id|engagement/people/:id/contact|engagement/comments/:id/reply",
+      "engagement/(summary|accounts|activity|posts|people|people/export\\.csv)|engagement/accounts/:id/sync|engagement/people/:id|engagement/people/:id/contact|engagement/comments/:id/(reply|private-reply)",
     ].join("|") +
     ")$",
 );

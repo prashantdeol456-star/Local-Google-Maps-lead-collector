@@ -213,6 +213,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     meta: () => socialConfig.meta,
     verifyToken: engagementVerifyToken(config.sessionSecret),
     publicBaseUrl: config.publicBaseUrl,
+    onMessages: (ids) => inboxWorker.pollAccountsSoon(ids),
     log: (msg) => app.log.warn(msg),
   });
   const engagementWorker = new EngagementWorker(db, engagement, {

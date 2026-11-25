@@ -851,6 +851,8 @@ export interface InboxMessageRecord {
   externalId: string | null;
   text: string;
   author: string;
+  /** JSON list of attachments (photos, voice notes, files) */
+  attachments: string | null;
   sentAt: Date;
   createdAt: Date;
 }
@@ -885,6 +887,7 @@ export interface AiAssistantSettingsRecord {
   minConfidence: number;
   maxAutoPerChatPerDay: number;
   telegramOffset: number;
+  telegramBusiness: string | null;
   aiProvider: string;
   aiModel: string;
   aiEffort: string;
@@ -914,7 +917,7 @@ export interface InboxRepository {
   listConversations(query: { platform?: string; status?: string; q?: string; skip: number; take: number }): Promise<{ items: InboxConversationListItem[]; total: number }>;
   countByStatus(): Promise<Record<string, number>>;
   /** Inserts messages not stored yet (by externalId); returns the new ones. */
-  addMessages(conversationId: string, messages: Pick<InboxMessageRecord, "direction" | "externalId" | "text" | "author" | "sentAt">[]): Promise<InboxMessageRecord[]>;
+  addMessages(conversationId: string, messages: (Pick<InboxMessageRecord, "direction" | "externalId" | "text" | "author" | "sentAt"> & { attachments?: string | null })[]): Promise<InboxMessageRecord[]>;
   /** The latest `take` messages, oldest first. */
   recentMessages(conversationId: string, take: number): Promise<InboxMessageRecord[]>;
   lastInbound(conversationId: string): Promise<InboxMessageRecord | null>;
@@ -923,6 +926,7 @@ export interface InboxRepository {
   awaitingReply(since: Date, before: Date, take: number): Promise<InboxConversationRecord[]>;
   createDraft(data: Omit<InboxDraftRecord, "id" | "createdAt" | "updatedAt" | "sentAt" | "error"> & { error?: string | null }): Promise<InboxDraftRecord>;
   findDraft(id: string): Promise<InboxDraftRecord | null>;
+  findMessage(id: string): Promise<InboxMessageRecord | null>;
   draftFor(conversationId: string, forMessageId: string): Promise<InboxDraftRecord | null>;
   pendingDraft(conversationId: string): Promise<InboxDraftRecord | null>;
   listDrafts(conversationId: string, take: number): Promise<InboxDraftRecord[]>;

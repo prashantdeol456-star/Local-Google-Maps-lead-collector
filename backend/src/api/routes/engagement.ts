@@ -76,6 +76,11 @@ export async function engagementRoutes(app: FastifyInstance, opts: { engagement:
     return { engagement: await engagement.reply(parse(IdParams, request.params).id, text) };
   });
 
+  app.post("/api/engagement/comments/:id/private-reply", async (request) => {
+    const { text } = parse(z.object({ text: z.string().trim().min(1).max(1000) }), request.body);
+    return { engagement: await engagement.privateReply(parse(IdParams, request.params).id, text) };
+  });
+
   // Webhook settings for the Meta app (super admins).
   app.get("/api/engagement/setup", async (request) => {
     requireSuperAdmin(request);

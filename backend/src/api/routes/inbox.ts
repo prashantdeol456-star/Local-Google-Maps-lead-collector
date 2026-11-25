@@ -111,6 +111,15 @@ export async function inboxRoutes(app: FastifyInstance, opts: { inbox: InboxServ
   app.get("/api/inbox/conversations/:id", async (request) => inbox.get(parse(IdParams, request.params).id));
   app.post("/api/inbox/conversations/:id/ai-reply", async (request) => ({ draft: await inbox.respond(parse(IdParams, request.params).id, { force: true }) }));
   app.post("/api/inbox/conversations/:id/send", async (request) => inbox.sendManual(parse(IdParams, request.params).id, parse(TextBody, request.body).text));
+  app.get("/api/inbox/media/:id/:n", async (request, reply) => {
+    const { id, n } = parse(z.object({ id: z.string().min(1).max(64), n: z.coerce.number().int().min(0).max(9) }), request.params);
+    const file = await inbox.media(id, n);
+    // Only plain pictures, videos and sound are shown in the page; anything else is downloaded.
+    const inline = /^(image\/(png|jpe?g|gif|webp)|video\/(mp4|webm|quicktime)|audio\/[a-z0-9.+-]+)$/i.test(file.mime);
+    reply.header("Content-Type", inline ? file.mime : "application/octet-stream").header("Cache-Control", "private, max-age=3600").header("X-Content-Type-Options", "nosniff");
+    if (!inline) reply.header("Content-Disposition", "attachment");
+    return reply.send(file.data);
+  });
   app.post("/api/inbox/conversations/:id/read", async (request) => inbox.markRead(parse(IdParams, request.params).id));
   app.post("/api/inbox/conversations/:id/handled", async (request) => ({ conversation: await inbox.markHandled(parse(IdParams, request.params).id) }));
   app.patch("/api/inbox/conversations/:id/mode", async (request) => {

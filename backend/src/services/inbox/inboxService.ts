@@ -22,6 +22,16 @@ import { canReplyOnPlatform, decide } from "./policy.js";
 import { ReplyWriterError } from "./replyWriter.js";
 import type { InboxRuntime } from "./runtime.js";
 
+/** The Telegram Business connection saved from the bot's updates. */
+function parseBusiness(json: string | null): { name: string; username: string | null; enabled: boolean; canReply: boolean; at: string } | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export const PLATFORMS: InboxPlatform[] = ["telegram", "facebook", "instagram", "linkedin"];
 export const REPLY_MODES: ReplyMode[] = ["smart", "auto", "draft", "off"];
 
@@ -137,12 +147,52 @@ export class InboxService {
     const meta = accounts.filter((a) => a.platform === "facebook_page" || a.platform === "instagram");
     return {
       ai: await this.opts.runtime.writer().then((w) => (w ? { configured: true, model: w.model } : { configured: false, model: null })),
-      telegram: { configured: !!(await this.opts.runtime.telegram()) },
+      telegram: { configured: !!(await this.opts.runtime.telegram()), business: parseBusiness((await this.repos.inbox.getSettings()).telegramBusiness) },
       facebook: { configured: this.metaReady(), accounts: meta.filter((a) => a.platform === "facebook_page").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
       instagram: { configured: this.metaReady(), accounts: meta.filter((a) => a.platform === "instagram").map((a) => ({ id: a.id, name: a.name, status: a.status, lastError: a.lastError })) },
       linkedin: { configured: true, via: "LinkedIn Messenger extension" },
       counts: await this.repos.inbox.countByStatus(),
     };
+  }
+
+  /**
+   * A photo, voice note or file of a message, for the panel: Telegram files are fetched with the
+   * bot token here (it never reaches the browser); Facebook/Instagram files from Meta's own links.
+   */
+  async media(messageId: string, n: number): Promise<{ data: Buffer; mime: string }> {
+    const message = await this.repos.inbox.findMessage(messageId);
+    const conversation = message && (await this.repos.inbox.findConversation(message.conversationId));
+    if (!message || !conversation) throw Errors.notFound("Message not found");
+    let list: { type?: string; url?: string | null; ref?: string | null; mime?: string | null }[] = [];
+    try {
+      list = JSON.parse(message.attachments ?? "[]");
+    } catch {
+      /* none */
+    }
+    const a = list[n];
+    if (!a) throw Errors.notFound("No such file");
+    if (a.ref?.startsWith("tg:")) {
+      const telegram = await this.opts.runtime.telegram();
+      const file = telegram ? await telegram.bot.download(a.ref.slice(3)).catch(() => null) : null;
+      if (!file) throw Errors.notFound("Telegram no longer has this file");
+      return { data: file.data, mime: a.mime ?? file.mime ?? "application/octet-stream" };
+    }
+    if (a.url) {
+      let url: URL;
+      try {
+        url = new URL(a.url);
+      } catch {
+        throw Errors.notFound("No such file");
+      }
+      // Only Meta's own file servers.
+      if (url.protocol !== "https:" || !/(^|\.)(fbcdn\.net|fbsbx\.com|facebook\.com|cdninstagram\.com|instagram\.com)$/i.test(url.hostname)) throw Errors.notFound("No such file");
+      const res = await fetch(url, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+      if (!res?.ok) throw Errors.notFound("The link to this file has expired: open it in the app");
+      const data = Buffer.from(await res.arrayBuffer());
+      if (data.length > 25 * 1024 * 1024) throw Errors.badRequest("File too large");
+      return { data, mime: a.mime ?? res.headers.get("content-type") ?? "application/octet-stream" };
+    }
+    throw Errors.notFound("No such file");
   }
 
   // ---- Incoming messages ----
@@ -163,6 +213,7 @@ export class InboxService {
         direction: m.direction,
         externalId: m.externalId,
         text: m.text.slice(0, MAX_TEXT),
+        attachments: m.attachments?.length ? JSON.stringify(m.attachments.slice(0, 10)) : null,
         // Our own messages we did not send from here were written in the app itself.
         author: m.direction === "in" ? "customer" : "elsewhere",
         sentAt: m.sentAt,
@@ -280,6 +331,7 @@ export class InboxService {
       autoRepliesToday: await this.repos.inbox.countAutoRepliesSince(conversation.id, new Date(now.getTime() - 24 * 60 * 60 * 1000)),
       maxAutoPerChatPerDay: settings.maxAutoPerChatPerDay,
       lastInboundAt: conversation.lastInboundAt,
+      accountKey: conversation.accountKey,
       now,
     });
 
@@ -315,7 +367,12 @@ export class InboxService {
     if (c.platform === "telegram") {
       const telegram = await this.opts.runtime.telegram();
       if (!telegram) throw new ChannelError("Telegram is not set up: add the bot token in AI Inbox → Setup", false);
-      return telegram.bot.send(c.participantId, text);
+      // Telegram Business: the bot answers as your own account, within 24 hours of their last message.
+      const business = c.accountKey.startsWith("business:") ? c.accountKey.slice("business:".length) : null;
+      if (business && !canReplyOnPlatform(c.platform, c.lastInboundAt, this.now(), c.accountKey)) {
+        throw new ChannelError("Over 24 hours since their last message: reply in Telegram yourself", false);
+      }
+      return telegram.bot.send(c.participantId, text, business);
     }
     if (c.platform === "facebook" || c.platform === "instagram") {
       if (!this.opts.meta || !this.metaReady()) throw new ChannelError("Facebook login is not set up (Integrations page → Facebook & Instagram app)", false);
@@ -457,7 +514,7 @@ export class InboxService {
     return {
       conversation,
       effectiveMode,
-      canReplyHere: conversation.platform !== "linkedin" && canReplyOnPlatform(conversation.platform, conversation.lastInboundAt, this.now()),
+      canReplyHere: conversation.platform !== "linkedin" && canReplyOnPlatform(conversation.platform, conversation.lastInboundAt, this.now(), conversation.accountKey),
       messages,
       drafts,
     };

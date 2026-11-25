@@ -12,14 +12,28 @@ export class ChannelError extends Error {
   }
 }
 
+/** A photo, video, voice note, file or sticker in a message (shown in the panel, not read by the AI). */
+export interface Attachment {
+  type: "image" | "video" | "audio" | "file" | "sticker";
+  /** Meta's link (it expires after a while) */
+  url?: string | null;
+  /** "tg:<file_id>": Telegram file, fetched through the platform (the bot token stays on the server) */
+  ref?: string | null;
+  name?: string | null;
+  mime?: string | null;
+}
+
 export interface IncomingMessage {
   externalId: string;
   direction: "in" | "out";
   text: string;
   sentAt: Date;
+  attachments?: Attachment[];
 }
 
 export interface IncomingThread {
+  /** Which inbox account it belongs to (Telegram: "bot", or "business:<connection id>" for your own number) */
+  accountKey?: string;
   externalThreadId: string;
   participantId: string | null;
   participantName: string;
@@ -41,22 +55,55 @@ interface TgUser {
   last_name?: string;
   username?: string;
 }
+type TgFile = { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
 interface TgMessage {
   message_id: number;
   date: number;
   chat: { id: number; type: string; first_name?: string; last_name?: string; username?: string; title?: string };
   from?: TgUser;
+  /** Telegram Business: the connection the message came through (your own account) */
+  business_connection_id?: string;
   text?: string;
   caption?: string;
-  photo?: unknown;
-  voice?: unknown;
-  video?: unknown;
-  document?: unknown;
-  sticker?: { emoji?: string };
+  photo?: TgFile[];
+  voice?: TgFile;
+  audio?: TgFile;
+  video?: TgFile;
+  video_note?: TgFile;
+  document?: TgFile;
+  sticker?: TgFile & { emoji?: string };
+}
+/** Telegram Business: you connected the bot to your own account (Settings → Telegram Business → Chatbots). */
+export interface TgBusinessConnection {
+  id: string;
+  user: TgUser;
+  user_chat_id: number;
+  date: number;
+  is_enabled: boolean;
+  rights?: { can_reply?: boolean };
+  can_reply?: boolean;
 }
 interface TgUpdate {
   update_id: number;
   message?: TgMessage;
+  business_connection?: TgBusinessConnection;
+  business_message?: TgMessage;
+}
+
+/** Text and attachments of a Telegram message (the AI reads the text; files are shown). */
+function telegramContent(m: TgMessage): { text: string; attachments: Attachment[] } {
+  const attachments: Attachment[] = [];
+  const add = (type: Attachment["type"], f: TgFile | undefined) => f && attachments.push({ type, ref: `tg:${f.file_id}`, name: f.file_name ?? null, mime: f.mime_type ?? null });
+  add("image", m.photo?.length ? m.photo[m.photo.length - 1] : undefined);
+  add("audio", m.voice ?? m.audio);
+  add("video", m.video ?? m.video_note);
+  add("file", m.document);
+  add("sticker", m.sticker);
+  const text =
+    m.text ??
+    m.caption ??
+    (m.photo ? placeholder("photo") : m.voice ? placeholder("voice message") : m.audio ? placeholder("audio") : m.video || m.video_note ? placeholder("video") : m.document ? placeholder("file") : m.sticker ? (m.sticker.emoji ?? placeholder("sticker")) : placeholder("message"));
+  return { text, attachments };
 }
 
 export class TelegramBot {
@@ -92,33 +139,65 @@ export class TelegramBot {
     return this.call<TgUser>("getMe", {});
   }
 
-  /** Waits up to `waitSec` for new messages. */
-  async updates(offset: number, waitSec: number): Promise<{ nextOffset: number; threads: IncomingThread[] }> {
-    const updates = await this.call<TgUpdate[]>("getUpdates", { offset, timeout: waitSec, allowed_updates: ["message"] }, (waitSec + 10) * 1000);
+  /**
+   * Waits up to `waitSec` for new messages: chats with the bot, and (Telegram Business) the chats of
+   * the account the bot is connected to. Business connections are reported to `onConnection`.
+   */
+  async updates(offset: number, waitSec: number, onConnection?: (c: TgBusinessConnection) => void): Promise<{ nextOffset: number; threads: IncomingThread[] }> {
+    const updates = await this.call<TgUpdate[]>(
+      "getUpdates",
+      { offset, timeout: waitSec, allowed_updates: ["message", "business_connection", "business_message"] },
+      (waitSec + 10) * 1000,
+    );
     const byChat = new Map<string, IncomingThread>();
     let nextOffset = offset;
     for (const u of updates) {
       nextOffset = Math.max(nextOffset, u.update_id + 1);
-      const m = u.message;
+      if (u.business_connection) onConnection?.(u.business_connection);
+      const business = !!u.business_message;
+      const m = u.business_message ?? u.message;
       // Private chats only: the AI never posts in groups.
-      if (!m || m.chat.type !== "private" || m.from?.is_bot) continue;
-      const id = String(m.chat.id);
+      if (!m || m.chat.type !== "private" || (!business && m.from?.is_bot)) continue;
+      const chatId = String(m.chat.id);
+      const conn = m.business_connection_id ?? "";
+      const key = business ? `b:${conn}:${chatId}` : chatId;
       const name = [m.chat.first_name, m.chat.last_name].filter(Boolean).join(" ") || m.chat.username || "Telegram user";
-      const thread = byChat.get(id) ?? { externalThreadId: id, participantId: id, participantName: name, participantUsername: m.chat.username ?? null, messages: [] };
-      const text =
-        m.text ??
-        m.caption ??
-        (m.photo ? placeholder("photo") : m.voice ? placeholder("voice message") : m.video ? placeholder("video") : m.document ? placeholder("file") : m.sticker ? (m.sticker.emoji ?? placeholder("sticker")) : placeholder("message"));
-      // /start is Telegram's "open the bot" button.
-      thread.messages.push({ externalId: `tg:${m.message_id}`, direction: "in", text: text === "/start" ? "(started the chat)" : text, sentAt: new Date(m.date * 1000) });
-      byChat.set(id, thread);
+      const thread = byChat.get(key) ?? {
+        accountKey: business ? `business:${conn}` : "bot",
+        externalThreadId: key,
+        participantId: chatId,
+        participantName: name,
+        participantUsername: m.chat.username ?? null,
+        messages: [],
+      };
+      const { text, attachments } = telegramContent(m);
+      // In a business chat the other person's id is the chat id: anything else was you (from your phone).
+      const direction = business && m.from && String(m.from.id) !== chatId ? "out" : "in";
+      thread.messages.push({
+        externalId: `tg:${business ? `${conn}:` : ""}${m.message_id}`,
+        direction,
+        text: text === "/start" && !business ? "(started the chat)" : text,
+        sentAt: new Date(m.date * 1000),
+        ...(attachments.length ? { attachments } : {}),
+      });
+      byChat.set(key, thread);
     }
     return { nextOffset, threads: [...byChat.values()] };
   }
 
-  async send(chatId: string, text: string): Promise<{ externalId: string }> {
-    const sent = await this.call<TgMessage>("sendMessage", { chat_id: chatId, text });
-    return { externalId: `tg:${sent.message_id}` };
+  /** Sends text; with `businessConnectionId`, as your own Telegram account (Telegram Business). */
+  async send(chatId: string, text: string, businessConnectionId?: string | null): Promise<{ externalId: string }> {
+    const sent = await this.call<TgMessage>("sendMessage", { chat_id: chatId, text, ...(businessConnectionId ? { business_connection_id: businessConnectionId } : {}) });
+    return { externalId: `tg:${businessConnectionId ? `${businessConnectionId}:` : ""}${sent.message_id}` };
+  }
+
+  /** A file sent in a chat (photos, voice notes…), at most 20 MB (Bot API limit). */
+  async download(fileId: string): Promise<{ data: Buffer; mime: string | null } | null> {
+    const file = await this.call<{ file_path?: string; file_size?: number }>("getFile", { file_id: fileId });
+    if (!file.file_path || (file.file_size ?? 0) > 20 * 1024 * 1024) return null;
+    const res = await this.fetchImpl(`https://api.telegram.org/file/bot${this.token}/${file.file_path}`, { signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    if (!res?.ok) return null;
+    return { data: Buffer.from(await res.arrayBuffer()), mime: res.headers.get("content-type") };
   }
 }
 
@@ -128,7 +207,22 @@ interface GraphConversation {
   id: string;
   updated_time: string;
   participants?: { data: { id: string; name?: string; username?: string }[] };
-  messages?: { data: { id: string; message?: string; created_time: string; from?: { id: string; name?: string; username?: string }; attachments?: unknown }[] };
+  messages?: {
+    data: {
+      id: string;
+      message?: string;
+      created_time: string;
+      from?: { id: string; name?: string; username?: string };
+      attachments?: { data?: { mime_type?: string; name?: string; image_data?: { url?: string }; video_data?: { url?: string }; file_url?: string }[] };
+    }[];
+  };
+}
+
+function metaAttachment(a: { mime_type?: string; name?: string; image_data?: { url?: string }; video_data?: { url?: string }; file_url?: string }): Attachment {
+  const mime = a.mime_type ?? null;
+  if (a.image_data?.url) return { type: /gif|webp/.test(mime ?? "") && /sticker/i.test(a.name ?? "") ? "sticker" : "image", url: a.image_data.url, name: a.name ?? null, mime };
+  if (a.video_data?.url) return { type: "video", url: a.video_data.url, name: a.name ?? null, mime };
+  return { type: /^audio\//.test(mime ?? "") ? "audio" : "file", url: a.file_url ?? null, name: a.name ?? null, mime };
 }
 
 export class MetaMessaging {
@@ -173,7 +267,7 @@ export class MetaMessaging {
     const page = await this.graph<{ data: GraphConversation[] }>(`${pageId}/conversations`, token, {
       query: {
         platform,
-        fields: "id,updated_time,participants,messages.limit(20){id,message,created_time,from,attachments}",
+        fields: "id,updated_time,participants,messages.limit(20){id,message,created_time,from,attachments{mime_type,name,image_data,video_data,file_url}}",
         limit: "25",
       },
     });
@@ -188,6 +282,7 @@ export class MetaMessaging {
           direction: (m.from?.id === selfId || m.from?.id === pageId ? "out" : "in") as "in" | "out",
           text: m.message?.trim() || (m.attachments ? placeholder("attachment") : placeholder("message")),
           sentAt: new Date(m.created_time),
+          ...(m.attachments?.data?.length ? { attachments: m.attachments.data.map(metaAttachment) } : {}),
         }))
         .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
       threads.push({

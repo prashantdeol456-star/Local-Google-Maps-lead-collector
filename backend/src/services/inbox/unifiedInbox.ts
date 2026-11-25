@@ -2,7 +2,7 @@
 // Facebook Messenger, Instagram, Telegram and LinkedIn (AI Inbox) — newest first, with unread
 // counts and how long a free reply is still allowed. Opening a chat uses that app's own screen.
 
-import { META_WINDOW_MS } from "./policy.js";
+import { hasReplyWindow, META_WINDOW_MS } from "./policy.js";
 import type { InboxService } from "./inboxService.js";
 import type { WhatsAppChatService } from "../whatsapp/chatService.js";
 
@@ -84,13 +84,14 @@ export class UnifiedInboxService {
       });
     }
     for (const c of inbox) {
-      const metaWindow = c.platform === "facebook" || c.platform === "instagram";
+      const metaWindow = hasReplyWindow(c.platform, c.accountKey);
+      const business = c.platform === "telegram" && c.accountKey.startsWith("business:");
       chats.push({
         source: "inbox",
         id: c.id,
         platform: c.platform as UnifiedPlatform,
         name: c.participantName,
-        handle: c.participantUsername ? `@${c.participantUsername}` : null,
+        handle: [business ? "your Telegram" : null, c.participantUsername ? `@${c.participantUsername}` : null].filter(Boolean).join(" · ") || null,
         lastMessageText: c.lastMessage?.text ?? null,
         lastMessageFromMe: c.lastMessage?.direction === "out",
         lastMessageAt: c.lastMessageAt,

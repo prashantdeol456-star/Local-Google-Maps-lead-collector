@@ -5,7 +5,7 @@
 
 import { ownerScope, type OwnerScope } from "../database/ownerScope.js";
 import type { Repositories } from "../database/repositories/index.js";
-import { ChannelError, type MetaMessaging } from "../services/inbox/channels.js";
+import { ChannelError, type MetaMessaging, type TgBusinessConnection } from "../services/inbox/channels.js";
 import type { InboxRuntime } from "../services/inbox/runtime.js";
 import type { InboxService } from "../services/inbox/inboxService.js";
 import type { SocialService } from "../services/social/socialService.js";
@@ -49,6 +49,8 @@ export class InboxWorker {
   async stop() {
     this.stopped = true;
     this.timers.forEach(clearInterval);
+    this.soon.forEach(clearTimeout);
+    this.soon.clear();
     this.timers = [];
     this.telegramAbort.abort();
     await Promise.allSettled([this.telegramLoop, this.processing, this.polling]);
@@ -137,8 +139,23 @@ export class InboxWorker {
     const bot = (await this.opts.runtime.telegram())?.bot;
     if (!bot) return 0;
     const settings = await this.repos.inbox.getSettings();
-    const { nextOffset, threads } = await bot.updates(settings.telegramOffset, waitSec);
-    for (const t of threads) await this.inbox.ingest("telegram", "bot", t);
+    const connections: TgBusinessConnection[] = [];
+    const { nextOffset, threads } = await bot.updates(settings.telegramOffset, waitSec, (c) => connections.push(c));
+    // Telegram Business: you connected (or disconnected) the bot to your own account.
+    for (const c of connections) {
+      await this.repos.inbox.updateSettings({
+        telegramBusiness: JSON.stringify({
+          id: c.id,
+          name: [c.user.first_name, c.user.last_name].filter(Boolean).join(" "),
+          username: c.user.username ?? null,
+          enabled: c.is_enabled,
+          canReply: c.rights?.can_reply ?? c.can_reply ?? false,
+          at: new Date(c.date * 1000).toISOString(),
+        }),
+      });
+      this.opts.log(`AI inbox: Telegram Business ${c.is_enabled ? "connected" : "disconnected"} (${c.user.username ?? c.user.first_name})`);
+    }
+    for (const t of threads) await this.inbox.ingest("telegram", t.accountKey ?? "bot", t);
     if (nextOffset !== settings.telegramOffset) await this.repos.inbox.updateSettings({ telegramOffset: nextOffset });
     return threads.length;
   }
@@ -155,6 +172,31 @@ export class InboxWorker {
       .catch((err) => this.opts.log(`AI inbox: Facebook/Instagram: ${String(err)}`))
       .finally(() => (this.polling = null));
     return this.polling;
+  }
+
+  private readonly soon = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** A webhook said these accounts have new messages: read them in 2 s (several pings → one read). */
+  pollAccountsSoon(accountIds: string[]) {
+    const meta = this.opts.meta;
+    if (!meta) return;
+    for (const id of accountIds) {
+      if (this.soon.has(id)) continue;
+      this.soon.set(
+        id,
+        setTimeout(() => {
+          this.soon.delete(id);
+          void (async () => {
+            const account = await this.repos.socialAccounts.findById(id);
+            if (!account || account.status === "expired") return;
+            const scope = await this.scopeOf(account.ownerId);
+            if (!scope) return;
+            await ownerScope.run(scope, () => this.pollAccount(meta, account));
+            await this.processOnce();
+          })().catch((err) => this.opts.log(`AI inbox: webhook read: ${String(err)}`));
+        }, 2_000),
+      );
+    }
   }
 
   private async pollMeta() {

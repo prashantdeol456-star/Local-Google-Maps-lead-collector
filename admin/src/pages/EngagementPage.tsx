@@ -46,6 +46,7 @@ interface Engagement {
   leadSignal: boolean;
   repliedAt: string | null;
   replyText: string | null;
+  privateReplyAt: string | null;
   occurredAt: string;
   person: PersonRef | null;
   post: { id: string; message: string | null; permalink: string | null; imageUrl: string | null } | null;
@@ -195,6 +196,42 @@ function ReplyBox({ e, onDone }: { e: Engagement; onDone: () => void }) {
   );
 }
 
+/** One private message (Messenger / Instagram Direct) to the person who wrote the comment. */
+function PrivateReply({ e, onDone }: { e: Engagement; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const send = useMutation({
+    mutationFn: () => api(`/engagement/comments/${e.id}/private-reply`, { method: "POST", body: { text } }),
+    onSuccess: () => {
+      setOpen(false);
+      onDone();
+    },
+  });
+  if (e.privateReplyAt) return <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">✓ Private message sent {formatRelative(e.privateReplyAt)}</p>;
+  if (Date.now() - new Date(e.occurredAt).getTime() > 7 * 24 * 3600_000) return null;
+  if (!open)
+    return (
+      <button className="mt-1 ml-3 text-xs text-brand-600 hover:underline" onClick={() => setOpen(true)} title="Meta allows one private message per comment, within 7 days">
+        Message privately
+      </button>
+    );
+  return (
+    <form
+      className="mt-2 flex gap-2"
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        if (text.trim()) send.mutate();
+      }}
+    >
+      <input className="input py-1 text-sm" placeholder={`Private ${e.platform === "instagram" ? "Instagram" : "Messenger"} message (one allowed)…`} value={text} maxLength={1000} onChange={(ev) => setText(ev.target.value)} aria-label="Private message" />
+      <button className="btn btn-primary px-3 py-1 text-sm" disabled={send.isPending || !text.trim()}>
+        {send.isPending ? "Sending…" : "Send"}
+      </button>
+      {send.error && <ErrorBox error={send.error} />}
+    </form>
+  );
+}
+
 function Activity({ platform }: { platform: string }) {
   const client = useQueryClient();
   const params = useSearchParams();
@@ -285,6 +322,7 @@ function Activity({ platform }: { platform: string }) {
                   Reply
                 </button>
               )}
+              {e.kind === "comment" && <PrivateReply e={e} onDone={() => void client.invalidateQueries({ queryKey: ["engagement"] })} />}
               {replying === e.id && (
                 <ReplyBox
                   e={e}
@@ -554,7 +592,7 @@ function Setup() {
       <ol className="mt-2 list-decimal space-y-1 pl-5">
         <li>
           In the Meta app (developers.facebook.com) → <strong>Webhooks</strong>, for <strong>Page</strong> subscribe to <code>{s.fields.page.join(", ")}</code>, and for{" "}
-          <strong>Instagram</strong> to <code>{s.fields.instagram.join(", ")}</code>.
+          <strong>Instagram</strong> to <code>{s.fields.instagram.join(", ")}</code>. The same webhook brings new Messenger and Instagram messages to All messages within seconds.
         </li>
         <li>
           Callback URL: <code className="break-all">{s.callbackUrl ?? "set PUBLIC_BASE_URL in the backend settings first"}</code>

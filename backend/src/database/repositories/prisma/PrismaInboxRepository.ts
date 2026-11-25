@@ -79,7 +79,7 @@ export class PrismaInboxRepository implements InboxRepository {
     return Object.fromEntries(rows.map((r) => [r.status, r._count._all]));
   }
 
-  async addMessages(conversationId: string, messages: Pick<InboxMessageRecord, "direction" | "externalId" | "text" | "author" | "sentAt">[]) {
+  async addMessages(conversationId: string, messages: (Pick<InboxMessageRecord, "direction" | "externalId" | "text" | "author" | "sentAt"> & { attachments?: string | null })[]) {
     const ids = messages.map((m) => m.externalId).filter((x): x is string => !!x);
     const existing = new Set(
       ids.length ? (await this.db.inboxMessage.findMany({ where: { conversationId, externalId: { in: ids } }, select: { externalId: true } })).map((m) => m.externalId) : [],
@@ -116,6 +116,9 @@ export class PrismaInboxRepository implements InboxRepository {
 
   createDraft(data: Parameters<InboxRepository["createDraft"]>[0]) {
     return this.db.inboxDraft.create({ data });
+  }
+  findMessage(id: string) {
+    return this.db.inboxMessage.findUnique({ where: { id } });
   }
   findDraft(id: string) {
     return this.db.inboxDraft.findUnique({ where: { id } });

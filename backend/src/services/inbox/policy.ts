@@ -12,6 +12,8 @@ export const META_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export interface SendContext {
   platform: string;
+  /** Telegram Business chats ("business:…") have a 24-hour reply window too */
+  accountKey?: string | null;
   mode: ReplyMode;
   minConfidence: number;
   autoRepliesToday: number;
@@ -25,8 +27,17 @@ export type Decision =
   | { action: "draft"; reason: string }
   | { action: "send"; reason: string };
 
-export function canReplyOnPlatform(platform: string, lastInboundAt: Date | null, now: Date): boolean {
-  if (platform !== "facebook" && platform !== "instagram") return true;
+/** True when replies must come within 24 hours of the person's last message. */
+export function hasReplyWindow(platform: string, accountKey?: string | null): boolean {
+  return platform === "facebook" || platform === "instagram" || (platform === "telegram" && !!accountKey?.startsWith("business:"));
+}
+
+/**
+ * Facebook, Instagram and Telegram Business (a bot replying on your own account) only allow a
+ * reply within 24 hours of the person's last message.
+ */
+export function canReplyOnPlatform(platform: string, lastInboundAt: Date | null, now: Date, accountKey?: string | null): boolean {
+  if (!hasReplyWindow(platform, accountKey)) return true;
   return !!lastInboundAt && now.getTime() - lastInboundAt.getTime() < META_WINDOW_MS;
 }
 
@@ -35,8 +46,8 @@ export function decide(reply: WrittenReply, ctx: SendContext): Decision {
   if (!reply.should_reply || !reply.reply) return { action: "none", reason: reply.intent === "spam" ? "Looks like spam: no reply" : "No reply needed" };
   // LinkedIn is never sent by the backend: the extension types it and you press Send.
   if (ctx.platform === "linkedin") return { action: "draft", reason: "LinkedIn: typed for you in the extension; you press Send" };
-  if (!canReplyOnPlatform(ctx.platform, ctx.lastInboundAt, ctx.now)) {
-    return { action: "draft", reason: "Over 24 hours since their last message: Facebook/Instagram no longer allow a reply from here" };
+  if (!canReplyOnPlatform(ctx.platform, ctx.lastInboundAt, ctx.now, ctx.accountKey)) {
+    return { action: "draft", reason: "Over 24 hours since their last message: the app no longer allows a reply from here" };
   }
   if (ctx.mode === "draft") return { action: "draft", reason: "Drafts only for this chat" };
   if (ctx.autoRepliesToday >= ctx.maxAutoPerChatPerDay) return { action: "draft", reason: `Already ${ctx.autoRepliesToday} automatic replies in this chat today` };

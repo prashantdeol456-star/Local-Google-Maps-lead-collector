@@ -207,9 +207,19 @@ export class MetaEngagementApi {
     return r.id;
   }
 
-  /** Real-time updates for this Page (webhooks of the app's "feed" field). */
+  /** Real-time updates for this Page: posts/comments ("feed") and Messenger/Instagram messages ("messages"). */
   async subscribePage(pageId: string, token: string): Promise<void> {
-    await this.graph<{ success?: boolean }>(`${pageId}/subscribed_apps`, token, { method: "POST", query: { subscribed_fields: "feed" } });
+    await this.graph<{ success?: boolean }>(`${pageId}/subscribed_apps`, token, { method: "POST", query: { subscribed_fields: "feed,messages" } });
+  }
+
+  /**
+   * One private message to the person who wrote a comment (Facebook Page or Instagram comment),
+   * sent as the Page. Meta allows one per comment, within 7 days.
+   */
+  async privateReply(pageId: string, token: string, commentId: string, text: string): Promise<string> {
+    const r = await this.graph<{ message_id?: string }>(`${pageId}/messages`, token, { method: "POST", body: { recipient: { comment_id: commentId }, message: { text } } as unknown as Record<string, string> });
+    if (!r.message_id) throw new EngagementApiError("Facebook did not confirm the message", true);
+    return r.message_id;
   }
 
   // ---- Instagram ----

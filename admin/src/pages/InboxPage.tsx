@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
-import { api, qs } from "../lib/api";
+import { api, qs, withViewOwner } from "../lib/api";
 import { formatDate, formatRelative } from "../lib/format";
 import { Link, setSearchParams, useSearchParams } from "../lib/router";
 
@@ -35,7 +35,46 @@ interface Message {
   direction: "in" | "out";
   text: string;
   author: string;
+  attachments: string | null;
   sentAt: string;
+}
+
+interface Attachment {
+  type: "image" | "video" | "audio" | "file" | "sticker";
+  url?: string | null;
+  ref?: string | null;
+  name?: string | null;
+}
+
+/** Photos, videos, voice notes and files of a message, fetched through the platform. */
+function Attachments({ m }: { m: Message }) {
+  let list: Attachment[] = [];
+  try {
+    list = JSON.parse(m.attachments ?? "[]") as Attachment[];
+  } catch {
+    return null;
+  }
+  if (!list.length) return null;
+  return (
+    <div className="mb-1 space-y-1">
+      {list.map((a, n) => {
+        const src = withViewOwner(`/api/inbox/media/${m.id}/${n}`);
+        if (a.type === "image" || a.type === "sticker")
+          return (
+            <a key={n} href={src} target="_blank" rel="noreferrer">
+              <img src={src} alt={a.name ?? "Photo"} className={`${a.type === "sticker" ? "h-24 w-24 object-contain" : "max-h-64"} rounded`} loading="lazy" />
+            </a>
+          );
+        if (a.type === "video") return <video key={n} controls preload="none" src={src} className="max-h-64 rounded" />;
+        if (a.type === "audio") return <audio key={n} controls preload="none" src={src} className="max-w-full" />;
+        return (
+          <a key={n} href={src} className="block underline" download>
+            📄 {a.name ?? "File"}
+          </a>
+        );
+      })}
+    </div>
+  );
 }
 interface Draft {
   id: string;
@@ -69,7 +108,7 @@ interface Settings {
 }
 interface Status {
   ai: { configured: boolean; model: string | null };
-  telegram: { configured: boolean };
+  telegram: { configured: boolean; business: { name: string; username: string | null; enabled: boolean; canReply: boolean; at: string } | null };
   facebook: { configured: boolean; accounts: { id: string; name: string; status: string; lastError: string | null }[] };
   instagram: { configured: boolean; accounts: { id: string; name: string; status: string; lastError: string | null }[] };
   linkedin: { configured: boolean };
@@ -233,7 +272,8 @@ export function ChatView({ id, onBack }: { id: string; onBack?: () => void }) {
                 m.direction === "out" ? "rounded-br-sm bg-brand-600 text-white" : "rounded-bl-sm bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-100"
               }`}
             >
-              <p className="whitespace-pre-wrap break-words">{m.text}</p>
+              <Attachments m={m} />
+              {!(m.attachments && /^\[(photo|attachment|video|voice message|audio|file|sticker)\]$/.test(m.text)) && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
               <p className={`mt-1 text-[10px] ${m.direction === "out" ? "text-white/70" : "text-slate-400"}`}>
                 {formatDate(m.sentAt)}
                 {AUTHOR_LABEL[m.author] && ` · ${AUTHOR_LABEL[m.author]}`}
@@ -723,13 +763,23 @@ function SetupTab() {
         </Step>
         <Step ok={s.telegram.configured} title="Telegram bot">
           <p>
-            Paste the token from <strong>@BotFather</strong> above. Share your bot link (t.me/your_bot) with customers. The AI replies in private chats only, never in groups.
+            Paste the token from <strong>@BotFather</strong> above. Share your bot link (t.me/your_bot) with customers. The AI replies in private chats only, never in groups. Photos, voice
+            notes and files show in the chat.
           </p>
+        </Step>
+        <Step ok={!!s.telegram.business?.enabled} title={s.telegram.business?.enabled ? `Telegram Business: your own Telegram (${s.telegram.business.username ? `@${s.telegram.business.username}` : s.telegram.business.name})` : "Telegram Business: chats of your own Telegram number (optional)"}>
+          <p>
+            In @BotFather open your bot → <em>Bot Settings → Business Mode</em> → turn it on. Then in your Telegram app: <em>Settings → Telegram Business → Chatbots</em>, add your bot,
+            choose which chats it may see and allow it to reply. Chats with customers on your own number then appear here and in All messages; replies go out as you, within 24
+            hours of their last message.
+          </p>
+          {s.telegram.business && !s.telegram.business.canReply && <p className="text-amber-600">The bot is connected but may not reply: allow “Reply to messages” in Telegram Business → Chatbots.</p>}
         </Step>
         <Step ok={fbOk} title="Facebook Page messages">
           <p>
-            Connect your Page under <Link to="/social" className="text-brand-600 hover:underline">Social Accounts</Link>, allowing the messaging permissions. New messages are
-            checked every minute. Facebook allows replies within 24 hours of the person&apos;s last message.
+            Connect your Page under <Link to="/social" className="text-brand-600 hover:underline">Social Accounts</Link>, allowing the messaging permissions. New messages arrive
+            within seconds once the Meta webhook is set up (Social Engagement → Real-time setup), and are also checked every minute. Facebook allows replies within 24 hours of the
+            person&apos;s last message. Photos, videos and voice notes show in the chat.
           </p>
         </Step>
         <Step ok={igOk} title="Instagram DMs">

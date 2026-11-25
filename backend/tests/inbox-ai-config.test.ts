@@ -83,7 +83,7 @@ describe("AI provider, model and keys from the admin panel", () => {
     await call("PUT", "/api/inbox/secrets/telegramToken", { value: TG });
     expect((await call("POST", "/api/inbox/test/telegram")).json()).toEqual({ ok: true, detail: "Connected to @acme_shop_bot" });
     expect(telegramCalls.at(-1)).toContain(`/bot${TG}/getMe`);
-    expect((await call("GET", "/api/inbox/status")).json().telegram).toEqual({ configured: true });
+    expect((await call("GET", "/api/inbox/status")).json().telegram).toEqual({ configured: true, business: null });
 
     await call("PUT", "/api/inbox/secrets/telegramToken", { value: "111111:AAHabcdefghijklmnopqrstuvwxyz0123456" });
     expect((await call("POST", "/api/inbox/test/telegram")).json()).toMatchObject({ ok: false, detail: expect.stringMatching(/rejected the bot token/) });
