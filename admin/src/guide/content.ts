@@ -362,10 +362,14 @@ export const GUIDE: GuideSection[] = [
     title: "Social accounts",
     audience: "all",
     pages: ["/social"],
-    image: img("15-social-accounts", "Connect Facebook, Instagram and LinkedIn"),
+    image: img("15-social-accounts", "Connect Facebook, Instagram, LinkedIn and YouTube"),
     intro:
-      "Click Connect: Facebook or LinkedIn opens its own login page; you never type your password into this panel. The platform receives an access token, stores it encrypted, and you can disconnect at any time.",
-    notes: ["The Connect buttons work once the administrator has set up the platform's Facebook and LinkedIn apps (see the server settings section)."],
+      "Click Connect: Facebook, LinkedIn or Google opens its own login page; you never type your password into this panel. The platform receives an access token, stores it encrypted, and you can disconnect at any time.",
+    steps: [
+      "Facebook & Instagram: one login connects every Page you manage and the Instagram Business/Creator account linked to each.",
+      "YouTube: “Connect with Google”, pick the Google account (or brand account) that owns the channel and allow access. Its comments and subscribers then come to Social Engagement.",
+    ],
+    notes: ["The Connect buttons work once the administrator has set up the platform's Facebook, LinkedIn and Google apps (Integrations page)."],
   },
   {
     id: "social-engagement",
@@ -374,9 +378,10 @@ export const GUIDE: GuideSection[] = [
     pages: ["/engagement"],
     image: img("26-social-engagement", "Social Engagement: who commented, liked and shared your Facebook and Instagram posts"),
     intro:
-      "Everyone who comments, likes or shares your own Facebook Page and Instagram posts is saved here by itself, with their name (or Instagram username), their ID and what they did. Comments that ask about price, fees, details or say DM are marked “Looks like a lead”.",
+      "Everyone who comments, likes or shares your own Facebook Page and Instagram posts, and who comments on or subscribes to your YouTube channel, is saved here by itself, with their name (or username / channel), their ID and what they did. Comments that ask about price, fees, details or say DM are marked “Looks like a lead”.",
     steps: [
       "Connect your Facebook Page under Social Accounts (the Instagram Business or Creator account linked to the Page comes with it). If you connected before this feature, press Connect again once and allow all permissions.",
+      "YouTube: connect your channel under Social Accounts (Connect with Google). It is checked every 15 minutes (YouTube has no live updates): the newest videos with their like and comment counts, every comment and reply with the channel that wrote it, and new subscribers whose subscriptions are public (“▶ Subscribed”). Reply to a YouTube comment here as your channel. Who liked a video is not shown by YouTube, only the count.",
       "Open Social Engagement and press “Sync now” on an account: your latest 50 posts and who engaged with them are read. After that it checks every 15 minutes by itself, and new comments arrive within seconds once real-time is on.",
       "Activity: the live feed of comments, likes/reactions and shares. Filter “Looks like a lead” or “Comments not answered”, and press Reply to answer a comment as your Page or Instagram account.",
       "“Message privately” sends the person who commented one private message (Messenger for a Page comment, Instagram Direct for an Instagram comment). Meta allows one per comment, within 7 days; when they answer, the chat continues in All messages.",
@@ -436,7 +441,7 @@ export const GUIDE: GuideSection[] = [
   },
   {
     id: "admin-platform-integrations",
-    title: "Administrators: Integrations page (Razorpay, Facebook, LinkedIn)",
+    title: "Administrators: Integrations page (Razorpay, Facebook, LinkedIn, Google)",
     audience: "admin",
     pages: ["/platform"],
     image: img("23-platform-integrations", "Integrations: Razorpay, Meta and LinkedIn apps, and where everything else is set up"),
@@ -444,6 +449,7 @@ export const GUIDE: GuideSection[] = [
       "Razorpay: in razorpay.com switch on Test mode → Account & Settings → API Keys → Generate Key; paste the Key ID (rzp_test_…) and Key Secret. Under Webhooks add the Webhook URL shown on the page with events payment.captured and payment.failed and a secret; enter the same secret. Save and click Test connection.",
       "Going live: after Razorpay approves your KYC, generate live keys (rzp_live_…), add the webhook in live mode and save the live values — the page then shows “Live — real payments”.",
       "Facebook & Instagram (Meta app) and LinkedIn app: create the apps, paste the Redirect URL shown on the page into them, and enter App ID / Secret or Client ID / Secret. Customers' Connect buttons work immediately.",
+      "Google app (YouTube): in console.cloud.google.com create a project, enable “YouTube Data API v3”, set up the OAuth consent screen with the scope youtube.force-ssl, then Credentials → OAuth client ID (Web application) with the Redirect URL shown on the page. Paste the Client ID and Client secret. Until Google verifies the app, only test users you add on the consent screen can connect their channel. The API allows 10,000 units a day (one channel check costs about 5, a reply 50).",
       "Keys are stored encrypted, never shown again (leave a secret empty to keep it) and replace the same values in Render. “Remove keys” goes back to the Render values, if any.",
       "The “Other integrations” table links to everything set up elsewhere: customers' senders, AI Inbox, Webhooks & n8n, Website, Extensions and Render.",
     ],
@@ -510,7 +516,7 @@ export const GUIDE: GuideSection[] = [
         ["Contact Finder phase 3: upload a sheet of companies/people and fill in emails and phones (websites first, Hunter within a budget)", "Done", "—"],
         ["All messages phase 2: Meta webhooks for Messenger/Instagram, photos and voice, private reply to comments, Telegram Business (your own Telegram number)", "Done", "Meta: Page webhook field “messages” and Instagram “messages”, App Review for pages_messaging and instagram_manage_messages. Telegram: Business Mode on the bot."],
         ["All messages phase 3: one contact across apps, labels, team assignment, WhatsApp Coexistence", "Agreed", "Meta Tech Provider status for Coexistence (Embedded Signup)."],
-        ["Social Engagement phase 2: YouTube comments and subscribers", "Agreed", "Google Cloud project with the YouTube Data API and OAuth consent screen."],
+        ["Social Engagement phase 2: YouTube comments and subscribers", "Built — needs Google setup", "Google Cloud project with the YouTube Data API, OAuth consent screen (youtube.force-ssl) and Google verification for customers' channels; keys on the Integrations page."],
         ["Social Engagement phase 3: LinkedIn company page comments, reactions, reposts", "Agreed", "LinkedIn Community Management API approval."],
         ["Customers re-download the Maps extension (v0.2.0)", "Recommended", "Fast hands-off collecting: reads the list without opening listings, runs in a background tab, starts the next keyword by itself, notifies when done. Also keeps leads waiting when credit runs out."],
         ["Per-user API tokens and integrations (phase D)", "Pending", "Each customer manages their own tokens and webhooks; final security review."],
