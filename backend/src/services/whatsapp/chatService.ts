@@ -383,6 +383,7 @@ export class WhatsAppChatService {
       profileName: c.profileName,
       customName: c.customName,
       leadId: c.leadId,
+      contactId: c.contactId,
       lastMessageAt: c.lastMessageAt,
       lastMessageText: c.lastMessageText,
       unreadCount: c.unreadCount,

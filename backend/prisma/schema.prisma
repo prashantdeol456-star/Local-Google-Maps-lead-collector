@@ -901,6 +901,12 @@ model InboxConversation {
   lastMessageAt       DateTime
   /// Messages from the person not yet opened in the admin panel
   unreadCount         Int            @default(0)
+  /// Contacts (OutreachContact) record this chat belongs to: one person across all apps
+  contactId           String?
+  /// JSON array of label names (same labels as WhatsApp Chat)
+  labels              String?
+  /// Your private notes about this person
+  notes               String?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   messages            InboxMessage[]
@@ -1325,6 +1331,8 @@ model WaChat {
   archivedAt      DateTime?
   /// No browser notifications until this time
   mutedUntil      DateTime?
+  /// Contacts (OutreachContact) record this chat belongs to: one person across all apps
+  contactId       String?
   /// JSON array of label names (WhatsApp Business labels)
   labels          String?
   /// Your private notes about this contact

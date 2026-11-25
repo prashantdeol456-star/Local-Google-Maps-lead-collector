@@ -5,6 +5,7 @@
 import { hasReplyWindow, META_WINDOW_MS } from "./policy.js";
 import type { InboxService } from "./inboxService.js";
 import type { WhatsAppChatService } from "../whatsapp/chatService.js";
+import { parseLabels } from "./chatContacts.js";
 
 export const UNIFIED_PLATFORMS = ["whatsapp", "facebook", "instagram", "telegram", "linkedin"] as const;
 export type UnifiedPlatform = (typeof UNIFIED_PLATFORMS)[number];
@@ -31,6 +32,9 @@ export interface UnifiedChat {
   /** Free replies allowed until (null: closed); "always" for Telegram bots and LinkedIn */
   replyUntil: Date | "always" | null;
   labels: string[];
+  /** Contacts record this chat belongs to (one person across apps) */
+  contactId: string | null;
+  notes: string | null;
 }
 
 const LIST_LIMIT = 300;
@@ -49,7 +53,7 @@ export class UnifiedInboxService {
   }
 
   /** `sources`: what the user may use (switched-off services are left out). */
-  async list(query: { platform?: UnifiedPlatform; filter?: UnifiedFilter; q?: string; sources: { whatsapp: boolean; inbox: boolean } }) {
+  async list(query: { platform?: UnifiedPlatform; filter?: UnifiedFilter; q?: string; label?: string; contactId?: string; sources: { whatsapp: boolean; inbox: boolean } }) {
     const filter = query.filter ?? "all";
     const wantWhatsApp = query.sources.whatsapp && (!query.platform || query.platform === "whatsapp");
     const wantInbox = query.sources.inbox && query.platform !== "whatsapp";
@@ -81,6 +85,8 @@ export class UnifiedInboxService {
         muted: !!c.mutedUntil,
         replyUntil: c.blocked ? null : c.windowOpenUntil,
         labels: c.labels,
+        contactId: c.contactId,
+        notes: c.notes,
       });
     }
     for (const c of inbox) {
@@ -105,11 +111,18 @@ export class UnifiedInboxService {
             ? new Date(c.lastInboundAt.getTime() + META_WINDOW_MS)
             : null
           : "always",
-        labels: [],
+        labels: parseLabels(c.labels),
+        contactId: c.contactId,
+        notes: c.notes,
       });
     }
 
-    const kept = chats.filter((c) => (filter === "unread" ? c.unreadCount > 0 : filter === "needs_reply" ? c.needsReply : true));
+    const kept = chats.filter(
+      (c) =>
+        (filter === "unread" ? c.unreadCount > 0 : filter === "needs_reply" ? c.needsReply : true) &&
+        (!query.label || c.labels.includes(query.label)) &&
+        (!query.contactId || c.contactId === query.contactId),
+    );
     kept.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
 
     // Per-app counts of the whole list (before the app filter), for the tabs.

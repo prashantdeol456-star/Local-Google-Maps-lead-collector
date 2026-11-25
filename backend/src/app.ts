@@ -71,6 +71,7 @@ import { HunterClient } from "./services/enrich/hunter.js";
 import { BulkEnrichService } from "./services/enrich/bulkEnrich.js";
 import { EnrichWorker } from "./jobs/enrichWorker.js";
 import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
+import { ChatContactsService } from "./services/inbox/chatContacts.js";
 import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
 import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
 import { MetaEngagementApi } from "./services/engagement/metaEngagement.js";
@@ -323,7 +324,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const bulkEnrich = new BulkEnrichService(db, enrich, { fetchText: siteFetch, importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName) });
   const enrichWorker = new EnrichWorker(bulkEnrich, { log: (msg) => app.log.warn(msg) });
   await app.register(enrichRoutes, { enrich, bulk: bulkEnrich });
-  await app.register(messageRoutes, { unified: new UnifiedInboxService({ whatsapp: waChats, inbox }) });
+  await app.register(messageRoutes, { unified: new UnifiedInboxService({ whatsapp: waChats, inbox }), contacts: new ChatContactsService(db) });
   await app.register(engagementWebhookRoutes, { engagement });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
   await app.register(senderRoutes, { senders });

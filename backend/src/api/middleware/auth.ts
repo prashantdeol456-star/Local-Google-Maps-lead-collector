@@ -52,7 +52,7 @@ const CUSTOMER_ROUTES = new RegExp(
       // Email finder (their own Hunter key) for Contact Finder
       "enrich/(status|hunter-key|refresh|find-email|verify-email|domain-emails|template\\.csv|jobs)|enrich/jobs/:id|enrich/jobs/:id/(export\\.csv|to-contacts)|enrich/jobs/:id/:action",
       // All messages: their WhatsApp and AI Inbox chats in one list
-      "messages/(chats|summary)",
+      "messages/(chats|summary|labels|contacts)|messages/chats/:source/:id/contact|messages/chats/inbox/:id",
       // Social Engagement (their own Pages and Instagram accounts)
       "engagement/(summary|accounts|activity|posts|people|people/export\\.csv)|engagement/accounts/:id/sync|engagement/people/:id|engagement/people/:id/contact|engagement/comments/:id/(reply|private-reply)",
     ].join("|") +

@@ -840,6 +840,9 @@ export interface InboxConversationRecord {
   lastOutboundAt: Date | null;
   lastMessageAt: Date;
   unreadCount: number;
+  contactId: string | null;
+  labels: string | null;
+  notes: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

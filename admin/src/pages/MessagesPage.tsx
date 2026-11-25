@@ -7,6 +7,7 @@ import { useMe } from "../lib/me";
 import { Link, setSearchParams, useSearchParams } from "../lib/router";
 import type { WhatsAppTemplate } from "../lib/types";
 import { ChatView, PlatformIcon } from "./InboxPage";
+import { ContactStrip } from "./messages/ContactStrip";
 import { ding, NewChat, WhatsAppConversation } from "./whatsapp/Conversation";
 
 // All messages: WhatsApp, Facebook Messenger, Instagram, Telegram and LinkedIn chats in one list.
@@ -32,6 +33,8 @@ interface UnifiedChat {
   muted: boolean;
   replyUntil: string | null;
   labels: string[];
+  contactId: string | null;
+  notes: string | null;
 }
 
 interface Summary {
@@ -76,6 +79,8 @@ export function MessagesPage() {
   const platform = (params.get("app") ?? "") as Platform | "";
   const filter = (params.get("filter") ?? "all") as Filter;
   const q = params.get("q") ?? "";
+  const label = params.get("label") ?? "";
+  const contact = params.get("contact") ?? "";
   const [search, setSearch] = useState(q);
   const [newChat, setNewChat] = useState<{ phone?: string; name?: string } | null>(null);
   const [notify, setNotify] = useState(() => {
@@ -92,9 +97,10 @@ export function MessagesPage() {
   const hasInbox = superAdmin || !!me?.services.includes("ai_inbox");
   const apps = (["whatsapp", "facebook", "instagram", "telegram", "linkedin"] as Platform[]).filter((p) => (p === "whatsapp" ? hasWhatsApp : hasInbox));
 
+  const labels = useQuery({ queryKey: ["messages", "labels"], queryFn: () => api<{ items: string[] }>("/messages/labels").then((r) => r.items) });
   const list = useQuery({
-    queryKey: ["messages", "chats", platform, filter, q],
-    queryFn: () => api<{ items: UnifiedChat[]; counts: Summary["counts"] }>(`/messages/chats${qs({ platform, filter: filter === "all" ? "" : filter, q })}`),
+    queryKey: ["messages", "chats", platform, filter, q, label, contact],
+    queryFn: () => api<{ items: UnifiedChat[]; counts: Summary["counts"] }>(`/messages/chats${qs({ platform, filter: filter === "all" ? "" : filter, q, label, contactId: contact })}`),
     placeholderData: keepPreviousData,
     refetchInterval: 30_000,
   });
@@ -137,6 +143,7 @@ export function MessagesPage() {
   };
 
   const [kind, id] = selected.split(":") as ["wa" | "in" | undefined, string | undefined];
+  const openChat = list.data?.items.find((c) => keyOf(c) === selected) ?? null;
   const counts = list.data?.counts ?? summary.data?.counts ?? {};
   const total = (p: Platform | "") => (p ? (counts[p]?.chats ?? 0) : Object.values(counts).reduce((a, c) => a + c.chats, 0));
   const unreadOf = (p: Platform | "") => (p ? (counts[p]?.unread ?? 0) : Object.values(counts).reduce((a, c) => a + c.unread, 0));
@@ -216,7 +223,25 @@ export function MessagesPage() {
                     {text}
                   </button>
                 ))}
+                {(labels.data?.length ?? 0) > 0 && (
+                  <select className="rounded-full bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800" value={label} onChange={(e) => setSearchParams({ label: e.target.value || null })} aria-label="Label">
+                    <option value="">All labels</option>
+                    {labels.data!.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
+              {contact && (
+                <p className="flex items-center justify-between rounded bg-brand-50 px-2 py-1 text-xs text-brand-700 dark:bg-brand-700/20 dark:text-brand-100">
+                  Showing one person&apos;s chats on every app
+                  <button onClick={() => setSearchParams({ contact: null })} aria-label="Show all chats">
+                    ✕
+                  </button>
+                </p>
+              )}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {list.isPending && <Spinner />}
@@ -294,6 +319,17 @@ export function MessagesPage() {
           </aside>
 
           <section className={`min-h-0 min-w-0 flex-1 flex-col ${selected ? "flex" : "hidden md:flex"}`}>
+            {(kind === "wa" || kind === "in") && id && (
+              <ContactStrip
+                key={selected}
+                source={kind === "wa" ? "whatsapp" : "inbox"}
+                id={id}
+                chatName={openChat?.name ?? ""}
+                inboxLabels={openChat?.labels ?? []}
+                inboxNotes={openChat?.notes ?? null}
+                knownLabels={labels.data ?? []}
+              />
+            )}
             {kind === "wa" && id ? (
               <WhatsAppConversation key={selected} chatId={id} onBack={() => setSearchParams({ chat: null })} onNewChat={(phone, name) => setNewChat({ phone, name })} />
             ) : kind === "in" && id ? (
