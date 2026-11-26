@@ -22,7 +22,7 @@ const CONTACT_PAGES = 3;
 
 export interface Found {
   value: string;
-  source: "given" | "website" | "contact_page" | "hunter";
+  source: "given" | "website" | "contact_page" | "hunter" | "snov";
 }
 
 /** Header names people use for each column (lower-case, without spaces and punctuation). */
@@ -228,9 +228,9 @@ export class BulkEnrichService {
         try {
           const res = await this.enrich.findEmail({ fullName: row.name!, domain, company: domain ? null : row.company, linkedinUrl: row.linkedinUrl });
           if (res.result) {
-            add(emails, res.result.email, "hunter");
+            add(emails, res.result.email, res.provider);
             if (res.status === "found") hunterUsed = 1;
-          } else notes.push("Hunter: not found");
+          } else notes.push(`${res.provider === "snov" ? "Snov.io" : "Hunter"}: not found`);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           notes.push(`Hunter: ${message}`);

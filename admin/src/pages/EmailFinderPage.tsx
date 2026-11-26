@@ -6,6 +6,7 @@ import { formatDate, formatRelative } from "../lib/format";
 import { setSearchParams, useSearchParams } from "../lib/router";
 import { EmailFinderBulk } from "./EmailFinderBulk";
 import { EmailFinderApollo } from "./EmailFinderApollo";
+import { SnovCard, useSnovStatus } from "./EmailFinderSnov";
 
 // Email finder: your own Hunter API key for Contact Finder (find a person's work email, check an
 // email, emails at a company's domain). Every lookup checks your free credits first and never
@@ -79,12 +80,12 @@ function KeyCard({ status, onSaved }: { status: Status; onSaved: (s: Status) => 
   );
 }
 
-function TryIt({ onDone }: { onDone: () => void }) {
+function TryIt({ onDone, hunter }: { onDone: () => void; hunter: boolean }) {
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [domain, setDomain] = useState("");
   const find = useMutation({
-    mutationFn: () => api<{ status: string; result: Found | null; creditsLeft: number | null }>("/enrich/find-email", { method: "POST", body: { fullName: name, company: company || null, domain: domain || null } }),
+    mutationFn: () => api<{ status: string; result: Found | null; creditsLeft: number | null; provider?: "hunter" | "snov" }>("/enrich/find-email", { method: "POST", body: { fullName: name, company: company || null, domain: domain || null } }),
     onSettled: onDone,
   });
   const byDomain = useMutation({
@@ -94,7 +95,7 @@ function TryIt({ onDone }: { onDone: () => void }) {
   return (
     <div className="card space-y-3 p-4">
       <h2 className="font-semibold">Try it</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-300">Contact Finder does the same from a LinkedIn profile or a website. Results come from Hunter: check the confidence before you write.</p>
+      <p className="text-sm text-slate-600 dark:text-slate-300">Contact Finder does the same from a LinkedIn profile or a website. Results come from Hunter, or Snov.io when Hunter cannot answer: check the confidence before you write.</p>
       <div className="grid gap-2 sm:grid-cols-3">
         <input className="input" placeholder="Person's full name" value={name} onChange={(e) => setName(e.target.value)} aria-label="Full name" />
         <input className="input" placeholder="Company name" value={company} onChange={(e) => setCompany(e.target.value)} aria-label="Company name" />
@@ -104,7 +105,7 @@ function TryIt({ onDone }: { onDone: () => void }) {
         <button className="btn btn-primary" disabled={find.isPending || !name.trim() || (!company.trim() && !domain.trim())} onClick={() => find.mutate()}>
           {find.isPending ? "Finding…" : "Find work email (1 credit if found)"}
         </button>
-        <button className="btn" disabled={byDomain.isPending || !domain.trim()} onClick={() => byDomain.mutate()}>
+        <button className="btn" disabled={byDomain.isPending || !domain.trim() || !hunter} onClick={() => byDomain.mutate()}>
           {byDomain.isPending ? "Searching…" : "Emails at this website (up to 5 credits)"}
         </button>
       </div>
@@ -114,10 +115,11 @@ function TryIt({ onDone }: { onDone: () => void }) {
           {find.data.result ? (
             <>
               <strong>{find.data.result.email}</strong> · confidence {find.data.result.score ?? "?"}% · {find.data.result.verification ?? "not checked"}
+              {` · by ${find.data.provider === "snov" ? "Snov.io" : "Hunter"}`}
               {find.data.status === "cached" && " · from an earlier lookup (no credit)"}
             </>
           ) : (
-            "Hunter found no email for this person (no credit used)."
+            `${find.data.provider === "snov" ? "Snov.io" : "Hunter"} found no email for this person (no credit used).`
           )}
         </p>
       )}
@@ -142,6 +144,8 @@ export function EmailFinderPage() {
   const status = useQuery({ queryKey: ["enrich"], queryFn: () => api<Status>("/enrich/status") });
   const refresh = useMutation({ mutationFn: () => api<Status>("/enrich/refresh", { method: "POST" }), onSuccess: (s) => client.setQueryData(["enrich"], s) });
   const s = status.data;
+  const snov = useSnovStatus().data;
+  const snovReady = !!snov?.configured && snov.status !== "disabled";
   return (
     <>
       <PageHeader
@@ -176,7 +180,7 @@ export function EmailFinderPage() {
       </nav>
       {status.isPending && tab !== "apollo" && <Spinner />}
       {tab === "apollo" && <EmailFinderApollo />}
-      {s && tab === "bulk" && <EmailFinderBulk hunterReady={s.configured && s.status !== "disabled"} creditsLeft={s.credits?.left ?? null} />}
+      {s && tab === "bulk" && <EmailFinderBulk hunterReady={(s.configured && s.status !== "disabled") || snovReady} creditsLeft={s.credits?.left ?? snov?.credits?.left ?? null} />}
       {status.error && tab !== "apollo" && <ErrorBox error={status.error} />}
       {refresh.error && <ErrorBox error={refresh.error} />}
       {s && tab === "key" && (
@@ -191,7 +195,8 @@ export function EmailFinderPage() {
           )}
           {s.exhaustedUntil && <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">Credits are used up: lookups start again on {formatDate(s.exhaustedUntil)}.</p>}
           <KeyCard status={s} onSaved={(next) => client.setQueryData(["enrich"], next)} />
-          {s.configured && s.status !== "disabled" && <TryIt onDone={() => void client.invalidateQueries({ queryKey: ["enrich"] })} />}
+          <SnovCard />
+          {((s.configured && s.status !== "disabled") || snovReady) && <TryIt hunter={s.configured && s.status !== "disabled"} onDone={() => void client.invalidateQueries({ queryKey: ["enrich"], refetchType: "all" }).then(() => client.invalidateQueries({ queryKey: ["snov"] }))} />}
           <div className="card">
             <h2 className="border-b border-slate-200 p-4 font-semibold dark:border-slate-800">Recent lookups</h2>
             {s.recent.length === 0 ? (

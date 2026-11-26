@@ -52,7 +52,7 @@ const CUSTOMER_ROUTES = new RegExp(
       // Marketplace leads (their own IndiaMART / TradeIndia / portal enquiries)
       "marketplace/(sources|leads|leads/export\\.csv)|marketplace/sources/:id|marketplace/sources/:id/pull",
       // Email finder (their own Hunter key) for Contact Finder
-      "enrich/(status|hunter-key|refresh|find-email|verify-email|domain-emails|template\\.csv|jobs)|enrich/jobs/:id|enrich/jobs/:id/(export\\.csv|to-contacts)|enrich/jobs/:id/:action|enrich/apollo/(status|key|refresh|search|reveal|to-contacts)",
+      "enrich/(status|hunter-key|refresh|find-email|verify-email|domain-emails|template\\.csv|jobs)|enrich/jobs/:id|enrich/jobs/:id/(export\\.csv|to-contacts)|enrich/jobs/:id/:action|enrich/apollo/(status|key|refresh|search|reveal|to-contacts)|enrich/snov/(status|key|refresh)",
       // All messages: their WhatsApp and AI Inbox chats in one list
       "messages/(chats|summary|labels|contacts)|messages/chats/:source/:id/contact|messages/chats/inbox/:id",
       // Social Engagement (their own Pages and Instagram accounts)

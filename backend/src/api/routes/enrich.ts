@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { EnrichmentService } from "../../services/enrich/enrichmentService.js";
 import type { ApolloService } from "../../services/enrich/apolloService.js";
+import type { SnovService } from "../../services/enrich/snovService.js";
 import { templateCsv, type BulkEnrichService } from "../../services/enrich/bulkEnrich.js";
 import { IdParams } from "../validation.js";
 import { requireSession } from "../middleware/auth.js";
@@ -39,8 +40,8 @@ const JobBody = z.object({
   hunterBudget: z.number().int().min(0).max(1000).default(0),
 });
 
-export async function enrichRoutes(app: FastifyInstance, opts: { enrich: EnrichmentService; bulk: BulkEnrichService; apollo: ApolloService }) {
-  const { enrich, bulk, apollo } = opts;
+export async function enrichRoutes(app: FastifyInstance, opts: { enrich: EnrichmentService; bulk: BulkEnrichService; apollo: ApolloService; snov: SnovService }) {
+  const { enrich, bulk, apollo, snov } = opts;
 
   // ---- Bulk: a sheet of companies / people ----
   app.get("/api/enrich/template.csv", async (_request, reply) =>
@@ -74,6 +75,15 @@ export async function enrichRoutes(app: FastifyInstance, opts: { enrich: Enrichm
     return bulk.toContacts(parse(IdParams, request.params).id, listName ?? null);
   });
 
+
+  // ---- Snov.io: the second email finder (used when Hunter cannot answer) ----
+  app.get("/api/enrich/snov/status", async () => snov.status());
+  app.put("/api/enrich/snov/key", async (request) => {
+    requireSession(request);
+    const { key } = parse(z.object({ key: z.object({ clientId: z.string().max(200), clientSecret: z.string().max(200) }).nullable() }), request.body);
+    return snov.setKey(key);
+  });
+  app.post("/api/enrich/snov/refresh", async () => snov.refresh());
 
   // ---- Apollo people search (free) and emails (1 Apollo credit each) ----
   app.get("/api/enrich/apollo/status", async () => apollo.status());

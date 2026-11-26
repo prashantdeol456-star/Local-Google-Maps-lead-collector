@@ -12,6 +12,7 @@
 // One lookup at a time per user, so two at once cannot both take the last credit.
 
 import type { PrismaClient } from "../../generated/prisma/client.js";
+import { AppError } from "../../utils/errors.js";
 import { ownerScope } from "../../database/ownerScope.js";
 import { Errors } from "../../utils/errors.js";
 import type { SecretBox } from "../../utils/secretBox.js";
@@ -60,7 +61,11 @@ export class EnrichmentService {
     private readonly db: PrismaClient,
     private readonly hunter: HunterClient,
     private readonly box: SecretBox,
-    private readonly opts: { now?: () => Date } = {},
+    private readonly opts: {
+      now?: () => Date;
+      /** Second provider (Snov.io) for name + website, used when Hunter cannot answer; null when it is not set up. */
+      fallback?: { usable: () => Promise<boolean>; findEmail: (fullName: string, domain: string) => Promise<LookupOutcome<FoundEmail>> };
+    } = {},
   ) {}
 
   private now() {
@@ -244,8 +249,37 @@ export class EnrichmentService {
     });
   }
 
-  /** A person's work email from their name and company (or their LinkedIn profile). */
-  findEmail(q: { fullName: string; domain?: string | null; company?: string | null; linkedinUrl?: string | null }) {
+  /** Can Hunter be asked now? (key saved, not switched off, credits not used up) */
+  private async hunterUsable() {
+    const acc = await this.db.hunterAccount.findUnique({ where: { id: ownerKey() } });
+    return !!acc && acc.status !== "disabled" && !(acc.exhaustedUntil && acc.exhaustedUntil > this.now());
+  }
+
+  /**
+   * A person's work email from their name and company (or their LinkedIn profile): Hunter, or
+   * Snov.io when Hunter has no key / is switched off / has no credits left and the website is known.
+   */
+  async findEmail(q: { fullName: string; domain?: string | null; company?: string | null; linkedinUrl?: string | null }): Promise<LookupOutcome<FoundEmail> & { provider: "hunter" | "snov" }> {
+    const fb = this.opts.fallback;
+    const domain = cleanDomain(q.domain);
+    const name = q.fullName.replace(/\s+/g, " ").trim();
+    const viaSnov = async () => (fb && domain && name.split(" ").length >= 2 && (await fb.usable()) ? { ...(await fb.findEmail(name, domain)), provider: "snov" as const } : null);
+    if (!(await this.hunterUsable())) {
+      const r = await viaSnov();
+      if (r) return r;
+    }
+    try {
+      return { ...(await this.hunterFindEmail(q)), provider: "hunter" };
+    } catch (err) {
+      if (err instanceof AppError && (err.code === "NO_CREDITS" || err.code === "HUNTER_DISABLED")) {
+        const r = await viaSnov();
+        if (r) return r;
+      }
+      throw err;
+    }
+  }
+
+  private hunterFindEmail(q: { fullName: string; domain?: string | null; company?: string | null; linkedinUrl?: string | null }) {
     const fullName = q.fullName.replace(/\s+/g, " ").trim();
     const domain = cleanDomain(q.domain);
     const company = q.company?.replace(/\s+/g, " ").trim() || null;

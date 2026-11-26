@@ -69,6 +69,8 @@ import { enrichRoutes } from "./api/routes/enrich.js";
 import { EnrichmentService } from "./services/enrich/enrichmentService.js";
 import { HunterClient } from "./services/enrich/hunter.js";
 import { ApolloClient } from "./services/enrich/apollo.js";
+import { SnovClient } from "./services/enrich/snov.js";
+import { SnovService } from "./services/enrich/snovService.js";
 import { ApolloService } from "./services/enrich/apolloService.js";
 import { BulkEnrichService } from "./services/enrich/bulkEnrich.js";
 import { EnrichWorker } from "./jobs/enrichWorker.js";
@@ -123,6 +125,7 @@ export interface AppDeps {
   /** Tests: fake Hunter API */
   hunterFetch?: typeof fetch;
   apolloFetch?: typeof fetch;
+  snovFetch?: typeof fetch;
   /** Tests: fake IndiaMART / TradeIndia / portal APIs */
   portalFetch?: typeof fetch;
   /** Tests: fake websites for Email finder → Bulk */
@@ -134,7 +137,7 @@ export interface AppDeps {
   razorpayFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, apolloFetch, siteFetch, portalFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, apolloFetch, snovFetch, siteFetch, portalFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -330,13 +333,16 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   await app.register(socialLeadRoutes, { socialLeads: new SocialLeadService(db, repos), timeZone: config.timeZone });
   await app.register(inboxRoutes, { inbox, worker: inboxWorker, runtime: inboxRuntime });
   await app.register(engagementRoutes, { engagement });
-  const enrich = new EnrichmentService(db, new HunterClient(hunterFetch ?? fetch), new SecretBox(config.sessionSecret, "hunter-keys"));
+  const snov = new SnovService(db, new SnovClient(snovFetch ?? fetch, snovFetch ? { pollMs: 1 } : {}), new SecretBox(config.sessionSecret, "snov-keys"));
+  const enrich = new EnrichmentService(db, new HunterClient(hunterFetch ?? fetch), new SecretBox(config.sessionSecret, "hunter-keys"), {
+    fallback: { usable: () => snov.usable(), findEmail: (name, domain) => snov.findEmail(name, domain) },
+  });
   const bulkEnrich = new BulkEnrichService(db, enrich, { fetchText: siteFetch, importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName) });
   const enrichWorker = new EnrichWorker(bulkEnrich, { log: (msg) => app.log.warn(msg) });
   const apollo = new ApolloService(db, new ApolloClient(apolloFetch ?? fetch), new SecretBox(config.sessionSecret, "apollo-keys"), {
     importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName),
   });
-  await app.register(enrichRoutes, { enrich, bulk: bulkEnrich, apollo });
+  await app.register(enrichRoutes, { enrich, bulk: bulkEnrich, apollo, snov });
   const marketplace = new MarketplaceService(db, new PortalClient(portalFetch ?? fetch, portalFetch ? async () => true : (u) => isPublicWebUrl(u)), new SecretBox(config.sessionSecret, "marketplace-keys"), {
     followUp: { whatsapp: async (input) => ({ chatId: (await waChats.start(input)).chat.id }) },
     bus,

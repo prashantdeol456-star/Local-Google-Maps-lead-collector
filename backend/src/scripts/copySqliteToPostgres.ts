@@ -60,6 +60,7 @@ export const TABLES = [
   "SocialEngagement",
   "HunterAccount",
   "ApolloAccount",
+  "SnovAccount",
   "EnrichLookup",
   "EnrichJob",
   "EnrichJobRow",

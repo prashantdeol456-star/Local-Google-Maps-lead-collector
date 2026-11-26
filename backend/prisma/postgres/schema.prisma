@@ -1583,6 +1583,26 @@ model ApolloAccount {
   updatedAt    DateTime  @updatedAt
 }
 
+/// The owner's own Snov.io API credentials: the second email finder, used when Hunter cannot answer.
+model SnovAccount {
+  /// The owner's user id ("default" outside a user's scope)
+  id           String    @id
+  /// Encrypted JSON {clientId, clientSecret}
+  keyEnc       String
+  keyHint      String
+  /// ok | disabled
+  status       String    @default("ok")
+  statusReason String?
+  /// Credits left, as Snov last said
+  credits      Float?
+  /// Most credits seen in this period (the 10 % safety margin is taken from it)
+  creditsPeak  Float?
+  resetDate    DateTime?
+  checkedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
 /// One lookup: credits reserved before the request, then settled with what Hunter counted.
 model EnrichLookup {
   id            String    @id @default(cuid())

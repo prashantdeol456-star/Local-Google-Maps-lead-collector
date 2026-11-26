@@ -222,6 +222,20 @@ export const GUIDE: GuideSection[] = [
     notes: ["Hunter's emails are its best guess with a confidence score: check them before writing. Personal mobile numbers are never looked up."],
   },
   {
+    id: "snov",
+    title: "Snov.io: the second email finder",
+    audience: "all",
+    image: img("32-email-finder-snov", "Email finder: the Hunter key and Snov.io as the second email finder, with its credits"),
+    intro:
+      "When Hunter cannot answer (no Hunter key, the key is switched off, or its free credits are used up), the platform asks Snov.io instead, with your own Snov.io account. It works for a person's name plus their company's website: in Contact Finder, in “Try it” and in Bulk.",
+    steps: [
+      "In Snov.io open Settings → API and copy the User ID and the Secret. Free Snov.io plans get API access only after asking Snov for it (a short demo call); paid plans have it already.",
+      "Email finder → Hunter key and credits → Snov.io card: paste both and press “Save and check”. They are kept encrypted on the server. The card shows the credits left and how many are kept back.",
+      "Nothing else to do: a lookup goes to Hunter first and to Snov.io when Hunter cannot answer. The answer says which one found the email; in Bulk the source column shows “Snov.io”.",
+      "Each email Snov.io returns costs 1 Snov.io credit. The credits are read first and 10 % are kept back, so nothing beyond your credits is ever used; the same person within 30 days is answered again for free.",
+    ],
+  },
+  {
     id: "apollo-search",
     title: "Apollo people search (decision-makers by job title)",
     audience: "all",
@@ -553,7 +567,7 @@ export const GUIDE: GuideSection[] = [
         ["All messages phase 3: one contact across apps, labels and notes on every chat", "Done", "—"],
         ["B2B phase 1: Marketplace leads from IndiaMART, TradeIndia and other portals' enquiry APIs, with an automatic WhatsApp reply", "Done", "Each customer pastes their own seller API key on Marketplace leads."],
         ["B2B phase 2: Apollo people search (title, company, city) with work emails within the credits", "Done", "Each customer adds a free Apollo API key (work-email account) on Email finder → Apollo people search."],
-        ["B2B phase 3: Snov.io as a second email finder", "Agreed", "Customer's free Snov.io API key."],
+        ["B2B phase 3: Snov.io as the second email finder when Hunter cannot answer", "Done", "Each customer adds Snov.io API credentials (free plans must ask Snov for API access)."],
         ["Team accounts: several people under one customer, chats assigned to a team member", "Not started", "Needs team members (sub-users) with their own logins first."],
         ["WhatsApp Coexistence: same number in the WhatsApp Business app and the API, 6 months of chat history", "Waiting", "Meta Tech Provider status (Embedded Signup) for the platform."],
         ["Social Engagement phase 2: YouTube comments and subscribers", "Built — needs Google setup", "Google Cloud project with the YouTube Data API, OAuth consent screen (youtube.force-ssl) and Google verification for customers' channels; keys on the Integrations page."],

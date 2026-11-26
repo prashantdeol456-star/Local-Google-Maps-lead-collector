@@ -146,6 +146,7 @@ async function seed() {
   seedBulkJob(users[0].id);
   seedMarketplace(users[0].id);
   seedApollo(users[0].id);
+  seedSnov(users[0].id);
 
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
@@ -301,6 +302,15 @@ function seedMarketplace(ownerId) {
   db.close();
 }
 
+/** Demo Snov.io credentials (never used: only the card is shown). */
+function seedSnov(ownerId) {
+  const db = new DatabaseSync(DB_FILE);
+  const now = new Date().toISOString().replace("Z", "+00:00");
+  const reset = new Date(Date.now() + 18 * 86400_000).toISOString().replace("Z", "+00:00");
+  db.prepare(`INSERT INTO "SnovAccount" ("id","keyEnc","keyHint","status","credits","creditsPeak","resetDate","checkedAt","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`).run(ownerId, "demo", "…a41c", "ok", 42, 50, reset, now, now, now);
+  db.close();
+}
+
 /** Demo Apollo key (never used: the guide's search answer is filled in the browser). */
 function seedApollo(ownerId) {
   const db = new DatabaseSync(DB_FILE);
@@ -387,6 +397,7 @@ async function shoot(page) {
   const bulkJob = await page.evaluate(async () => (await (await fetch("/api/enrich/jobs")).json()).items[0].id);
   await shot("29-email-finder-bulk", `/admin/email-finder?job=${bulkJob}`);
   await shot("30-marketplace-leads", "/admin/marketplace");
+  await shot("32-email-finder-snov", "/admin/email-finder", () => page.evaluate(() => [...document.querySelectorAll("h2")].find((h) => h.textContent.startsWith("Snov.io"))?.closest(".card")?.scrollIntoView({ block: "center" })));
   await page.setRequestInterception(true);
   const apolloDemo = (req) => {
     if (req.url().endsWith("/api/enrich/apollo/search")) req.respond({ status: 200, contentType: "application/json", body: JSON.stringify(APOLLO_DEMO) });

@@ -36,7 +36,7 @@ interface Row {
   note: string | null;
 }
 
-const SOURCE: Record<string, string> = { given: "in sheet", website: "website", contact_page: "contact page", hunter: "Hunter" };
+const SOURCE: Record<string, string> = { given: "in sheet", website: "website", contact_page: "contact page", hunter: "Hunter", snov: "Snov.io" };
 const STATUS: Record<Row["status"], string> = { pending: "Waiting", found: "Found", not_found: "Nothing found", failed: "Failed", skipped: "Skipped (no website or name)" };
 const JOB_STATUS: Record<Job["status"], string> = { queued: "Waiting", running: "Running", paused: "Paused", done: "Done", stopped: "Stopped" };
 
