@@ -59,6 +59,7 @@ export const TABLES = [
   "SocialPerson",
   "SocialEngagement",
   "HunterAccount",
+  "ApolloAccount",
   "EnrichLookup",
   "EnrichJob",
   "EnrichJobRow",

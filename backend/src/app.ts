@@ -68,6 +68,8 @@ import { messageRoutes } from "./api/routes/messages.js";
 import { enrichRoutes } from "./api/routes/enrich.js";
 import { EnrichmentService } from "./services/enrich/enrichmentService.js";
 import { HunterClient } from "./services/enrich/hunter.js";
+import { ApolloClient } from "./services/enrich/apollo.js";
+import { ApolloService } from "./services/enrich/apolloService.js";
 import { BulkEnrichService } from "./services/enrich/bulkEnrich.js";
 import { EnrichWorker } from "./jobs/enrichWorker.js";
 import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
@@ -120,6 +122,7 @@ export interface AppDeps {
   socialFetch?: typeof fetch;
   /** Tests: fake Hunter API */
   hunterFetch?: typeof fetch;
+  apolloFetch?: typeof fetch;
   /** Tests: fake IndiaMART / TradeIndia / portal APIs */
   portalFetch?: typeof fetch;
   /** Tests: fake websites for Email finder → Bulk */
@@ -131,7 +134,7 @@ export interface AppDeps {
   razorpayFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, siteFetch, portalFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, apolloFetch, siteFetch, portalFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -330,7 +333,10 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const enrich = new EnrichmentService(db, new HunterClient(hunterFetch ?? fetch), new SecretBox(config.sessionSecret, "hunter-keys"));
   const bulkEnrich = new BulkEnrichService(db, enrich, { fetchText: siteFetch, importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName) });
   const enrichWorker = new EnrichWorker(bulkEnrich, { log: (msg) => app.log.warn(msg) });
-  await app.register(enrichRoutes, { enrich, bulk: bulkEnrich });
+  const apollo = new ApolloService(db, new ApolloClient(apolloFetch ?? fetch), new SecretBox(config.sessionSecret, "apollo-keys"), {
+    importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName),
+  });
+  await app.register(enrichRoutes, { enrich, bulk: bulkEnrich, apollo });
   const marketplace = new MarketplaceService(db, new PortalClient(portalFetch ?? fetch, portalFetch ? async () => true : (u) => isPublicWebUrl(u)), new SecretBox(config.sessionSecret, "marketplace-keys"), {
     followUp: { whatsapp: async (input) => ({ chatId: (await waChats.start(input)).chat.id }) },
     bus,

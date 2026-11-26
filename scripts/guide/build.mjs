@@ -145,6 +145,7 @@ async function seed() {
   seedInbox(users[0].id);
   seedBulkJob(users[0].id);
   seedMarketplace(users[0].id);
+  seedApollo(users[0].id);
 
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
@@ -300,6 +301,30 @@ function seedMarketplace(ownerId) {
   db.close();
 }
 
+/** Demo Apollo key (never used: the guide's search answer is filled in the browser). */
+function seedApollo(ownerId) {
+  const db = new DatabaseSync(DB_FILE);
+  const now = new Date().toISOString().replace("Z", "+00:00");
+  const end = new Date(Date.now() + 20 * 86400_000).toISOString().replace("Z", "+00:00");
+  db.prepare(`INSERT INTO "ApolloAccount" ("id","keyEnc","keyHint","status","creditsLimit","creditsUsed","cycleEnd","checkedAt","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`).run(ownerId, "demo", "…x9Fq", "ok", 75, 12, end, now, now, now);
+  db.close();
+}
+
+/** What the guide shows for an Apollo search (made-up people). */
+const APOLLO_DEMO = {
+  total: 1842,
+  page: 1,
+  pages: 74,
+  pageSize: 25,
+  people: [
+    { id: "d1", firstName: "Neha", lastName: "Ag***l", title: "HR Manager", company: "Brightpath Infotech", domain: "brightpath.example.in", hasEmail: true, revealed: { name: "Neha Agarwal", title: "HR Manager", company: "Brightpath Infotech", email: "neha.agarwal@brightpath.example.in", emailStatus: "verified", linkedinUrl: "https://www.linkedin.com/in/example-neha", city: "Noida", country: "India" } },
+    { id: "d2", firstName: "Arjun", lastName: "Me***a", title: "Head of Talent Acquisition", company: "Corelink Systems", domain: "corelink.example.in", hasEmail: true, revealed: { name: "Arjun Mehra", title: "Head of Talent Acquisition", company: "Corelink Systems", email: "arjun@corelink.example.in", emailStatus: "verified", linkedinUrl: null, city: "Noida", country: "India" } },
+    { id: "d3", firstName: "Pooja", lastName: "Si***h", title: "HR Manager", company: "Nimbus Retail", domain: "nimbusretail.example.in", hasEmail: true, revealed: null },
+    { id: "d4", firstName: "Vikas", lastName: "Ya***v", title: "Senior HR Manager", company: "Greenleaf Foods", domain: "greenleaf.example.in", hasEmail: true, revealed: null },
+    { id: "d5", firstName: "Simran", lastName: "Ka***r", title: "HR Business Partner", company: "Orbit Logistics", domain: null, hasEmail: false, revealed: null },
+  ],
+};
+
 // ---------- screenshots ----------
 async function shoot(page) {
   async function login(email, password) {
@@ -362,6 +387,23 @@ async function shoot(page) {
   const bulkJob = await page.evaluate(async () => (await (await fetch("/api/enrich/jobs")).json()).items[0].id);
   await shot("29-email-finder-bulk", `/admin/email-finder?job=${bulkJob}`);
   await shot("30-marketplace-leads", "/admin/marketplace");
+  await page.setRequestInterception(true);
+  const apolloDemo = (req) => {
+    if (req.url().endsWith("/api/enrich/apollo/search")) req.respond({ status: 200, contentType: "application/json", body: JSON.stringify(APOLLO_DEMO) });
+    else req.continue();
+  };
+  page.on("request", apolloDemo);
+  await shot("31-apollo-search", "/admin/email-finder?tab=apollo", async () => {
+    await page.type('input[placeholder="HR Manager, Purchase Manager"]', "HR Manager");
+    await page.type('input[placeholder="Noida, India; Gurugram, India"]', "Noida, India");
+    await clickText("Search Apollo");
+    await pause(1200);
+    await page.click('input[aria-label="Select Pooja"]');
+    await page.click('input[aria-label="Select Vikas"]');
+    await page.evaluate(() => document.querySelector("table")?.closest(".card")?.scrollIntoView({ block: "start" }));
+  });
+  page.off("request", apolloDemo);
+  await page.setRequestInterception(false);
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));

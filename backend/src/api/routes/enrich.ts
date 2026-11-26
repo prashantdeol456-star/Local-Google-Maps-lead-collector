@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { EnrichmentService } from "../../services/enrich/enrichmentService.js";
+import type { ApolloService } from "../../services/enrich/apolloService.js";
 import { templateCsv, type BulkEnrichService } from "../../services/enrich/bulkEnrich.js";
 import { IdParams } from "../validation.js";
 import { requireSession } from "../middleware/auth.js";
@@ -15,6 +16,18 @@ const FindBody = z.object({
   linkedinUrl: text(500),
 });
 
+const terms = z.array(z.string().trim().max(120)).max(20).default([]);
+const ApolloSearchBody = z.object({
+  titles: terms,
+  seniorities: z.array(z.enum(["owner", "founder", "c_suite", "partner", "vp", "head", "director", "manager", "senior", "entry", "intern"])).max(11).default([]),
+  personLocations: terms,
+  organizationLocations: terms,
+  domains: z.array(z.string().trim().max(253)).max(50).default([]),
+  employeeRanges: z.array(z.string().regex(/^\d+,\d+$/)).max(10).default([]),
+  keywords: text(200),
+  page: z.number().int().min(1).max(500).default(1),
+});
+
 const MAX_BASE64 = Math.ceil((5 * 1024 * 1024 * 4) / 3); // 5 MB sheet
 
 const JobBody = z.object({
@@ -26,8 +39,8 @@ const JobBody = z.object({
   hunterBudget: z.number().int().min(0).max(1000).default(0),
 });
 
-export async function enrichRoutes(app: FastifyInstance, opts: { enrich: EnrichmentService; bulk: BulkEnrichService }) {
-  const { enrich, bulk } = opts;
+export async function enrichRoutes(app: FastifyInstance, opts: { enrich: EnrichmentService; bulk: BulkEnrichService; apollo: ApolloService }) {
+  const { enrich, bulk, apollo } = opts;
 
   // ---- Bulk: a sheet of companies / people ----
   app.get("/api/enrich/template.csv", async (_request, reply) =>
@@ -61,6 +74,26 @@ export async function enrichRoutes(app: FastifyInstance, opts: { enrich: Enrichm
     return bulk.toContacts(parse(IdParams, request.params).id, listName ?? null);
   });
 
+
+  // ---- Apollo people search (free) and emails (1 Apollo credit each) ----
+  app.get("/api/enrich/apollo/status", async () => apollo.status());
+  app.put("/api/enrich/apollo/key", async (request) => {
+    requireSession(request);
+    const { key } = parse(z.object({ key: z.string().max(200).nullable() }), request.body);
+    return apollo.setKey(key);
+  });
+  app.post("/api/enrich/apollo/refresh", async () => apollo.refresh());
+  app.post("/api/enrich/apollo/search", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request) => {
+    const b = parse(ApolloSearchBody, request.body);
+    return apollo.search(b, b.page);
+  });
+  app.post("/api/enrich/apollo/reveal", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request) =>
+    apollo.reveal(parse(z.object({ ids: z.array(z.string().max(40)).min(1).max(25) }), request.body).ids),
+  );
+  app.post("/api/enrich/apollo/to-contacts", async (request) => {
+    const b = parse(z.object({ ids: z.array(z.string().max(40)).min(1).max(500), listName: z.string().trim().max(100).nullish() }), request.body);
+    return apollo.toContacts(b.ids, b.listName ?? null);
+  });
 
   app.get("/api/enrich/status", async () => enrich.status());
   // The key is typed in the admin panel only (never in an extension).

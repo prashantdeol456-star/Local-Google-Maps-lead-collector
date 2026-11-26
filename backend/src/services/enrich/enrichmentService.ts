@@ -84,7 +84,7 @@ export class EnrichmentService {
     const acc = await this.db.hunterAccount.findUnique({ where: { id: ownerKey() } });
     const since = new Date(this.now().getTime() - 31 * DAY);
     const [recent, held] = await Promise.all([
-      this.db.enrichLookup.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "desc" }, take: 20 }),
+      this.db.enrichLookup.findMany({ where: { provider: "hunter", createdAt: { gte: since } }, orderBy: { createdAt: "desc" }, take: 20 }),
       this.heldUnits(),
     ]);
     return {
@@ -167,7 +167,7 @@ export class EnrichmentService {
   /** Credits held for lookups that are not settled yet (sent, answer unknown). */
   private async heldUnits(): Promise<number> {
     const since = new Date(this.now().getTime() - 31 * DAY);
-    const rows = await this.db.enrichLookup.findMany({ where: { status: { in: HELD_STATUSES }, createdAt: { gte: since } }, select: { reservedUnits: true } });
+    const rows = await this.db.enrichLookup.findMany({ where: { provider: "hunter", status: { in: HELD_STATUSES }, createdAt: { gte: since } }, select: { reservedUnits: true } });
     return rows.reduce((a, r) => a + r.reservedUnits, 0);
   }
 

@@ -212,7 +212,7 @@ export const GUIDE: GuideSection[] = [
     intro:
       "Finds a person's work email from their name and company, or the emails at a company's website, with your own free Hunter account (50 credits a month). Contact Finder uses it from LinkedIn profiles and websites; you can also try it on this page.",
     steps: [
-      "Make a free account on hunter.io, open API → API keys, copy the key, paste it here and press “Save and check”. The key is kept encrypted on the server and is never put in the extension.",
+      "Tabs: “Hunter key and credits”, “Bulk (sheet)” and “Apollo people search” (next section). Make a free account on hunter.io, open API → API keys, copy the key, paste it here and press “Save and check”. The key is kept encrypted on the server and is never put in the extension.",
       "Credits: finding an email costs 1 credit only when one is found; checking an email 0.5; emails at a website 1 per email found (at most 5 per search). The same search again within 30 days is answered from your earlier result for free.",
       "Before every lookup the platform asks Hunter how many credits are left and keeps 10 % as a safety margin, so nothing is ever spent beyond your free credits and nothing paid is used. When they run out, lookups wait until Hunter renews them (the date is shown).",
       "Recent lookups lists each search with its result and the credits it used. A lookup that did not answer in time keeps its credit “held” until the month's numbers settle.",
@@ -220,6 +220,22 @@ export const GUIDE: GuideSection[] = [
       "The sheet is worked through in the background, one row at a time; you can pause, resume or stop it. Each row shows what was found and where (website, contact page, Hunter, or already in the sheet). Export CSV downloads the results; “Add the found ones to Contacts” puts the rows with an email or phone into Contacts under a list name, ready for a campaign.",
     ],
     notes: ["Hunter's emails are its best guess with a confidence score: check them before writing. Personal mobile numbers are never looked up."],
+  },
+  {
+    id: "apollo-search",
+    title: "Apollo people search (decision-makers by job title)",
+    audience: "all",
+    image: img("31-apollo-search", "Email finder → Apollo people search: HR managers at Noida companies, two with their work emails"),
+    intro:
+      "Finds people by job title, seniority, location and company in Apollo.io's database with your own free Apollo account, for example HR managers or purchase heads in Noida, or the founders of IT companies abroad. Searching is free; you then pick the people you want and get their work emails, 1 Apollo credit each, only within your credits.",
+    steps: [
+      "Make a free account on apollo.io with your work email (Apollo does not give free API access to Gmail/Yahoo accounts). Then Settings → Integrations → API → Create new key, tick People API Search, People Enrichment and View Credit Usage Stats (or “Set as master key”), copy the key.",
+      "Email finder → Apollo people search: paste the key and press “Save and check”. It is kept encrypted on the server. The cards show the email credits of your Apollo plan this month, what is used, and the 10 % kept back as a safety margin.",
+      "Find people (free): job titles (comma-separated), a location (where the company's office is, or where the person lives), seniority, company size, company websites or keywords. Apollo shows first names and hides part of the last name until you get the person's details.",
+      "Tick the people you want and press “Get emails for N selected”. Each costs 1 Apollo credit when Apollo returns the person (nothing when it has nobody). The platform checks your credits first and stops before going over them; a person you already got in the last 30 days is shown again for free.",
+      "Type a list name and press “Add … revealed to Contacts” to put them in Contacts (name, email, job title, company, LinkedIn), ready for an email campaign.",
+    ],
+    notes: ["Only work emails are fetched. Personal emails and mobile numbers are never asked for (they cost much more and are personal data)."],
   },
   {
     id: "marketplace",
@@ -536,7 +552,7 @@ export const GUIDE: GuideSection[] = [
         ["All messages phase 2: Meta webhooks for Messenger/Instagram, photos and voice, private reply to comments, Telegram Business (your own Telegram number)", "Done", "Meta: Page webhook field “messages” and Instagram “messages”, App Review for pages_messaging and instagram_manage_messages. Telegram: Business Mode on the bot."],
         ["All messages phase 3: one contact across apps, labels and notes on every chat", "Done", "—"],
         ["B2B phase 1: Marketplace leads from IndiaMART, TradeIndia and other portals' enquiry APIs, with an automatic WhatsApp reply", "Done", "Each customer pastes their own seller API key on Marketplace leads."],
-        ["B2B phase 2: Apollo people search (title, company, city) with emails within a credit limit", "Agreed", "Customer's free Apollo API key."],
+        ["B2B phase 2: Apollo people search (title, company, city) with work emails within the credits", "Done", "Each customer adds a free Apollo API key (work-email account) on Email finder → Apollo people search."],
         ["B2B phase 3: Snov.io as a second email finder", "Agreed", "Customer's free Snov.io API key."],
         ["Team accounts: several people under one customer, chats assigned to a team member", "Not started", "Needs team members (sub-users) with their own logins first."],
         ["WhatsApp Coexistence: same number in the WhatsApp Business app and the API, 6 months of chat history", "Waiting", "Meta Tech Provider status (Embedded Signup) for the platform."],

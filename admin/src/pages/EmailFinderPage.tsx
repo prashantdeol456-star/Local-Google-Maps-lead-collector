@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { formatDate, formatRelative } from "../lib/format";
 import { setSearchParams, useSearchParams } from "../lib/router";
 import { EmailFinderBulk } from "./EmailFinderBulk";
+import { EmailFinderApollo } from "./EmailFinderApollo";
 
 // Email finder: your own Hunter API key for Contact Finder (find a person's work email, check an
 // email, emails at a company's domain). Every lookup checks your free credits first and never
@@ -137,7 +138,7 @@ function TryIt({ onDone }: { onDone: () => void }) {
 export function EmailFinderPage() {
   const client = useQueryClient();
   const params = useSearchParams();
-  const tab = params.get("tab") === "bulk" || params.get("job") ? "bulk" : "key";
+  const tab = params.get("tab") === "apollo" ? "apollo" : params.get("tab") === "bulk" || params.get("job") ? "bulk" : "key";
   const status = useQuery({ queryKey: ["enrich"], queryFn: () => api<Status>("/enrich/status") });
   const refresh = useMutation({ mutationFn: () => api<Status>("/enrich/refresh", { method: "POST" }), onSuccess: (s) => client.setQueryData(["enrich"], s) });
   const s = status.data;
@@ -145,9 +146,9 @@ export function EmailFinderPage() {
     <>
       <PageHeader
         title="Email finder"
-        subtitle="Emails and phones for people and companies: Contact Finder, a whole sheet at once (Bulk), and your own Hunter key for work emails. Only your free Hunter credits are used, never more."
+        subtitle="Emails and phones for people and companies: Contact Finder, a whole sheet at once (Bulk), your own Hunter key for work emails, and Apollo to find decision-makers by job title. Only your own free credits are used, never more."
         actions={
-          s?.configured ? (
+          s?.configured && tab !== "apollo" ? (
             <button className="btn" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
               {refresh.isPending ? "Checking…" : "⟳ Check credits"}
             </button>
@@ -159,6 +160,7 @@ export function EmailFinderPage() {
           [
             ["key", "Hunter key and credits"],
             ["bulk", "Bulk (sheet)"],
+            ["apollo", "Apollo people search"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -172,9 +174,10 @@ export function EmailFinderPage() {
           </button>
         ))}
       </nav>
-      {status.isPending && <Spinner />}
+      {status.isPending && tab !== "apollo" && <Spinner />}
+      {tab === "apollo" && <EmailFinderApollo />}
       {s && tab === "bulk" && <EmailFinderBulk hunterReady={s.configured && s.status !== "disabled"} creditsLeft={s.credits?.left ?? null} />}
-      {status.error && <ErrorBox error={status.error} />}
+      {status.error && tab !== "apollo" && <ErrorBox error={status.error} />}
       {refresh.error && <ErrorBox error={refresh.error} />}
       {s && tab === "key" && (
         <div className="space-y-6">

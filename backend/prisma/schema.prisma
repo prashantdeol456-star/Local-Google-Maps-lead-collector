@@ -1563,6 +1563,24 @@ model HunterAccount {
   updatedAt      DateTime  @updatedAt
 }
 
+/// The owner's own Apollo.io API key (people search is free; each email found costs 1 credit).
+model ApolloAccount {
+  /// The owner's user id ("default" outside a user's scope)
+  id           String    @id
+  keyEnc       String
+  keyHint      String
+  /// ok | disabled
+  status       String    @default("ok")
+  statusReason String?
+  /// lead_credit for this billing cycle (email reveals)
+  creditsLimit Float?
+  creditsUsed  Float?
+  cycleEnd     DateTime?
+  checkedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
 /// One lookup: credits reserved before the request, then settled with what Hunter counted.
 model EnrichLookup {
   id            String    @id @default(cuid())
