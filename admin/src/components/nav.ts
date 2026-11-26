@@ -25,6 +25,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/collections", label: "Collections", icon: "⌖" },
       { to: "/contacts", label: "Contacts (Sheets)", icon: "▤" },
       { to: "/social-leads", label: "Social Leads", icon: "◎" },
+      { to: "/marketplace", label: "Marketplace leads", icon: "⇆" },
     ],
   },
   {

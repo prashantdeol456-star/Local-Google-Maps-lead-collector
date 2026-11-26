@@ -72,6 +72,11 @@ import { BulkEnrichService } from "./services/enrich/bulkEnrich.js";
 import { EnrichWorker } from "./jobs/enrichWorker.js";
 import { UnifiedInboxService } from "./services/inbox/unifiedInbox.js";
 import { ChatContactsService } from "./services/inbox/chatContacts.js";
+import { marketplaceRoutes } from "./api/routes/marketplace.js";
+import { MarketplaceService } from "./services/marketplace/marketplaceService.js";
+import { PortalClient } from "./services/marketplace/portals.js";
+import { MarketplaceWorker } from "./jobs/marketplaceWorker.js";
+import { isPublicWebUrl } from "./services/justdial/websiteEmail.js";
 import { engagementRoutes, engagementWebhookRoutes } from "./api/routes/engagement.js";
 import { EngagementService, engagementVerifyToken } from "./services/engagement/engagementService.js";
 import { MetaEngagementApi } from "./services/engagement/metaEngagement.js";
@@ -115,6 +120,8 @@ export interface AppDeps {
   socialFetch?: typeof fetch;
   /** Tests: fake Hunter API */
   hunterFetch?: typeof fetch;
+  /** Tests: fake IndiaMART / TradeIndia / portal APIs */
+  portalFetch?: typeof fetch;
   /** Tests: fake websites for Email finder → Bulk */
   siteFetch?: (url: string) => Promise<{ url: string; html: string } | null>;
   /** Fake AI writer / network for the AI Inbox (tests). */
@@ -124,7 +131,7 @@ export interface AppDeps {
   razorpayFetch?: typeof fetch;
 }
 
-export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, siteFetch }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db: rawDb, logger = true, emailProvider, whatsappProvider, aiNavigator, socialFetch, replyWriter, inboxFetch, razorpayFetch, hunterFetch, siteFetch, portalFetch }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger
       ? {
@@ -324,6 +331,13 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   const bulkEnrich = new BulkEnrichService(db, enrich, { fetchText: siteFetch, importContacts: (fileName, data, listName) => contacts.importSheet(fileName, data, listName) });
   const enrichWorker = new EnrichWorker(bulkEnrich, { log: (msg) => app.log.warn(msg) });
   await app.register(enrichRoutes, { enrich, bulk: bulkEnrich });
+  const marketplace = new MarketplaceService(db, new PortalClient(portalFetch ?? fetch, portalFetch ? async () => true : (u) => isPublicWebUrl(u)), new SecretBox(config.sessionSecret, "marketplace-keys"), {
+    followUp: { whatsapp: async (input) => ({ chatId: (await waChats.start(input)).chat.id }) },
+    bus,
+    log: (msg) => app.log.warn(msg),
+  });
+  const marketplaceWorker = new MarketplaceWorker(db, marketplace, { log: (msg) => app.log.warn(msg) });
+  await app.register(marketplaceRoutes, { marketplace });
   await app.register(messageRoutes, { unified: new UnifiedInboxService({ whatsapp: waChats, inbox }), contacts: new ChatContactsService(db) });
   await app.register(engagementWebhookRoutes, { engagement });
   await app.register(whatsappWebhookRoutes, { provider: waProvider, onEvents: (events) => waTracking.handle(events) });
@@ -342,6 +356,8 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
   app.decorate("engagementWorker", engagementWorker);
   app.decorate("engagement", engagement);
   app.decorate("enrichWorker", enrichWorker);
+  app.decorate("marketplaceWorker", marketplaceWorker);
+  app.decorate("marketplace", marketplace);
   app.decorate("bulkEnrich", bulkEnrich);
   app.decorate("webhookWorker", webhookWorker);
   app.decorate("maintenance", maintenance);
@@ -350,7 +366,7 @@ export async function buildApp({ config, db: rawDb, logger = true, emailProvider
     integrations.stop();
     maintenance.stop();
     justdialWorker.stop();
-    await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop(), engagementWorker.stop(), enrichWorker.stop()]);
+    await Promise.all([emailWorker.stop(), whatsappWorker.stop(), webhookWorker.stop(), inboxWorker.stop(), engagementWorker.stop(), enrichWorker.stop(), marketplaceWorker.stop()]);
   });
   return app;
 }
@@ -365,6 +381,8 @@ declare module "fastify" {
     engagementWorker: EngagementWorker;
     engagement: EngagementService;
     enrichWorker: EnrichWorker;
+    marketplaceWorker: MarketplaceWorker;
+    marketplace: MarketplaceService;
     bulkEnrich: BulkEnrichService;
     justdialWorker: JustdialWorker;
     webhookWorker: WebhookWorker;

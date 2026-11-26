@@ -49,6 +49,8 @@ const CUSTOMER_ROUTES = new RegExp(
       "inbox/(ai-config|secrets/:name|test/:what|settings|status|conversations|refresh)",
       "inbox/conversations/:id|inbox/conversations/:id/(ai-reply|send|handled|mode|read)|inbox/media/:id/:n|inbox/drafts/:id/(approve|dismiss)",
       "social/(providers|accounts|connect/:provider)|social/accounts/:id|social/accounts/:id/check",
+      // Marketplace leads (their own IndiaMART / TradeIndia / portal enquiries)
+      "marketplace/(sources|leads|leads/export\\.csv)|marketplace/sources/:id|marketplace/sources/:id/pull",
       // Email finder (their own Hunter key) for Contact Finder
       "enrich/(status|hunter-key|refresh|find-email|verify-email|domain-emails|template\\.csv|jobs)|enrich/jobs/:id|enrich/jobs/:id/(export\\.csv|to-contacts)|enrich/jobs/:id/:action",
       // All messages: their WhatsApp and AI Inbox chats in one list

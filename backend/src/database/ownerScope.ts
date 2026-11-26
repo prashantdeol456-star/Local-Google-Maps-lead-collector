@@ -55,6 +55,9 @@ export const OWNED_MODELS = new Set([
   "EnrichLookup",
   "EnrichJob",
   "EnrichJobRow",
+  // Marketplace leads
+  "MarketplaceSource",
+  "MarketplaceLead",
 ]);
 
 /** Models owned through their collection (CollectionJob): model → relation field. */

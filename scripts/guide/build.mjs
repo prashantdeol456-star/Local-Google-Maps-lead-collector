@@ -144,6 +144,7 @@ async function seed() {
   seedEngagement(users[0].id);
   seedInbox(users[0].id);
   seedBulkJob(users[0].id);
+  seedMarketplace(users[0].id);
 
   // Billing: demo Razorpay test keys (not real; the throw-away database is deleted afterwards) and a manual credit
   await j("PUT", "/api/platform-integrations/razorpay", { keyId: "rzp_test_GuideDemo01", keySecret: "guide-demo-not-a-real-secret", webhookSecret: "guide-demo-webhook" }, sa);
@@ -276,6 +277,29 @@ function seedBulkJob(ownerId) {
   db.close();
 }
 
+/** Demo IndiaMART + TradeIndia sources with a few buyer enquiries (made-up people). */
+function seedMarketplace(ownerId) {
+  const db = new DatabaseSync(DB_FILE);
+  const at = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString().replace("Z", "+00:00");
+  const id = () => randomUUID().replace(/-/g, "").slice(0, 25);
+  const im = id();
+  const ti = id();
+  const src = db.prepare(`INSERT INTO "MarketplaceSource" ("id","ownerId","kind","name","configEnc","configHint","enabled","status","lastPolledAt","lastLeadAt","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
+  src.run(im, ownerId, "indiamart", "IndiaMART", "demo", "…k7Q2", 1, "ok", at(1), at(12), at(3000), at(1));
+  src.run(ti, ownerId, "tradeindia", "TradeIndia", "demo", "…91ab", 1, "ok", at(2), at(95), at(3000), at(2));
+  const leads = [
+    [im, "indiamart", "Ramesh Gupta", "+919810012345", "ramesh@guptatraders.example.in", "Gupta Traders", "Delhi", "Delhi", "Refurbished laptops", "Need 50 units of i5 laptops, best price with GST bill?", 12, "sent", "Template enquiry_thanks"],
+    [im, "indiamart", "Anita Shah", "+919822000111", null, "Shah Mobiles", "Pune", "Maharashtra", "Mobile phone accessories", "Bulk order of chargers and cables for my shop.", 48, "sent", "Template enquiry_thanks"],
+    [ti, "tradeindia", "Vikram Singh", "+919811100000", "vikram@vkexports.example.in", "VK Exports", "Mumbai", "Maharashtra", "Copper cables", "Please send your catalogue and MOQ.", 95, "none", null],
+    [im, "indiamart", "Farhan Ali", "+919900112233", null, null, "Lucknow", "Uttar Pradesh", "Smartphones", "Looking for a wholesale dealer in Lucknow.", 300, "failed", "Add your WhatsApp number on My sender"],
+  ];
+  const lead = db.prepare(`INSERT INTO "MarketplaceLead" ("id","ownerId","sourceId","kind","externalId","name","mobile","email","company","city","state","product","message","receivedAt","followUp","followUpNote","createdAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  leads.forEach(([sourceId, kind, name, mobile, email, company, city, state, product, message, minAgo, followUp, note], i) => {
+    lead.run(id(), ownerId, sourceId, kind, String(5000 + i), name, mobile, email, company, city, state, product, message, at(minAgo), followUp, note, at(minAgo));
+  });
+  db.close();
+}
+
 // ---------- screenshots ----------
 async function shoot(page) {
   async function login(email, password) {
@@ -337,6 +361,7 @@ async function shoot(page) {
   await shot("27-all-messages", `/admin/messages?chat=in:${igChat}`);
   const bulkJob = await page.evaluate(async () => (await (await fetch("/api/enrich/jobs")).json()).items[0].id);
   await shot("29-email-finder-bulk", `/admin/email-finder?job=${bulkJob}`);
+  await shot("30-marketplace-leads", "/admin/marketplace");
 
   await login(OWNER.email, OWNER.password);
   await shot("16-users", "/admin/users", () => clickText("Services ("));

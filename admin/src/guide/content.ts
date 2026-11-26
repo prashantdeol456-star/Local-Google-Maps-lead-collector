@@ -222,6 +222,23 @@ export const GUIDE: GuideSection[] = [
     notes: ["Hunter's emails are its best guess with a confidence score: check them before writing. Personal mobile numbers are never looked up."],
   },
   {
+    id: "marketplace",
+    title: "Marketplace leads (IndiaMART, TradeIndia, other portals)",
+    audience: "all",
+    pages: ["/marketplace"],
+    image: img("30-marketplace-leads", "Marketplace leads: connected portals and the buyer enquiries they sent, with the WhatsApp reply"),
+    intro:
+      "Brings the buyer enquiries from your own seller account on IndiaMART, TradeIndia or another B2B portal into the platform every 5 minutes, saves each buyer to Contacts and can send them an approved WhatsApp template from your own number straight away. It reads only your own enquiries with the API key the portal gives its paying sellers; portal directories are never scraped.",
+    steps: [
+      "Under “Connect a portal” (later: “+ Connect another portal”) pick the portal. IndiaMART: log in as a seller → Lead Manager → Import/Export Leads (or Settings) → Pull API, generate the CRM key and paste it here. TradeIndia: My Dashboard → Inquiries & Contacts → My Inquiry API, copy the User ID, Profile ID and Key. Other portal (ExportersIndia, …): paste the full https enquiry API link from its member panel and give it a name.",
+      "Choose an approved WhatsApp template for the automatic reply, or leave “No automatic WhatsApp reply”. The reply goes from your number on My sender; the chat then shows in All messages / WhatsApp Chat. Buyers on portals usually take the seller who answers first.",
+      "Press “Save and start checking”. The portal is checked every 5 minutes (IndiaMART allows no more), and “⟳ Check now” checks at once if the last check was 5 or more minutes ago. Keys are kept encrypted on the server.",
+      "Each new enquiry is saved once: buyer, company, city, mobile, email, product and message (click a row to read the message). Buyers go to Contacts under the portal's name; someone already in Contacts with the same mobile is reused.",
+      "A wrong key or a portal problem shows on the portal card in red. Pause stops the checks, Resume starts them again, Remove deletes the portal (the enquiries stay). Export CSV downloads the enquiries.",
+    ],
+    notes: ["Needs a paid seller account on the portal (that is where the API key comes from). Use “Find leads” pages for directories like Google Maps and Justdial."],
+  },
+  {
     id: "contacts",
     title: "Contacts (Sheets)",
     audience: "all",
@@ -518,6 +535,9 @@ export const GUIDE: GuideSection[] = [
         ["Contact Finder phase 3: upload a sheet of companies/people and fill in emails and phones (websites first, Hunter within a budget)", "Done", "—"],
         ["All messages phase 2: Meta webhooks for Messenger/Instagram, photos and voice, private reply to comments, Telegram Business (your own Telegram number)", "Done", "Meta: Page webhook field “messages” and Instagram “messages”, App Review for pages_messaging and instagram_manage_messages. Telegram: Business Mode on the bot."],
         ["All messages phase 3: one contact across apps, labels and notes on every chat", "Done", "—"],
+        ["B2B phase 1: Marketplace leads from IndiaMART, TradeIndia and other portals' enquiry APIs, with an automatic WhatsApp reply", "Done", "Each customer pastes their own seller API key on Marketplace leads."],
+        ["B2B phase 2: Apollo people search (title, company, city) with emails within a credit limit", "Agreed", "Customer's free Apollo API key."],
+        ["B2B phase 3: Snov.io as a second email finder", "Agreed", "Customer's free Snov.io API key."],
         ["Team accounts: several people under one customer, chats assigned to a team member", "Not started", "Needs team members (sub-users) with their own logins first."],
         ["WhatsApp Coexistence: same number in the WhatsApp Business app and the API, 6 months of chat history", "Waiting", "Meta Tech Provider status (Embedded Signup) for the platform."],
         ["Social Engagement phase 2: YouTube comments and subscribers", "Built — needs Google setup", "Google Cloud project with the YouTube Data API, OAuth consent screen (youtube.force-ssl) and Google verification for customers' channels; keys on the Integrations page."],

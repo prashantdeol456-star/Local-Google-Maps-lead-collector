@@ -36,7 +36,7 @@ export function parseServices(json: string | null | undefined): ServiceId[] {
 const ROUTE_SERVICES: [RegExp, ServiceId][] = [
   [/^\/api\/(leads|jobs|export|justdial)(\/|$)/, "google_maps"],
   [/^\/api\/linkedin\//, "linkedin"],
-  [/^\/api\/(contacts|enrich)(\/|$)/, "contacts"],
+  [/^\/api\/(contacts|enrich|marketplace)(\/|$)/, "contacts"],
   [/^\/api\/email\//, "email"],
   [/^\/api\/whatsapp\//, "whatsapp"],
   [/^\/api\/inbox\//, "ai_inbox"],

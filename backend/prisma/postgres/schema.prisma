@@ -1642,3 +1642,67 @@ model EnrichJobRow {
   @@index([jobId, idx])
   @@index([jobId, status])
 }
+
+// ---- Marketplace leads: the buyer enquiries a user receives on IndiaMART, TradeIndia and other
+// B2B portals, pulled with the portal's own enquiry API (the user's seller account). ----
+
+/// One portal account of a user.
+model MarketplaceSource {
+  id           String    @id @default(cuid())
+  ownerId      String?
+  /// indiamart | tradeindia | custom
+  kind         String
+  name         String
+  /// The portal's API settings (key…), AES-256-GCM encrypted; never sent to the browser
+  configEnc    String
+  /// e.g. "…a1b2" of the key, to recognise it
+  configHint   String
+  enabled      Boolean   @default(true)
+  /// ok | error
+  status       String    @default("ok")
+  lastError    String?
+  /// Enquiries are read up to this time
+  cursorAt     DateTime?
+  lastPolledAt DateTime?
+  lastLeadAt   DateTime?
+  /// Approved WhatsApp template sent to every new enquiry (null = no automatic message)
+  waTemplateId String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([ownerId])
+}
+
+/// One buyer enquiry.
+model MarketplaceLead {
+  id           String   @id @default(cuid())
+  ownerId      String?
+  sourceId     String
+  kind         String
+  /// The portal's enquiry id
+  externalId   String
+  name         String
+  mobile       String?
+  email        String?
+  company      String?
+  city         String?
+  state        String?
+  country      String?
+  product      String?
+  subject      String?
+  message      String?
+  /// The portal's enquiry type (direct, buy-lead, call…)
+  queryType    String?
+  receivedAt   DateTime
+  /// Contacts (OutreachContact) record made for it
+  contactId    String?
+  /// none | sent | failed | skipped
+  followUp     String   @default("none")
+  followUpNote String?
+  /// WhatsApp chat started by the automatic message
+  waChatId     String?
+  createdAt    DateTime @default(now())
+
+  @@unique([sourceId, externalId])
+  @@index([ownerId, receivedAt])
+}
