@@ -297,7 +297,8 @@ export function applySyncEvent(state: CollectorState, event: SyncEvent, pending:
 
 /** Fresh state for a Justdial run of one keyword. */
 export function newJustdialRun(state: CollectorState, settings: CollectorSettings, keyword: string, now: number, tabId: number | null): CollectorState {
-  const label = `Justdial: ${keyword} in ${settings.location.trim()}`;
+  const site = settings.source === "grotal" ? "Grotal" : "Justdial";
+  const label = settings.location.trim() ? `${site}: ${keyword} in ${settings.location.trim()}` : `${site}: ${keyword}`;
   const s: CollectorState = {
     ...state,
     status: "running",

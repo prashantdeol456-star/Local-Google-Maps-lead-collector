@@ -23,6 +23,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
   const keywords = parseKeywords(settings.keyword);
   const query = buildSearchQuery(keywords[0] ?? "", settings.location);
   const justdial = settings.source === "justdial";
+  const grotal = settings.source === "grotal";
   const [templates, setTemplates] = useState<{ id: string; name: string }[] | null>(null);
 
   useEffect(() => {
@@ -36,12 +37,16 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
         <span className="fields__title">Collect from</span>
         <div className="fields__grid">
           <label className="check">
-            <input type="radio" name="source" checked={!justdial} onChange={() => onChange({ ...settings, source: "google_maps" })} />
+            <input type="radio" name="source" checked={!justdial && !grotal} onChange={() => onChange({ ...settings, source: "google_maps" })} />
             Google Maps
           </label>
           <label className="check">
             <input type="radio" name="source" checked={justdial} onChange={() => onChange({ ...settings, source: "justdial" })} />
             Justdial
+          </label>
+          <label className="check">
+            <input type="radio" name="source" checked={grotal} onChange={() => onChange({ ...settings, source: "grotal" })} />
+            Grotal
           </label>
         </div>
       </div>
@@ -50,7 +55,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
         <span>Search Keyword</span>
         <textarea
           rows={2}
-          placeholder="University"
+          placeholder={grotal ? "Mobile Phone Dealers" : "University"}
           value={settings.keyword}
           maxLength={2200}
           onChange={(e) => onChange({ ...settings, keyword: e.target.value })}
@@ -62,13 +67,15 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
             {keywords.length} searches will be queued
             {isOn(settings.autoNext) ? ", one after another by themselves" : "; you start each one"}: {keywords.join(" → ")}
           </small>
+        ) : grotal ? (
+          <small className="hint">Tip: separate keywords with commas to queue several searches, or paste a Grotal list link (from grotal.com) as the keyword.</small>
         ) : (
           <small className="hint">Tip: separate keywords with commas to queue several searches.</small>
         )}
       </label>
 
       <label className="field">
-        <span>{justdial ? "City" : "Location"}</span>
+        <span>{justdial || grotal ? "City" : "Location"}</span>
         <input
           type="text"
           placeholder="Lucknow"
@@ -92,7 +99,20 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
         {errors.maxRecords && <small className="error">{errors.maxRecords}</small>}
       </label>
 
-      {justdial ? (
+      {grotal ? (
+        <div className="fields">
+          <span className="fields__title">Grotal</span>
+          <label className="check" title="Email and the full address from each business's Grotal page (most businesses do not list an email).">
+            <input type="checkbox" checked={isOn(settings.grOpenProfiles)} onChange={(e) => onChange({ ...settings, grOpenProfiles: e.target.checked })} />
+            Open each business page for email and full address
+          </label>
+          <label className="check" title="Finds the same business on Google Maps (in another background tab) for its website, rating and map link.">
+            <input type="checkbox" checked={isOn(settings.grMatchMaps)} onChange={(e) => onChange({ ...settings, grMatchMaps: e.target.checked })} />
+            Add website and rating from Google Maps
+          </label>
+          <small className="hint">Opens Grotal in its own tab and reads every list page (20 businesses each) until Maximum Records; set the pace with the speed slider below. The job stops if Grotal shows a block page.</small>
+        </div>
+      ) : justdial ? (
         <div className="fields">
           <span className="fields__title">Justdial</span>
           <label className="check" title="Address, website, year established, timings and photo links from each business page.">

@@ -129,6 +129,8 @@ export interface LeadListQuery {
   state?: string;
   category?: string;
   searchKeyword?: string;
+  /** Where the lead was collected: "google_maps", "justdial", "grotal"… */
+  source?: string;
   /** true = has a value, false = empty */
   hasPhone?: boolean;
   hasEmail?: boolean;
@@ -177,7 +179,7 @@ export interface LeadRepository {
   /** Admin edit: overwrites the given fields. Returns null if the lead does not exist. */
   edit(id: string, data: LeadEditData): Promise<LeadRecord | null>;
   /** Distinct values with counts, most common first (for filter dropdowns). */
-  facets(limit: number): Promise<LeadFacets>;
+  facets(limit: number, source?: string): Promise<LeadFacets>;
 }
 
 export const LEAD_EDITABLE_FIELDS = [

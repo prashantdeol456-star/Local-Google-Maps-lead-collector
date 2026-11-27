@@ -117,6 +117,26 @@ async function seed() {
   }
   await j("PATCH", `/api/jobs/${jdJob.id}`, { status: "completed" }, cu);
 
+  // Grotal demo leads (as the extension sends them in Grotal mode)
+  const grJob = (await j("POST", "/api/jobs", { searchKeyword: "Mobile Phone Dealers", location: "Delhi" }, cu)).job;
+  await j("PATCH", `/api/jobs/${grJob.id}`, { status: "running" }, cu);
+  const gr = [
+    ["Sri Sai Telecom", "Mobile Phone Dealers", "+91 90000 50001", "Shop 12, Bawa Plaza, Karol Bagh, Delhi", null, null, null],
+    ["Hot Spot Mobile Store", "Mobile Phone Dealers", "+91 90000 50002", "73, Ghaffar Market, Karol Bagh, Delhi", "hotspotmobile.example.in", 4.3, 128],
+    ["PS Mobile World", "Mobile Phone Accessories", "+91 90000 50003", "Shop 88, Gaffar Market, Karol Bagh, Delhi", null, 4.1, 64],
+    ["Talwar Mobile Shop", "Mobile Phone Repair", "+91 90000 50004", "202, Royal Chamber, Karol Bagh, Delhi 110005", "talwarmobile.example.in", 4.6, 212],
+  ];
+  let g = 0;
+  for (const [name, category, phone, address, site, rating, reviewCount] of gr) {
+    g++;
+    await j("POST", "/api/leads", {
+      jobId: grJob.id,
+      clientKey: `gr:${g}`,
+      lead: { name, category, phone, website: site && `https://${site}`, email: site ? `info@${site}` : null, address, city: "Delhi", state: "Delhi", country: "India", rating, reviewCount, searchKeyword: "Mobile Phone Dealers", source: "grotal" },
+    }, cu);
+  }
+  await j("PATCH", `/api/jobs/${grJob.id}`, { status: "completed" }, cu);
+
   for (const [slug, name, headline, company] of [
     ["rahul-hr-demo", "Rahul Verma", "HR Manager at Acme Healthcare", "Acme Healthcare"],
     ["neha-ops-demo", "Neha Singh", "Operations Head | Hospital administration", "City Care Hospital"],
@@ -389,6 +409,7 @@ async function shoot(page) {
   await shot("19-contacts", "/admin/contacts");
   await shot("21-billing", "/admin/billing");
   await shot("24-justdial-leads", "/admin/justdial");
+  await shot("33-grotal-leads", "/admin/grotal");
   const waChat = await page.evaluate(async () => (await (await fetch("/api/whatsapp/chats")).json()).items[0].id);
   await shot("25-whatsapp-chat", `/admin/whatsapp-chat?chat=${waChat}`);
   await shot("26-social-engagement", "/admin/engagement");

@@ -9,7 +9,7 @@ import { NAV_GROUPS } from "./nav";
 import { rupees, type MyBilling } from "../lib/billing";
 
 /** Pages a customer can use; the rest is for super admins until it is separated per user. */
-const CUSTOMER_PAGES = new Set(["/", "/leads", "/justdial", "/whatsapp-chat", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/quick-send", "/opt-outs", "/contacts", "/sender", "/inbox", "/messages", "/email-finder", "/marketplace", "/social", "/engagement", "/guide", "/billing"]);
+const CUSTOMER_PAGES = new Set(["/", "/leads", "/justdial", "/grotal", "/whatsapp-chat", "/linkedin", "/collections", "/extensions", "/email", "/whatsapp", "/templates", "/quick-send", "/opt-outs", "/contacts", "/sender", "/inbox", "/messages", "/email-finder", "/marketplace", "/social", "/engagement", "/guide", "/billing"]);
 
 /** Customer-only pages (super admins send with the .env senders, set up in Settings). */
 const CUSTOMER_ONLY = new Set(["/sender", "/billing"]);
@@ -20,6 +20,7 @@ const CUSTOMER_ONLY = new Set(["/sender", "/billing"]);
 const PAGE_SERVICE: Record<string, string> = {
   "/leads": "google_maps",
   "/justdial": "google_maps",
+  "/grotal": "google_maps",
   "/collections": "google_maps",
   "/linkedin": "linkedin",
   "/contacts": "contacts",

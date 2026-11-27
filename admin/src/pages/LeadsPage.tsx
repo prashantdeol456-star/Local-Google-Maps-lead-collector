@@ -55,7 +55,11 @@ function YesNoSelect({ label, param, value }: { label: string; param: string; va
   );
 }
 
-export function LeadsPage() {
+/**
+ * Google Maps Leads, or (with `source`) the leads of one other site, e.g. Grotal Leads: the same
+ * list, filters, exports and "Email / WhatsApp selected", limited to that source.
+ */
+export function LeadsPage({ source, title = "Google Maps Leads", emptyHint }: { source?: string; title?: string; emptyHint?: string } = {}) {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
   const city = params.get("city") ?? "";
@@ -80,13 +84,13 @@ export function LeadsPage() {
   }, [search, q]);
 
   const filters = { q, city, state, category, keyword, ...extra };
-  const query = qs({ ...filters, sort, order, page, pageSize });
+  const query = qs({ ...filters, source, sort, order, page, pageSize });
   const leads = useQuery({
     queryKey: ["leads", query],
     queryFn: () => api<Page<Lead>>(`/leads${query}`),
     placeholderData: keepPreviousData,
   });
-  const facets = useQuery({ queryKey: ["facets"], queryFn: () => api<Facets>("/leads/facets") });
+  const facets = useQuery({ queryKey: ["facets", source ?? ""], queryFn: () => api<Facets>(`/leads/facets${qs({ source })}`) });
 
   const client = useQueryClient();
   const remove = useMutation({
@@ -107,13 +111,13 @@ export function LeadsPage() {
     else next.add(id);
     setSelected(next);
   };
-  const exportFiltered = qs({ ...filters, sort, order });
+  const exportFiltered = qs({ ...filters, source, sort, order });
   const exportSelected = qs({ ids: [...selected].join(",") });
 
   return (
     <>
       <PageHeader
-        title="Google Maps Leads"
+        title={title}
         subtitle={leads.data ? `${formatNumber(leads.data.total)} ${filtered ? "matching" : "total"}` : " "}
         actions={
           selected.size > 0 ? (
@@ -232,7 +236,7 @@ export function LeadsPage() {
 
         {leads.data && leads.data.items.length === 0 && (
           <EmptyState title={filtered ? "No leads match these filters" : "No leads yet"}>
-            {!filtered && "Collected leads appear here as soon as the extension saves them."}
+            {!filtered && (emptyHint ?? "Collected leads appear here as soon as the extension saves them.")}
           </EmptyState>
         )}
 

@@ -1,4 +1,4 @@
-import { isActive, isOn, validateCollectorSettings, type CollectorCommand } from "@platform/shared";
+import { isActive, isDirectorySource, isOn, validateCollectorSettings, type CollectorCommand } from "@platform/shared";
 import { useState } from "react";
 import type { BackendStatus } from "../../storage/auth";
 import { ActivityLog } from "../components/ActivityLog";
@@ -43,7 +43,7 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
   const active = isActive(state.status);
   // In a background tab the job opens its own Maps search, so no Maps tab is needed first.
   const canStart =
-    state.status === "paused" || (formValid && (settings.source === "justdial" || isOn(settings.runInBackground) || !!page?.isMaps));
+    state.status === "paused" || (formValid && (isDirectorySource(settings.source) || isOn(settings.runInBackground) || !!page?.isMaps));
 
   async function run(command: CollectorCommand) {
     setBusy(true);
@@ -75,7 +75,7 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
       </header>
 
       <BackendStatusBar status={backendStatus} onLogout={onLogout} onRetry={onRetry} />
-      <PageStatus page={page} justdial={(active ? state.jobSettings?.source : settings.source) === "justdial"} />
+      <PageStatus page={page} source={active ? state.jobSettings?.source : settings.source} />
 
       {active && state.jobLabel && (
         <p className="job-label">
@@ -90,7 +90,7 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
         onChange={setSettings}
         onOpenSearch={openSearch}
       />
-      {(active ? state.jobSettings?.source : settings.source) === "justdial" && <JdSpeedControl />}
+      {isDirectorySource(active ? state.jobSettings?.source : settings.source) && <JdSpeedControl site={(active ? state.jobSettings?.source : settings.source) === "grotal" ? "Grotal" : "Justdial"} />}
 
       <Controls status={state.status} canStart={canStart} busy={busy} onCommand={run} />
       {error && (

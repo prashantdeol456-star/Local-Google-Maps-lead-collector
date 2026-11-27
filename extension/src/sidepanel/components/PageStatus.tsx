@@ -1,7 +1,19 @@
+import type { CollectorSource } from "@platform/shared";
 import type { MapsPageState } from "../../utils/maps";
 
-export function PageStatus({ page, justdial = false }: { page: MapsPageState | null; justdial?: boolean }) {
-  if (justdial) {
+export function PageStatus({ page, source }: { page: MapsPageState | null; source?: CollectorSource }) {
+  if (source === "grotal") {
+    return (
+      <div className="page-status page-status--on">
+        <span className="dot" />
+        <div>
+          <strong>Grotal mode</strong>
+          <p>START opens Grotal in its own tab and reads every list page by itself. A second tab with Google Maps is used only to find each business's website and rating.</p>
+        </div>
+      </div>
+    );
+  }
+  if (source === "justdial") {
     return (
       <div className="page-status page-status--on">
         <span className="dot" />

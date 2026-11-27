@@ -85,6 +85,29 @@ describe("GET /api/leads/facets", () => {
   });
 });
 
+describe("leads of one source (Grotal Leads page)", () => {
+  it("lists, counts, exports and offers filters for that source only", async () => {
+    await saveLead({ name: "Sri Sai Telecom", phone: "09313410164", city: "Delhi", searchKeyword: "Mobile Phone Dealers", source: "grotal" });
+    await saveLead({ name: "Hot Spot Mobile Store", phone: "09873916316", city: "Delhi", searchKeyword: "Mobile Phone Dealers", source: "grotal" });
+    await saveLead({ name: "City College", city: "Lucknow", searchKeyword: "College" });
+
+    const list = (await inject("GET", "/api/leads?source=grotal")).json();
+    expect(list.total).toBe(2);
+    expect(list.items.map((l: { source: string }) => l.source)).toEqual(["grotal", "grotal"]);
+    expect((await inject("GET", "/api/leads")).json().total).toBe(3);
+
+    expect((await inject("GET", "/api/leads/facets?source=grotal")).json()).toMatchObject({
+      cities: [{ value: "Delhi", count: 2 }],
+      keywords: [{ value: "Mobile Phone Dealers", count: 2 }],
+    });
+
+    const csv = await inject("GET", "/api/export/csv?source=grotal");
+    expect(csv.statusCode).toBe(200);
+    expect(csv.body).toContain("Sri Sai Telecom");
+    expect(csv.body).not.toContain("City College");
+  });
+});
+
 describe("live events", () => {
   it("services publish lead and job events after saving", async () => {
     const events: AppEvent[] = [];

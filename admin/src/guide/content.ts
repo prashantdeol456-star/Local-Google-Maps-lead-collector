@@ -123,7 +123,7 @@ export const GUIDE: GuideSection[] = [
     pages: ["/extensions"],
     image: img("06-extensions", "Extensions page with download buttons and the backend URL"),
     steps: [
-      "Open Extensions in the menu and click “Download zip” for the ones you need: Maps Data Collector (Google Maps and Justdial leads), LinkedIn Helper (save LinkedIn profiles), LinkedIn Messenger (send LinkedIn Outreach campaigns) Meta Helper (Instagram and Facebook search, Instagram Outreach) and Contact Finder (emails and phones on the websites and LinkedIn profiles you open). You only see the ones for the services your account has.",
+      "Open Extensions in the menu and click “Download zip” for the ones you need: Maps Data Collector (Google Maps, Justdial and Grotal leads), LinkedIn Helper (save LinkedIn profiles), LinkedIn Messenger (send LinkedIn Outreach campaigns) Meta Helper (Instagram and Facebook search, Instagram Outreach) and Contact Finder (emails and phones on the websites and LinkedIn profiles you open). You only see the ones for the services your account has.",
       "Extract the zip into a folder (right click → Extract All).",
       "In Chrome open chrome://extensions and switch on Developer mode (top right).",
       "Click “Load unpacked” and choose the extracted folder (the one with manifest.json).",
@@ -164,6 +164,22 @@ export const GUIDE: GuideSection[] = [
       "After the search, the platform looks for a public email on each business's own website. If you chose an email template under “Email campaign for new leads”, the new leads with an email go into an email campaign that starts by itself (your sender, with an unsubscribe link). The extension never fills in Justdial's enquiry forms.",
       "Justdial Leads shows everything in one row per business, with filters (phone, email, website, found on Google Maps), Export CSV and Email / WhatsApp campaign for selected rows.",
       "Justdial does not allow automated collection, so use it at your own risk and at a calm pace. If Justdial shows a security check or blocks the page, the job pauses and you get a notification: open the tab, deal with it yourself, then press RESUME.",
+    ],
+  },
+  {
+    id: "grotal",
+    title: "Collect Grotal leads",
+    audience: "all",
+    pages: ["/grotal"],
+    image: img("33-grotal-leads", "Grotal Leads: businesses read from Grotal, with the same filters, exports and campaign buttons as Google Maps Leads"),
+    steps: [
+      "Open the Maps Data Collector side panel (version 0.4.0 or later: re-download it from Extensions) and choose “Grotal” under Collect from.",
+      "Type the keyword (e.g. “Mobile Phone Dealers”) and the city (e.g. “Delhi”, “Mumbai”, “Bengaluru”); several keywords separated by commas run one after another. Or paste a Grotal list link from grotal.com as the keyword (for example a list for one area such as Karol Bagh); then the city is taken from the link. Press START.",
+      "The extension opens Grotal in its own tab, finds the city in Grotal's own city list and reads the list page by page (20 businesses a page: name, area, address, phone and categories) until your “Max records” or the end of the list. Keep that tab open (you can work in other tabs). The “Grotal speed” slider sets the pause between pages, even while a job runs.",
+      "“Open each business page for email and full address” opens each business's Grotal page and saves an email when Grotal lists one (most do not).",
+      "“Add website and rating from Google Maps” looks the same business up on Google Maps in a second background tab for its website, rating and map link. Only a clear name match is used. Grotal's own phone number is kept first.",
+      "Grotal Leads shows one row per business with search, filters (city, category, keyword, phone, email, website, rating, date), Export CSV / XLSX and Email / WhatsApp for selected rows. A business you already have (same phone, website or Google Maps place) is not saved twice and stays where it was first found.",
+      "If Grotal shows a block page or a security check, the job pauses and you get a notification: open the tab, wait or deal with it yourself, then press RESUME. The extension never fills in Grotal's forms, writes reviews or logs in.",
     ],
   },
   {
@@ -266,7 +282,7 @@ export const GUIDE: GuideSection[] = [
       "Each new enquiry is saved once: buyer, company, city, mobile, email, product and message (click a row to read the message). Buyers go to Contacts under the portal's name; someone already in Contacts with the same mobile is reused.",
       "A wrong key or a portal problem shows on the portal card in red. Pause stops the checks, Resume starts them again, Remove deletes the portal (the enquiries stay). Export CSV downloads the enquiries.",
     ],
-    notes: ["Needs a paid seller account on the portal (that is where the API key comes from). Use “Find leads” pages for directories like Google Maps and Justdial."],
+    notes: ["Needs a paid seller account on the portal (that is where the API key comes from). Use “Find leads” pages for directories like Google Maps, Justdial and Grotal."],
   },
   {
     id: "contacts",
@@ -568,6 +584,7 @@ export const GUIDE: GuideSection[] = [
         ["B2B phase 1: Marketplace leads from IndiaMART, TradeIndia and other portals' enquiry APIs, with an automatic WhatsApp reply", "Done", "Each customer pastes their own seller API key on Marketplace leads."],
         ["B2B phase 2: Apollo people search (title, company, city) with work emails within the credits", "Done", "Each customer adds a free Apollo API key (work-email account) on Email finder → Apollo people search."],
         ["B2B phase 3: Snov.io as the second email finder when Hunter cannot answer", "Done", "Each customer adds Snov.io API credentials (free plans must ask Snov for API access)."],
+        ["Grotal collection (Maps extension v0.4.0, Grotal Leads page)", "Done", "Customers re-download the Maps extension."],
         ["Team accounts: several people under one customer, chats assigned to a team member", "Not started", "Needs team members (sub-users) with their own logins first."],
         ["WhatsApp Coexistence: same number in the WhatsApp Business app and the API, 6 months of chat history", "Waiting", "Meta Tech Provider status (Embedded Signup) for the platform."],
         ["Social Engagement phase 2: YouTube comments and subscribers", "Built — needs Google setup", "Google Cloud project with the YouTube Data API, OAuth consent screen (youtube.force-ssl) and Google verification for customers' channels; keys on the Integrations page."],

@@ -1,6 +1,7 @@
 import {
   buildSearchQuery,
   checkAiAction,
+  isDirectorySource,
   isOn,
   nextStatus,
   parseKeywords,
@@ -45,6 +46,7 @@ import {
   isCurrentRun,
   newJustdialRun,
 } from "./jobController";
+import { GrotalRunner } from "./grotalRunner";
 import { JustdialRunner } from "./justdialRunner";
 import { checkLocalDuplicate } from "./localDedupe";
 import { SyncEngine, type SyncEvent } from "./sync";
@@ -172,17 +174,26 @@ function statusUpdate(jobId: string | null, status: Extract<OutboxPayload, { kin
   return jobId ? enqueue({ kind: "status", jobId, status, reason }) : Promise.resolve();
 }
 
-// ---- Justdial jobs (the background drives the Justdial tab) ----
+// ---- Justdial and Grotal jobs (the background drives the job's own tab) ----
 
-const justdial = new JustdialRunner({
+const runnerDeps = {
   loadState: loadCollectorState,
   updateState,
   enqueue,
   statusUpdate,
-  finished: (state) => afterRun(state),
-});
+  finished: (state: CollectorState) => afterRun(state),
+};
+const justdial = new JustdialRunner(runnerDeps);
+const grotal = new GrotalRunner(runnerDeps);
 
-const isJustdial = (s: CollectorState) => s.jobSettings?.source === "justdial";
+/** Jobs the background drives by itself (Justdial, Grotal): no Maps page needed. */
+const isJustdial = (s: CollectorState) => isDirectorySource(s.jobSettings?.source);
+
+/** Runs the current Justdial or Grotal job (each runner only takes its own source). */
+function runDirectory() {
+  justdial.run().catch(console.error);
+  grotal.run().catch(console.error);
+}
 
 async function startJustdialJob(settings: CollectorSettings): Promise<MessageResponse<unknown>> {
   const keywords = parseKeywords(settings.keyword);
@@ -198,16 +209,16 @@ async function startJustdialJob(settings: CollectorSettings): Promise<MessageRes
   const created = await createBackendJob(settings, keywords);
   if (!created.ok) return created;
 
-  // Shown to the user (they asked for Justdial); the Google Maps look-up tab stays in the background.
+  // Shown to the user (they asked for Justdial or Grotal); the Google Maps look-up tab stays in the background.
   const tab = await chrome.tabs.create({ url: "about:blank", active: true });
-  if (tab.id === undefined) return { ok: false, error: "Could not open a Justdial tab" };
+  if (tab.id === undefined) return { ok: false, error: `Could not open a ${settings.source === "grotal" ? "Grotal" : "Justdial"} tab` };
   const now = Date.now();
   let state = newJustdialRun({ ...current, queue: null }, settings, keywords[0]!, now, tab.id);
   await clearOtherProcessedKeys(state.runId);
   state = await updateState(() => ({ ...state, backendJobId: created.jobId, queue: created.queue }));
 
   // "Send the new leads to an email campaign" for every search of this job.
-  if (settings.jdTemplateId) {
+  if (settings.jdTemplateId && settings.source === "justdial") {
     const ids = created.queue ? created.queue.jobs.map((j) => j.id) : [created.jobId];
     for (const id of ids) {
       const res = await api("POST", `/api/justdial/jobs/${encodeURIComponent(id)}/auto-campaign`, { templateId: settings.jdTemplateId });
@@ -216,7 +227,7 @@ async function startJustdialJob(settings: CollectorSettings): Promise<MessageRes
     state = await updateState((s) => withLog(s, "info", "New leads with an email will go into an email campaign when the search finishes"));
   }
   await chrome.alarms.create(WATCHDOG_ALARM, { periodInMinutes: 0.5 });
-  justdial.run().catch(console.error);
+  runDirectory();
   return { ok: true, data: state };
 }
 
@@ -231,7 +242,7 @@ async function startNextJustdial(): Promise<MessageResponse<unknown>> {
   if (!(await tabExists(tabId))) tabId = (await chrome.tabs.create({ url: "about:blank", active: false })).id ?? null;
   await clearOtherProcessedKeys(dry.state.runId);
   const state = await updateState(() => ({ ...dry.state, tabId }));
-  justdial.run().catch(console.error);
+  runDirectory();
   return { ok: true, data: state };
 }
 
@@ -451,7 +462,7 @@ async function openBackgroundSearch(query: string): Promise<{ tabId: number; pag
 }
 
 async function startNewJob(settings: CollectorSettings): Promise<MessageResponse<unknown>> {
-  if (settings.source === "justdial") return startJustdialJob(settings);
+  if (isDirectorySource(settings.source)) return startJustdialJob(settings);
   const keywords = parseKeywords(settings.keyword);
   const current = await loadCollectorState();
   let tabId = await getActiveTabId();
@@ -537,7 +548,7 @@ async function handleCommand(command: CollectorCommand, settings: CollectorSetti
     const state = await updateState((s) => withLog({ ...s, status: "running", tabId, lastHeartbeatAt: Date.now() }, "info", "Job resumed"));
     await statusUpdate(state.backendJobId, "running", null);
     await chrome.alarms.create(WATCHDOG_ALARM, { periodInMinutes: 0.5 });
-    justdial.run().catch(console.error);
+    runDirectory();
     return { ok: true, data: state };
   }
 
@@ -651,7 +662,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
     if (isJustdial(state)) {
       // The background drives Justdial jobs: if Chrome restarted the background, carry on.
-      if (!justdial.isActive(state.runId)) justdial.run().catch(console.error);
+      if (!justdial.isActive(state.runId) && !grotal.isActive(state.runId)) runDirectory();
       return null;
     }
     const next = applyWatchdog(state);

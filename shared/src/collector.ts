@@ -32,7 +32,7 @@ export interface CollectorSettings {
   runInBackground?: boolean;
   /** Start the next queued search by itself when one finishes (on unless turned off). */
   autoNext?: boolean;
-  /** Where to collect: Google Maps (default) or Justdial. */
+  /** Where to collect: Google Maps (default), Justdial or Grotal. */
   source?: CollectorSource;
   /** Justdial: open every profile for address, website, photos… (on unless turned off). */
   jdOpenProfiles?: boolean;
@@ -42,9 +42,16 @@ export interface CollectorSettings {
   jdShowNumber?: boolean;
   /** Justdial: email template for an automatic campaign with the new leads (null = no campaign). */
   jdTemplateId?: string | null;
+  /** Grotal: open every business page for the full address and email (on unless turned off). */
+  grOpenProfiles?: boolean;
+  /** Grotal: look each business up on Google Maps for website and rating (on unless turned off). */
+  grMatchMaps?: boolean;
 }
 
-export type CollectorSource = "google_maps" | "justdial";
+export type CollectorSource = "google_maps" | "justdial" | "grotal";
+
+/** Sources the extension's background drives by itself in their own tab (no Maps page needed). */
+export const isDirectorySource = (s: CollectorSource | undefined): s is "justdial" | "grotal" => s === "justdial" || s === "grotal";
 
 /** "Show Number" presses per day at most (Justdial may ask to log in or block the account). */
 export const JD_SHOW_NUMBER_DAILY_LIMIT = 30;
@@ -98,6 +105,10 @@ export function validateCollectorSettings(s: CollectorSettings): SettingsErrors 
   }
   if (!s.fields.name) errors.fields = "Name is always collected";
   if (s.source === "justdial" && !s.location.trim()) errors.location = "Justdial needs a city (e.g. Delhi)";
+  // A pasted Grotal list address already contains the city.
+  if (s.source === "grotal" && !s.location.trim() && !keywords.every((k) => /^https:\/\/www\.grotal\.com\//i.test(k))) {
+    errors.location = "Grotal needs a city (e.g. Delhi), or paste a Grotal list address as the keyword";
+  }
   return errors;
 }
 

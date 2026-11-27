@@ -22,6 +22,8 @@ export const LeadFilterShape = {
   state: optionalText(100),
   category: optionalText(100),
   keyword: optionalText(100),
+  /** Only leads from this source ("grotal" for the Grotal Leads page) */
+  source: optionalText(50),
   hasPhone: yesNo,
   hasEmail: yesNo,
   hasWebsite: yesNo,
@@ -49,6 +51,7 @@ export function toLeadFilters(p: LeadFilterParams, timeZone: string): Omit<LeadL
     state: p.state,
     category: p.category,
     searchKeyword: p.keyword,
+    source: p.source,
     hasPhone: p.hasPhone,
     hasEmail: p.hasEmail,
     hasWebsite: p.hasWebsite,

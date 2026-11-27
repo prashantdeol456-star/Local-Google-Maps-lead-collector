@@ -38,8 +38,8 @@ export class LeadService {
     return toLeadView(lead);
   }
 
-  facets() {
-    return this.repos.leads.facets(FACET_LIMIT);
+  facets(source?: string) {
+    return this.repos.leads.facets(FACET_LIMIT, source);
   }
 
   /**

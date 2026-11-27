@@ -15,7 +15,7 @@ export const DOWNLOADABLE_EXTENSIONS = [
   {
     id: "maps-data-collector",
     folder: "extension",
-    description: "Collects Google Maps and Justdial listings into Google Maps Leads and Justdial Leads, in a tab behind yours.",
+    description: "Collects Google Maps, Justdial and Grotal listings into Google Maps Leads, Justdial Leads and Grotal Leads, in a tab behind yours.",
   },
   { id: "linkedin-helper", folder: "linkedin-extension", description: "Saves LinkedIn profiles you open (with the Contact info you can see) into LinkedIn Leads." },
   {

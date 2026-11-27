@@ -123,7 +123,10 @@ export async function leadRoutes(
     return { items, total, page: query.page, pageSize: query.pageSize };
   });
 
-  app.get("/api/leads/facets", async () => leads.facets());
+  app.get("/api/leads/facets", async (request) => {
+    const { source } = parse(z.object({ source: z.string().trim().max(50).optional() }), request.query);
+    return leads.facets(source || undefined);
+  });
 
   app.patch("/api/leads/:id", async (request) => {
     const { id } = parse(IdParams, request.params);

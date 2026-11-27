@@ -42,7 +42,7 @@ export interface ExtractedListing {
   mapsUrl: string | null;
   placeId: string | null;
   searchKeyword: string;
-  source: "google_maps" | "justdial";
+  source: "google_maps" | "justdial" | "grotal";
   /** Internal: processed-tracking key (feature id). */
   clientKey: string;
 }

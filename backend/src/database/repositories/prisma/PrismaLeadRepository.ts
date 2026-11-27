@@ -34,6 +34,7 @@ export class PrismaLeadRepository implements LeadRepository {
       ...(query.state ? { state: query.state } : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.searchKeyword ? { searchKeyword: query.searchKeyword } : {}),
+      ...(query.source ? { source: query.source } : {}),
       ...(query.minRating !== undefined ? { rating: { gte: query.minRating } } : {}),
       ...(query.minReviews !== undefined ? { reviewCount: { gte: query.minReviews } } : {}),
       ...(Object.keys(createdAt).length ? { createdAt } : {}),
@@ -119,11 +120,11 @@ export class PrismaLeadRepository implements LeadRepository {
     return count ? this.findById(id) : null;
   }
 
-  async facets(limit: number): Promise<LeadFacets> {
+  async facets(limit: number, source?: string): Promise<LeadFacets> {
     const group = async (field: "city" | "state" | "category" | "searchKeyword") => {
       const rows = await this.db.lead.groupBy({
         by: [field],
-        where: { [field]: { not: null } },
+        where: { [field]: { not: null }, ...(source ? { source } : {}) },
         _count: { _all: true },
         orderBy: { _count: { [field]: "desc" } },
         take: limit,

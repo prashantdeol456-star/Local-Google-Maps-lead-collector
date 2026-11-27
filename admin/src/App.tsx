@@ -60,6 +60,8 @@ function Routes({ admin }: { admin: Admin }) {
   if ((params = matchPath("/instagram-outreach/:id", path))) return <LinkedInCampaignDetailPage key={params.id} id={params.id!} platform="instagram" />;
   if (path === "/social-leads") return <SocialLeadsPage />;
   if (path === "/justdial") return <JustdialLeadsPage />;
+  if (path === "/grotal")
+    return <LeadsPage key="grotal" source="grotal" title="Grotal Leads" emptyHint="Choose Grotal in the Maps Data Collector extension (Collect from: Grotal), type a keyword and a city, and press START." />;
   if (path === "/whatsapp-chat") return <WhatsAppChatPage />;
   if (path === "/campaign-logs") return <CampaignLogsPage />;
   if (path === "/social") return <SocialAccountsPage />;
