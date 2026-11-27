@@ -137,6 +137,26 @@ async function seed() {
   }
   await j("PATCH", `/api/jobs/${grJob.id}`, { status: "completed" }, cu);
 
+  // Sulekha demo leads (as the extension sends them in Sulekha mode)
+  const suJob = (await j("POST", "/api/jobs", { searchKeyword: "Student Visa Consultants", location: "Ghaziabad" }, cu)).job;
+  await j("PATCH", `/api/jobs/${suJob.id}`, { status: "running" }, cu);
+  const su = [
+    ["Akash Overseas Education", "+91 90000 60001", "Plot 17, RDC, Raj Nagar, Ghaziabad - 201002", 4.6, 41, "akashoverseas.example.in"],
+    ["Grades Global Immigration", "+91 90000 60002", "A-7, Near Bank, Vaishali Sector 4, Ghaziabad - 201010", 5, 12, null],
+    ["Northstar Visa Services", "+91 90000 60003", "1315, Shipra Mall Road, Indirapuram, Ghaziabad - 201014", 4.3, 27, "northstarvisa.example.in"],
+    ["Pathway Study Abroad", "+91 90000 60004", "127, Shopping Plaza, Kaushambi, Ghaziabad - 201010", 3.5, 8, null],
+  ];
+  let sIdx = 0;
+  for (const [name, phone, address, rating, reviewCount, site] of su) {
+    sIdx++;
+    await j("POST", "/api/leads", {
+      jobId: suJob.id,
+      clientKey: `su:${sIdx}`,
+      lead: { name, category: "Student Visa Consultants", phone, website: site && `https://${site}`, address, city: "Ghaziabad", state: "Uttar Pradesh", country: "India", rating, reviewCount, searchKeyword: "Student Visa Consultants", source: "sulekha" },
+    }, cu);
+  }
+  await j("PATCH", `/api/jobs/${suJob.id}`, { status: "completed" }, cu);
+
   for (const [slug, name, headline, company] of [
     ["rahul-hr-demo", "Rahul Verma", "HR Manager at Acme Healthcare", "Acme Healthcare"],
     ["neha-ops-demo", "Neha Singh", "Operations Head | Hospital administration", "City Care Hospital"],
@@ -410,6 +430,7 @@ async function shoot(page) {
   await shot("21-billing", "/admin/billing");
   await shot("24-justdial-leads", "/admin/justdial");
   await shot("33-grotal-leads", "/admin/grotal");
+  await shot("34-sulekha-leads", "/admin/sulekha");
   const waChat = await page.evaluate(async () => (await (await fetch("/api/whatsapp/chats")).json()).items[0].id);
   await shot("25-whatsapp-chat", `/admin/whatsapp-chat?chat=${waChat}`);
   await shot("26-social-engagement", "/admin/engagement");

@@ -2,6 +2,17 @@ import type { CollectorSource } from "@platform/shared";
 import type { MapsPageState } from "../../utils/maps";
 
 export function PageStatus({ page, source }: { page: MapsPageState | null; source?: CollectorSource }) {
+  if (source === "sulekha") {
+    return (
+      <div className="page-status page-status--on">
+        <span className="dot" />
+        <div>
+          <strong>Sulekha mode</strong>
+          <p>START opens Sulekha in its own tab, finds the category for your keyword and reads every list page and business page by itself. A second tab with Google Maps is used only to find each business's website.</p>
+        </div>
+      </div>
+    );
+  }
   if (source === "grotal") {
     return (
       <div className="page-status page-status--on">

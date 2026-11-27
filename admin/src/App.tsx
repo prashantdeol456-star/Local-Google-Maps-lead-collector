@@ -62,6 +62,8 @@ function Routes({ admin }: { admin: Admin }) {
   if (path === "/justdial") return <JustdialLeadsPage />;
   if (path === "/grotal")
     return <LeadsPage key="grotal" source="grotal" title="Grotal Leads" emptyHint="Choose Grotal in the Maps Data Collector extension (Collect from: Grotal), type a keyword and a city, and press START." />;
+  if (path === "/sulekha")
+    return <LeadsPage key="sulekha" source="sulekha" title="Sulekha Leads" emptyHint="Choose Sulekha in the Maps Data Collector extension (Collect from: Sulekha), type the service and a city, and press START." />;
   if (path === "/whatsapp-chat") return <WhatsAppChatPage />;
   if (path === "/campaign-logs") return <CampaignLogsPage />;
   if (path === "/social") return <SocialAccountsPage />;

@@ -47,6 +47,7 @@ import {
   newJustdialRun,
 } from "./jobController";
 import { GrotalRunner } from "./grotalRunner";
+import { SulekhaRunner } from "./sulekhaRunner";
 import { JustdialRunner } from "./justdialRunner";
 import { checkLocalDuplicate } from "./localDedupe";
 import { SyncEngine, type SyncEvent } from "./sync";
@@ -185,14 +186,16 @@ const runnerDeps = {
 };
 const justdial = new JustdialRunner(runnerDeps);
 const grotal = new GrotalRunner(runnerDeps);
+const sulekha = new SulekhaRunner(runnerDeps);
 
-/** Jobs the background drives by itself (Justdial, Grotal): no Maps page needed. */
+/** Jobs the background drives by itself (Justdial, Grotal, Sulekha): no Maps page needed. */
 const isJustdial = (s: CollectorState) => isDirectorySource(s.jobSettings?.source);
 
-/** Runs the current Justdial or Grotal job (each runner only takes its own source). */
+/** Runs the current Justdial, Grotal or Sulekha job (each runner only takes its own source). */
 function runDirectory() {
   justdial.run().catch(console.error);
   grotal.run().catch(console.error);
+  sulekha.run().catch(console.error);
 }
 
 async function startJustdialJob(settings: CollectorSettings): Promise<MessageResponse<unknown>> {
@@ -211,7 +214,7 @@ async function startJustdialJob(settings: CollectorSettings): Promise<MessageRes
 
   // Shown to the user (they asked for Justdial or Grotal); the Google Maps look-up tab stays in the background.
   const tab = await chrome.tabs.create({ url: "about:blank", active: true });
-  if (tab.id === undefined) return { ok: false, error: `Could not open a ${settings.source === "grotal" ? "Grotal" : "Justdial"} tab` };
+  if (tab.id === undefined) return { ok: false, error: `Could not open a ${settings.source === "grotal" ? "Grotal" : settings.source === "sulekha" ? "Sulekha" : "Justdial"} tab` };
   const now = Date.now();
   let state = newJustdialRun({ ...current, queue: null }, settings, keywords[0]!, now, tab.id);
   await clearOtherProcessedKeys(state.runId);
@@ -662,7 +665,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
     if (isJustdial(state)) {
       // The background drives Justdial jobs: if Chrome restarted the background, carry on.
-      if (!justdial.isActive(state.runId) && !grotal.isActive(state.runId)) runDirectory();
+      if (!justdial.isActive(state.runId) && !grotal.isActive(state.runId) && !sulekha.isActive(state.runId)) runDirectory();
       return null;
     }
     const next = applyWatchdog(state);

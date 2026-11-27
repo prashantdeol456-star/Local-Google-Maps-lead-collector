@@ -32,7 +32,7 @@ export interface CollectorSettings {
   runInBackground?: boolean;
   /** Start the next queued search by itself when one finishes (on unless turned off). */
   autoNext?: boolean;
-  /** Where to collect: Google Maps (default), Justdial or Grotal. */
+  /** Where to collect: Google Maps (default), Justdial, Grotal or Sulekha. */
   source?: CollectorSource;
   /** Justdial: open every profile for address, website, photos… (on unless turned off). */
   jdOpenProfiles?: boolean;
@@ -46,12 +46,16 @@ export interface CollectorSettings {
   grOpenProfiles?: boolean;
   /** Grotal: look each business up on Google Maps for website and rating (on unless turned off). */
   grMatchMaps?: boolean;
+  /** Sulekha: open every business page for phone, full address, rating and contact person (on unless turned off). */
+  suOpenProfiles?: boolean;
+  /** Sulekha: look each business up on Google Maps for the website (on unless turned off). */
+  suMatchMaps?: boolean;
 }
 
-export type CollectorSource = "google_maps" | "justdial" | "grotal";
+export type CollectorSource = "google_maps" | "justdial" | "grotal" | "sulekha";
 
 /** Sources the extension's background drives by itself in their own tab (no Maps page needed). */
-export const isDirectorySource = (s: CollectorSource | undefined): s is "justdial" | "grotal" => s === "justdial" || s === "grotal";
+export const isDirectorySource = (s: CollectorSource | undefined): s is "justdial" | "grotal" | "sulekha" => s === "justdial" || s === "grotal" || s === "sulekha";
 
 /** "Show Number" presses per day at most (Justdial may ask to log in or block the account). */
 export const JD_SHOW_NUMBER_DAILY_LIMIT = 30;
@@ -108,6 +112,9 @@ export function validateCollectorSettings(s: CollectorSettings): SettingsErrors 
   // A pasted Grotal list address already contains the city.
   if (s.source === "grotal" && !s.location.trim() && !keywords.every((k) => /^https:\/\/www\.grotal\.com\//i.test(k))) {
     errors.location = "Grotal needs a city (e.g. Delhi), or paste a Grotal list address as the keyword";
+  }
+  if (s.source === "sulekha" && !s.location.trim() && !keywords.every((k) => /^https:\/\/www\.sulekha\.com\//i.test(k))) {
+    errors.location = "Sulekha needs a city (e.g. Delhi), or paste a Sulekha list address as the keyword";
   }
   return errors;
 }

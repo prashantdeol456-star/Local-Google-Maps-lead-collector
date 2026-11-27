@@ -90,7 +90,7 @@ export function CollectorPage({ backendStatus, onLogout, onRetry }: Props) {
         onChange={setSettings}
         onOpenSearch={openSearch}
       />
-      {isDirectorySource(active ? state.jobSettings?.source : settings.source) && <JdSpeedControl site={(active ? state.jobSettings?.source : settings.source) === "grotal" ? "Grotal" : "Justdial"} />}
+      {isDirectorySource(active ? state.jobSettings?.source : settings.source) && <JdSpeedControl site={({ grotal: "Grotal", sulekha: "Sulekha" } as const)[(active ? state.jobSettings?.source : settings.source) as "grotal" | "sulekha"] ?? "Justdial"} />}
 
       <Controls status={state.status} canStart={canStart} busy={busy} onCommand={run} />
       {error && (

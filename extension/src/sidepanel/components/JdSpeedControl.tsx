@@ -4,7 +4,7 @@ import { clampSpeed, JD_PACES, JD_SPEED_DEFAULT, JD_SPEED_KEY, loadJdSpeed, save
 // Slow ↔ Fast for Justdial and Grotal: how calmly the list is scrolled and business pages are opened.
 // Works while a job runs: the next scroll uses the new pace.
 
-export function JdSpeedControl({ site = "Justdial" }: { site?: "Justdial" | "Grotal" }) {
+export function JdSpeedControl({ site = "Justdial" }: { site?: "Justdial" | "Grotal" | "Sulekha" }) {
   const [speed, setSpeed] = useState<number>(JD_SPEED_DEFAULT);
 
   useEffect(() => {
@@ -39,8 +39,8 @@ export function JdSpeedControl({ site = "Justdial" }: { site?: "Justdial" | "Gro
           <small className="hint">Fast</small>
         </div>
         <small className="hint">
-          {site === "Grotal" ? (
-            <>{pace.profileDelay / 1000} s between pages (each list page has 20 businesses). You can change it while a job runs. Slower is kinder to Grotal and less likely to be blocked.</>
+          {site !== "Justdial" ? (
+            <>{pace.profileDelay / 1000} s between pages. You can change it while a job runs. Slower is kinder to {site} and less likely to be blocked.</>
           ) : (
             <>
               About {pace.per10} per 10 businesses while scrolling the list, then {pace.profileDelay / 1000} s between business pages. You can change it while a job runs. Slower is

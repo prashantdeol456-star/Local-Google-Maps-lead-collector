@@ -24,6 +24,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
   const query = buildSearchQuery(keywords[0] ?? "", settings.location);
   const justdial = settings.source === "justdial";
   const grotal = settings.source === "grotal";
+  const sulekha = settings.source === "sulekha";
   const [templates, setTemplates] = useState<{ id: string; name: string }[] | null>(null);
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
         <span className="fields__title">Collect from</span>
         <div className="fields__grid">
           <label className="check">
-            <input type="radio" name="source" checked={!justdial && !grotal} onChange={() => onChange({ ...settings, source: "google_maps" })} />
+            <input type="radio" name="source" checked={!justdial && !grotal && !sulekha} onChange={() => onChange({ ...settings, source: "google_maps" })} />
             Google Maps
           </label>
           <label className="check">
@@ -48,6 +49,10 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
             <input type="radio" name="source" checked={grotal} onChange={() => onChange({ ...settings, source: "grotal" })} />
             Grotal
           </label>
+          <label className="check">
+            <input type="radio" name="source" checked={sulekha} onChange={() => onChange({ ...settings, source: "sulekha" })} />
+            Sulekha
+          </label>
         </div>
       </div>
 
@@ -55,7 +60,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
         <span>Search Keyword</span>
         <textarea
           rows={2}
-          placeholder={grotal ? "Mobile Phone Dealers" : "University"}
+          placeholder={grotal ? "Mobile Phone Dealers" : sulekha ? "Student Visa Consultants" : "University"}
           value={settings.keyword}
           maxLength={2200}
           onChange={(e) => onChange({ ...settings, keyword: e.target.value })}
@@ -67,6 +72,8 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
             {keywords.length} searches will be queued
             {isOn(settings.autoNext) ? ", one after another by themselves" : "; you start each one"}: {keywords.join(" → ")}
           </small>
+        ) : sulekha ? (
+          <small className="hint">Tip: use Sulekha's own words for the service (e.g. “Visa Consultants”, “Interior Designers”); separate keywords with commas to queue searches, or paste a Sulekha list link as the keyword.</small>
         ) : grotal ? (
           <small className="hint">Tip: separate keywords with commas to queue several searches, or paste a Grotal list link (from grotal.com) as the keyword.</small>
         ) : (
@@ -75,7 +82,7 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
       </label>
 
       <label className="field">
-        <span>{justdial || grotal ? "City" : "Location"}</span>
+        <span>{justdial || grotal || sulekha ? "City" : "Location"}</span>
         <input
           type="text"
           placeholder="Lucknow"
@@ -99,7 +106,24 @@ export function SettingsForm({ settings, errors, disabled, onChange, onOpenSearc
         {errors.maxRecords && <small className="error">{errors.maxRecords}</small>}
       </label>
 
-      {grotal ? (
+      {sulekha ? (
+        <div className="fields">
+          <span className="fields__title">Sulekha</span>
+          <label className="check" title="Phone, full address, map position, rating and contact person from each business's Sulekha page. Sulekha shows the phone only there.">
+            <input type="checkbox" checked={isOn(settings.suOpenProfiles)} onChange={(e) => onChange({ ...settings, suOpenProfiles: e.target.checked })} />
+            Open each business page for phone and full address
+          </label>
+          {!isOn(settings.suOpenProfiles) && <small className="hint">Without the business pages Sulekha gives only name and area (no phone).</small>}
+          <label className="check" title="Finds the same business on Google Maps (in another background tab) for its website and map link.">
+            <input type="checkbox" checked={isOn(settings.suMatchMaps)} onChange={(e) => onChange({ ...settings, suMatchMaps: e.target.checked })} />
+            Add website from Google Maps
+          </label>
+          <small className="hint">
+            Opens Sulekha in its own tab, picks the closest Sulekha category for your keyword and reads its pages until Maximum Records; set the pace with the speed slider below. Sulekha's terms
+            forbid crawling it for business purposes and say it may claim damages, so use it at your own risk, at a slow pace. The job stops if Sulekha shows a block page.
+          </small>
+        </div>
+      ) : grotal ? (
         <div className="fields">
           <span className="fields__title">Grotal</span>
           <label className="check" title="Email and the full address from each business's Grotal page (most businesses do not list an email).">

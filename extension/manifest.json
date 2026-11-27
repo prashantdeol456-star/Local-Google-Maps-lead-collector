@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Maps Data Collector",
-  "version": "0.4.0",
-  "description": "Collects publicly visible Google Maps, Justdial and Grotal listing information into your lead database.",
+  "version": "0.5.0",
+  "description": "Collects publicly visible Google Maps, Justdial, Grotal and Sulekha listing information into your lead database.",
   "minimum_chrome_version": "116",
   "action": {
     "default_title": "Open Maps Data Collector"
@@ -75,6 +75,15 @@
       ],
       "js": [
         "src/content/grotal/index.ts"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.sulekha.com/*"
+      ],
+      "js": [
+        "src/content/sulekha/index.ts"
       ],
       "run_at": "document_idle"
     }
